@@ -58,6 +58,10 @@ model School {
   phone         String?
   email         String?
   logo          String?
+  motto         String?
+  website       String?
+  principalSignature String?
+  stampSeal     String?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -72,6 +76,9 @@ model School {
   feeStructures FeeStructure[]
   hostels       Hostel[]
   buses         Bus[]
+  teacherAssignments TeacherAssignment[]
+  termReportCards    TermReportCard[]
+  gradingScales      GradingScale[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -113,6 +120,7 @@ model User {
   sentMessages  Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   loginHistory  LoginHistory[]
+  teacherAssignments TeacherAssignment[]
 
   @@unique([email, tenantId])
   @@index([tenantId])
@@ -253,6 +261,7 @@ model Student {
   disciplinaryRecords DisciplinaryRecord[]
   documents       Document[]
   examAttempts    ExamAttempt[]
+  termReportCards TermReportCard[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
@@ -352,6 +361,7 @@ model Term {
   attendances Attendance[]
   results     Result[]
   examinations Examination[]
+  termReportCards TermReportCard[]
 
   @@unique([sessionId, name])
   @@index([sessionId])
@@ -370,6 +380,8 @@ model Class {
   school      School   @relation(fields: [schoolId], references: [id])
   classEnrollments ClassEnrollment[]
   timetableSlots TimetableSlot[]
+  teacherAssignments TeacherAssignment[]
+  termReportCards    TermReportCard[]
 
   @@unique([schoolId, name, section])
   @@index([schoolId])
@@ -405,6 +417,7 @@ model Subject {
   timetableSlots TimetableSlot[]
   results     Result[]
   questions   Question[]
+  teacherAssignments TeacherAssignment[]
 
   @@unique([schoolId, code])
 }
@@ -434,31 +447,118 @@ model Attendance {
 // ─── RESULTS ──────────────────────────────────────────────────────────────────
 
 model Result {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   studentId     String
   subjectId     String
   termId        String
-  ca1Score      Float?   @default(0)
-  ca2Score      Float?   @default(0)
-  examScore     Float?   @default(0)
-  totalScore    Float?   @default(0)
+  ca1Score      Float?       @default(0)
+  ca2Score      Float?       @default(0)
+  ca3Score      Float?       @default(0)
+  examScore     Float?       @default(0)
+  totalScore    Float?       @default(0)
   grade         String?
   position      Int?
   remark        String?
-  isApproved    Boolean  @default(false)
+  status        ResultStatus @default(DRAFT)
+  isApproved    Boolean      @default(false)
+  submittedBy   String?
+  submittedAt   DateTime?
   approvedBy    String?
   approvedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  isSynced      Boolean  @default(true)
+  publishedBy   String?
+  publishedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  isSynced      Boolean      @default(true)
 
-  student       Student  @relation(fields: [studentId], references: [id])
-  subject       Subject  @relation(fields: [subjectId], references: [id])
-  term          Term     @relation(fields: [termId], references: [id])
+  student       Student      @relation(fields: [studentId], references: [id])
+  subject       Subject      @relation(fields: [subjectId], references: [id])
+  term          Term         @relation(fields: [termId], references: [id])
 
   @@unique([studentId, subjectId, termId])
   @@index([studentId])
   @@index([termId])
+  @@index([status])
+}
+
+model TeacherAssignment {
+  id            String          @id @default(uuid())
+  schoolId      String
+  userId        String
+  classId       String
+  subjectId     String?
+  roleType      TeacherRoleType @default(SUBJECT_TEACHER)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  school        School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class         Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject       Subject?        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, classId, subjectId])
+  @@index([schoolId])
+  @@index([userId])
+  @@index([classId])
+}
+
+model TermReportCard {
+  id                    String       @id @default(uuid())
+  schoolId              String
+  studentId             String
+  termId                String
+  classId               String
+  attendanceDaysTotal   Int          @default(0)
+  attendanceDaysPresent Int          @default(0)
+  attendanceDaysAbsent  Int          @default(0)
+  classTeacherRemark    String?      @db.Text
+  principalRemark       String?      @db.Text
+  nextTermResumption    DateTime?
+  promotionStatus       String?
+  affectiveRatings      Json?
+  psychomotorRatings    Json?
+  totalScore            Float?       @default(0)
+  averageScore          Float?       @default(0)
+  position              Int?
+  classSize             Int?
+  status                ResultStatus @default(DRAFT)
+  submittedBy           String?
+  submittedAt           DateTime?
+  approvedBy            String?
+  approvedAt            DateTime?
+  publishedBy           String?
+  publishedAt           DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  school                School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student               Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term                  Term         @relation(fields: [termId], references: [id], onDelete: Cascade)
+  class                 Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, termId])
+  @@index([schoolId])
+  @@index([classId, termId])
+  @@index([status])
+}
+
+model GradingScale {
+  id          String   @id @default(uuid())
+  schoolId    String
+  name        String   @default("Default")
+  minScore    Float
+  maxScore    Float
+  grade       String
+  gradePoint  Float?
+  remark      String
+  isPass      Boolean  @default(true)
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
 }
 
 // ─── CBT EXAMINATIONS ─────────────────────────────────────────────────────────
@@ -1152,3 +1252,16 @@ enum SyncStatus {
   COMPLETED
   FAILED
 }
+
+enum ResultStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PUBLISHED
+}
+
+enum TeacherRoleType {
+  CLASS_MASTER
+  SUBJECT_TEACHER
+}
+

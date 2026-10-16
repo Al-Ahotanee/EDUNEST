@@ -90,12 +90,39 @@ export const financeApi = {
 
 // ─── Results ──────────────────────────────────────────────────────────────────
 export const resultsApi = {
+  matrix: (params: { classId: string; subjectId: string; termId: string }) =>
+    api.get('/results/matrix', { params }),
+  saveMatrix: (data: {
+    classId: string;
+    subjectId: string;
+    termId: string;
+    scores: any[];
+    submitForApproval?: boolean;
+  }) => api.post('/results/matrix/save', data),
+  myAssignments: () => api.get('/results/my-assignments'),
+  teacherAssignments: (userId?: string) =>
+    api.get('/results/teacher-assignments', { params: { userId } }),
+  assignTeacher: (data: any) => api.post('/results/teacher-assignments', data),
+  deleteTeacherAssignment: (id: string) => api.delete(`/results/teacher-assignments/${id}`),
+  pipeline: (termId: string) => api.get(`/results/pipeline/${termId}`),
+  approve: (data: { termId: string; classId?: string; subjectId?: string }) =>
+    api.post('/results/approve', data),
+  publish: (data: { termId: string; classId?: string; subjectId?: string }) =>
+    api.post('/results/publish', data),
+  unpublish: (data: { termId: string; classId: string; subjectId?: string; reason?: string }) =>
+    api.post('/results/unpublish', data),
+  broadsheet: (classId: string, termId: string) =>
+    api.get(`/results/broadsheet/${classId}/${termId}`),
+  reportCard: (studentId: string, termId: string) =>
+    api.get(`/results/report-card/student/${studentId}/term/${termId}`),
+  endorseReportCard: (data: any) => api.post('/results/report-card/endorse', data),
+  gradingScales: () => api.get('/results/grading-scales'),
+  updateGradingScale: (id: string, data: any) => api.put(`/results/grading-scales/${id}`, data),
+  stats: (termId: string) => api.get(`/results/statistics/term/${termId}`),
   enterScore: (data: any) => api.post('/results/score', data),
   bulkScores: (scores: any[]) => api.post('/results/bulk-score', { scores }),
-  classResults: (classId: string, termId: string) => api.get(`/results/class/${classId}/term/${termId}`),
-  reportCard: (studentId: string, termId: string) => api.get(`/results/report-card/student/${studentId}/term/${termId}`),
-  approve: (termId: string) => api.post(`/results/approve/term/${termId}`),
-  stats: (termId: string) => api.get(`/results/statistics/term/${termId}`),
+  classResults: (classId: string, termId: string) =>
+    api.get(`/results/class/${classId}/term/${termId}`),
 };
 
 // ─── Academic ─────────────────────────────────────────────────────────────────

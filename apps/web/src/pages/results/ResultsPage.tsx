@@ -1,372 +1,751 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, useFieldArray } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { Plus, Award, CheckCircle, FileText, TrendingUp, Upload } from 'lucide-react';
 import {
-  StatCard, DataTable, Button, Modal, Select, PageLoader, Card, Badge,
-} from '../../components/ui';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Cell,
+} from 'recharts';
+import {
+  Award,
+  CheckCircle,
+  FileText,
+  TrendingUp,
+  Table,
+  Layers,
+  ShieldCheck,
+  GraduationCap,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  UserCheck,
+} from 'lucide-react';
+import { StatCard, Button, Modal, Select, PageLoader, Card } from '../../components/ui';
 import { resultsApi, academicApi, studentsApi } from '../../services/api';
-import { getGradeColor, formatDate } from '../../lib/utils';
+import { useAuthStore } from '../../store/authStore';
+import { ScoreEntrySpreadsheet } from '../../components/results/ScoreEntrySpreadsheet';
+import { ClassBroadsheet } from '../../components/results/ClassBroadsheet';
+import { ApprovalPipelineTab } from '../../components/results/ApprovalPipelineTab';
+import { OfficialReportSheet } from '../../components/results/OfficialReportSheet';
+import { TeacherAssignmentsTab } from '../../components/results/TeacherAssignmentsTab';
 
 const GRADE_COLORS: Record<string, string> = {
-  'A+': '#059669', A: '#10b981', B: '#3b82f6', C: '#f59e0b', D: '#f97316', F: '#ef4444',
+  A1: '#059669',
+  B2: '#10b981',
+  B3: '#3b82f6',
+  C4: '#0ea5e9',
+  C5: '#f59e0b',
+  C6: '#f97316',
+  D7: '#eab308',
+  E8: '#fb923c',
+  F9: '#ef4444',
+  'A+': '#059669',
+  A: '#10b981',
+  B: '#3b82f6',
+  C: '#f59e0b',
+  D: '#f97316',
+  F: '#ef4444',
 };
 
 export default function ResultsPage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'entry' | 'analytics' | 'reportcard'>('entry');
-  const [scoreModal, setScoreModal] = useState(false);
+  const { user } = useAuthStore();
+
+  const isSuperAdmin = user?.isSuperAdmin;
+  const userRoles = (user?.roles || []).map((r) => r.name.toLowerCase());
+  const isSchoolAdmin =
+    isSuperAdmin ||
+    userRoles.some((n) =>
+      ['admin', 'school admin', 'principal', 'proprietor', 'director', 'head of school'].some((t) =>
+        n.includes(t),
+      ),
+    );
+
+  const [tab, setTab] = useState<'analytics' | 'matrix' | 'broadsheet' | 'pipeline' | 'reportcard' | 'assignments'>(
+    'matrix',
+  );
+
+  // Common filters
   const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
-  const [reportCard, setReportCard] = useState<any>(null);
-  const [reportLoading, setReportLoading] = useState(false);
 
-  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => academicApi.classes().then(r => r.data.data || []) });
-  const { data: subjectsData } = useQuery({ queryKey: ['subjects'], queryFn: () => academicApi.subjects().then(r => r.data.data || []) });
+  // Endorsement Modal State
+  const [endorseModalOpen, setEndorseModalOpen] = useState(false);
+  const [endorseForm, setEndorseForm] = useState<any>({
+    classTeacherRemark: '',
+    principalRemark: '',
+    attendanceDaysTotal: 110,
+    attendanceDaysPresent: 106,
+    attendanceDaysAbsent: 4,
+    nextTermResumption: '',
+    promotionStatus: 'PROMOTED',
+    affectiveRatings: {
+      punctuality: 5,
+      neatness: 5,
+      politeness: 5,
+      honesty: 4,
+      leadership: 4,
+      attentiveness: 5,
+      cooperation: 5,
+      emotionalStability: 4,
+    },
+    psychomotorRatings: {
+      handwriting: 4,
+      sports: 4,
+      crafts: 4,
+      publicSpeaking: 4,
+      toolsHandling: 4,
+    },
+  });
 
-  const { data: sessionsData } = useQuery({ queryKey: ['sessions'], queryFn: () => academicApi.sessions().then(r => r.data.data || []) });
-  const currentSession = sessionsData?.find((s: any) => s.isCurrent) || sessionsData?.[0];
+  // Queries
+  const { data: classesData = [] } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => academicApi.classes().then((r) => r.data.data || []),
+  });
 
-  const { data: termsData } = useQuery({
+  const { data: subjectsData = [] } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => academicApi.subjects().then((r) => r.data.data || []),
+  });
+
+  const { data: sessionsData = [] } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: () => academicApi.sessions().then((r) => r.data.data || []),
+  });
+  const currentSession = sessionsData.find((s: any) => s.isCurrent) || sessionsData[0];
+
+  const { data: termsData = [] } = useQuery({
     queryKey: ['terms', currentSession?.id],
-    queryFn: () => academicApi.terms(currentSession.id).then(r => r.data.data || []),
+    queryFn: () => academicApi.terms(currentSession.id).then((r) => r.data.data || []),
     enabled: !!currentSession?.id,
   });
-  const currentTerm = termsData?.find((t: any) => t.isCurrent) || termsData?.[0];
+  const currentTerm = termsData.find((t: any) => t.isCurrent) || termsData[0];
 
-  const { data: classResults, isLoading: loadingResults } = useQuery({
-    queryKey: ['class-results', selectedClass, selectedTerm || currentTerm?.id],
-    queryFn: () => resultsApi.classResults(selectedClass, selectedTerm || currentTerm?.id).then(r => r.data.data),
-    enabled: !!(selectedClass && (selectedTerm || currentTerm?.id)),
-  });
+  // Auto-select defaults
+  React.useEffect(() => {
+    if (!selectedTerm && currentTerm?.id) setSelectedTerm(currentTerm.id);
+    if (!selectedClass && classesData[0]?.id) setSelectedClass(classesData[0].id);
+    if (!selectedSubject && subjectsData[0]?.id) setSelectedSubject(subjectsData[0].id);
+  }, [currentTerm, classesData, subjectsData, selectedTerm, selectedClass, selectedSubject]);
 
+  // Overall Statistics Query
   const { data: resultStats } = useQuery({
     queryKey: ['result-stats', selectedTerm || currentTerm?.id],
-    queryFn: () => resultsApi.stats(selectedTerm || currentTerm?.id).then(r => r.data.data),
+    queryFn: () => resultsApi.stats(selectedTerm || currentTerm?.id).then((r) => r.data.data),
     enabled: !!(selectedTerm || currentTerm?.id),
   });
 
-  const { data: studentsData } = useQuery({ queryKey: ['students-for-results'], queryFn: () => studentsApi.list({ limit: 200 }).then(r => r.data.data || []), enabled: scoreModal });
-
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
-    defaultValues: { studentId: '', termId: '', scores: [{ subjectId: '', ca1Score: 0, ca2Score: 0, examScore: 0 }] },
-  });
-  const { fields, append, remove } = useFieldArray({ control, name: 'scores' });
-
-  const enterScoreMutation = useMutation({
-    mutationFn: (data: any) => {
-      const scores = data.scores.map((s: any) => ({ ...s, studentId: data.studentId, termId: data.termId || currentTerm?.id }));
-      return resultsApi.bulkScores(scores);
-    },
-    onSuccess: () => {
-      toast.success('Scores entered successfully!');
-      queryClient.invalidateQueries({ queryKey: ['class-results'] });
-      queryClient.invalidateQueries({ queryKey: ['result-stats'] });
-      setScoreModal(false);
-      reset();
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to enter scores'),
+  // Students in selected class (for report card student selector)
+  const { data: classEnrollments = [] } = useQuery({
+    queryKey: ['class-enrollments', selectedClass],
+    queryFn: () =>
+      resultsApi
+        .matrix({ classId: selectedClass, subjectId: selectedSubject || subjectsData[0]?.id || '', termId: selectedTerm || currentTerm?.id })
+        .then((r) => r.data.data?.students || []),
+    enabled: !!(selectedClass && (selectedTerm || currentTerm?.id)),
   });
 
-  const approveMutation = useMutation({
-    mutationFn: (termId: string) => resultsApi.approve(termId),
-    onSuccess: () => { toast.success('Results approved!'); queryClient.invalidateQueries({ queryKey: ['class-results'] }); },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
-  });
-
-  const loadReportCard = async () => {
-    if (!selectedStudent || !(selectedTerm || currentTerm?.id)) {
-      toast.error('Select a student and term');
-      return;
+  // Auto-select student for report card
+  React.useEffect(() => {
+    if (classEnrollments.length > 0 && !selectedStudent) {
+      setSelectedStudent(classEnrollments[0].studentId);
     }
-    setReportLoading(true);
-    try {
-      const res = await resultsApi.reportCard(selectedStudent, selectedTerm || currentTerm?.id);
-      setReportCard(res.data.data);
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Failed to load report card');
-    } finally {
-      setReportLoading(false);
+  }, [classEnrollments, selectedStudent]);
+
+  // Report Card Query
+  const { data: reportCardData, isLoading: loadingReportCard, refetch: refetchReportCard } = useQuery({
+    queryKey: ['report-card', selectedStudent, selectedTerm || currentTerm?.id],
+    queryFn: () =>
+      resultsApi
+        .reportCard(selectedStudent, selectedTerm || currentTerm?.id)
+        .then((r) => r.data.data),
+    enabled: !!(selectedStudent && (selectedTerm || currentTerm?.id)),
+  });
+
+  // Populate Endorse Form when report card loads
+  const handleOpenEndorse = () => {
+    if (reportCardData) {
+      setEndorseForm({
+        classTeacherRemark: reportCardData.endorsements?.classTeacherRemark || '',
+        principalRemark: reportCardData.endorsements?.principalRemark || '',
+        attendanceDaysTotal: reportCardData.attendance?.daysOpened || 110,
+        attendanceDaysPresent: reportCardData.attendance?.daysPresent || 106,
+        attendanceDaysAbsent: reportCardData.attendance?.daysAbsent || 4,
+        nextTermResumption: reportCardData.endorsements?.nextTermResumption || '',
+        promotionStatus: reportCardData.academicSummary?.promotionStatus || 'PROMOTED',
+        affectiveRatings: reportCardData.affectiveDomain || {
+          punctuality: 5,
+          neatness: 5,
+          politeness: 5,
+          honesty: 4,
+          leadership: 4,
+          attentiveness: 5,
+          cooperation: 5,
+          emotionalStability: 4,
+        },
+        psychomotorRatings: reportCardData.psychomotorDomain || {
+          handwriting: 4,
+          sports: 4,
+          crafts: 4,
+          publicSpeaking: 4,
+          toolsHandling: 4,
+        },
+      });
+    }
+    setEndorseModalOpen(true);
+  };
+
+  // Endorse Mutation
+  const endorseMutation = useMutation({
+    mutationFn: (data: any) =>
+      resultsApi.endorseReportCard({
+        studentId: selectedStudent,
+        termId: selectedTerm || currentTerm?.id,
+        classId: selectedClass,
+        ...data,
+      }),
+    onSuccess: () => {
+      toast.success('Report card remarks and holistic ratings saved successfully!');
+      queryClient.invalidateQueries({ queryKey: ['report-card', selectedStudent] });
+      queryClient.invalidateQueries({ queryKey: ['class-broadsheet'] });
+      setEndorseModalOpen(false);
+      refetchReportCard();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to save endorsements'),
+  });
+
+  // Quick Student Navigation in Report Card view
+  const currentStudentIndex = classEnrollments.findIndex((s: any) => s.studentId === selectedStudent);
+  const handlePrevStudent = () => {
+    if (currentStudentIndex > 0) {
+      setSelectedStudent(classEnrollments[currentStudentIndex - 1].studentId);
+    }
+  };
+  const handleNextStudent = () => {
+    if (currentStudentIndex < classEnrollments.length - 1) {
+      setSelectedStudent(classEnrollments[currentStudentIndex + 1].studentId);
     }
   };
 
-  const resultColumns = [
-    { key: 'position', header: '#', render: (r: any) => <span className="font-bold text-slate-900 w-8 text-center inline-block">{r.position}</span> },
-    { key: 'name', header: 'Student', render: (r: any) => <span className="font-semibold">{r.name}</span> },
-    { key: 'admissionNumber', header: 'Adm. No.', render: (r: any) => <span className="text-slate-500">{r.admissionNumber}</span> },
-    { key: 'subjects', header: 'Subjects', render: (r: any) => <span>{r.subjects?.length || 0}</span> },
-    { key: 'totalScore', header: 'Total', render: (r: any) => <span className="font-bold">{r.totalScore?.toFixed(1)}</span> },
-    { key: 'averageScore', header: 'Average', render: (r: any) => <span className="font-bold">{r.averageScore?.toFixed(1)}%</span> },
-    { key: 'grade', header: 'Grade', render: (r: any) => <span className={`font-bold text-base ${getGradeColor(r.grade)}`}>{r.grade}</span> },
-  ];
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div>
-          <h1 className="page-title">Results Management</h1>
-          <p className="page-subtitle">Score entry, report cards & performance analytics</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+            <GraduationCap className="text-blue-600" size={28} />
+            Result Management & Terminal Broadsheets
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Institutional examination grading, approval pipeline, master broadsheets, and official printable report cards.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" icon={<CheckCircle size={16} />}
-            onClick={() => approveMutation.mutate(selectedTerm || currentTerm?.id)}
-            loading={approveMutation.isPending}
-            disabled={!(selectedTerm || currentTerm?.id)}>
-            Approve Results
-          </Button>
-          <Button icon={<Plus size={16} />} onClick={() => setScoreModal(true)}>
-            Enter Scores
-          </Button>
+
+        {/* Global Term Badge */}
+        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm text-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-slate-500 font-medium">Session:</span>
+          <span className="font-bold text-slate-800">{currentSession?.name || '—'}</span>
+          <span className="text-slate-300">•</span>
+          <span className="text-slate-500 font-medium">Term:</span>
+          <span className="font-bold text-slate-800">{currentTerm?.name || '—'}</span>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Entries" value={(resultStats?.total || 0).toLocaleString()} icon={<FileText size={20} />} color="blue" />
-        <StatCard title="Passed" value={(resultStats?.passed || 0).toLocaleString()} subtitle={`${resultStats?.passRate || 0}% pass rate`} icon={<CheckCircle size={20} />} color="green" />
-        <StatCard title="Failed" value={(resultStats?.failed || 0).toLocaleString()} icon={<Award size={20} />} color="red" />
-        <StatCard title="Avg Score" value={`${resultStats?.averageScore || 0}%`} icon={<TrendingUp size={20} />} color="purple" />
-      </div>
+      {/* Navigation Tabs Bar */}
+      <div className="flex flex-wrap items-center gap-1 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm print:hidden">
+        <button
+          onClick={() => setTab('matrix')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            tab === 'matrix' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Table size={15} />
+          Score Entry Grid
+        </button>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['entry', 'analytics', 'reportcard'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            {t === 'reportcard' ? 'Report Card' : t.charAt(0).toUpperCase() + t.slice(1)}
+        <button
+          onClick={() => setTab('broadsheet')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            tab === 'broadsheet' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Layers size={15} />
+          Class Broadsheet
+        </button>
+
+        <button
+          onClick={() => setTab('reportcard')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            tab === 'reportcard' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <FileText size={15} />
+          Official Report Sheet
+        </button>
+
+        {isSchoolAdmin && (
+          <button
+            onClick={() => setTab('pipeline')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              tab === 'pipeline' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldCheck size={15} />
+            Approval Pipeline
           </button>
-        ))}
+        )}
+
+        <button
+          onClick={() => setTab('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            tab === 'analytics' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <TrendingUp size={15} />
+          Analytics & Distribution
+        </button>
+
+        {isSchoolAdmin && (
+          <button
+            onClick={() => setTab('assignments')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              tab === 'assignments' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <UserCheck size={15} />
+            Teacher Assignments
+          </button>
+        )}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <Select
-          options={(classesData || []).map((c: any) => ({ value: c.id, label: c.name }))}
-          placeholder="Select Class"
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="w-44 py-2 text-sm"
-        />
-        <Select
-          options={(termsData || []).map((t: any) => ({ value: t.id, label: `${t.name} — ${currentSession?.name}` }))}
-          placeholder="Select Term"
-          value={selectedTerm}
-          onChange={(e) => setSelectedTerm(e.target.value)}
-          className="w-56 py-2 text-sm"
-        />
-      </div>
-
-      {/* Score Entry Tab */}
-      {tab === 'entry' && (
-        <DataTable
-          data={classResults || []}
-          columns={resultColumns}
-          loading={loadingResults}
-          emptyMessage="Select a class and term to view results, or enter scores."
+      {/* ─── TAB 1: SPREADSHEET MATRIX SCORE ENTRY ────────────────────────────── */}
+      {tab === 'matrix' && (
+        <ScoreEntrySpreadsheet
+          classes={classesData}
+          subjects={subjectsData}
+          terms={termsData}
+          selectedClass={selectedClass}
+          selectedSubject={selectedSubject}
+          selectedTerm={selectedTerm}
+          onClassChange={setSelectedClass}
+          onSubjectChange={setSelectedSubject}
+          onTermChange={setSelectedTerm}
+          isPrivileged={isSchoolAdmin}
         />
       )}
 
-      {/* Analytics Tab */}
-      {tab === 'analytics' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="card p-6">
-            <h3 className="font-bold text-slate-900 mb-6">Grade Distribution</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={resultStats?.gradeDistribution || []} barSize={36}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="grade" tick={{ fontSize: 13, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="count" name="Students" radius={[6, 6, 0, 0]}>
-                  {(resultStats?.gradeDistribution || []).map((entry: any) => (
-                    <Cell key={entry.grade} fill={GRADE_COLORS[entry.grade] || '#94a3b8'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="card p-6 space-y-4">
-            <h3 className="font-bold text-slate-900">Performance Summary</h3>
-            {(resultStats?.gradeDistribution || []).map((g: any) => (
-              <div key={g.grade} className="flex items-center gap-3">
-                <span className={`w-8 text-sm font-bold ${getGradeColor(g.grade)}`}>{g.grade}</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-2.5">
-                  <div
-                    className="h-2.5 rounded-full transition-all"
-                    style={{
-                      width: resultStats?.total ? `${(g.count / resultStats.total) * 100}%` : '0%',
-                      backgroundColor: GRADE_COLORS[g.grade] || '#94a3b8',
-                    }}
-                  />
-                </div>
-                <span className="text-sm font-semibold text-slate-700 w-8 text-right">{g.count}</span>
-              </div>
-            ))}
-            <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-3 text-sm">
-              <div className="text-center p-3 bg-emerald-50 rounded-xl">
-                <p className="text-xl font-bold text-emerald-600">{resultStats?.passRate || 0}%</p>
-                <p className="text-slate-500 text-xs">Pass Rate</p>
-              </div>
-              <div className="text-center p-3 bg-blue-50 rounded-xl">
-                <p className="text-xl font-bold text-blue-600">{resultStats?.averageScore || 0}%</p>
-                <p className="text-slate-500 text-xs">Class Average</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ─── TAB 2: CLASS BROADSHEET ──────────────────────────────────────────── */}
+      {tab === 'broadsheet' && (
+        <ClassBroadsheet
+          classes={classesData}
+          terms={termsData}
+          selectedClass={selectedClass}
+          selectedTerm={selectedTerm}
+          onClassChange={setSelectedClass}
+          onTermChange={setSelectedTerm}
+        />
       )}
 
-      {/* Report Card Tab */}
+      {/* ─── TAB 3: OFFICIAL REPORT CARD ──────────────────────────────────────── */}
       {tab === 'reportcard' && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <Select
-              options={(studentsData || []).map((s: any) => ({ value: s.id, label: `${s.firstName} ${s.lastName} (${s.admissionNumber})` }))}
-              placeholder="Select Student"
-              value={selectedStudent}
-              onChange={(e) => setSelectedStudent(e.target.value)}
-              className="w-72 py-2 text-sm"
-            />
-            <Button onClick={loadReportCard} loading={reportLoading} icon={<FileText size={16} />}>
-              Generate Report Card
-            </Button>
-          </div>
-
-          {reportCard && (
-            <div className="card overflow-hidden">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold">{reportCard.student?.firstName} {reportCard.student?.lastName}</h2>
-                    <p className="text-blue-200 text-sm mt-1">{reportCard.student?.admissionNumber} • Class: {reportCard.student?.class || '—'}</p>
-                    <p className="text-blue-200 text-sm">{reportCard.term?.name} — {reportCard.term?.session}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-5xl font-black ${reportCard.summary.grade === 'F' ? 'text-red-300' : 'text-white'}`}>
-                      {reportCard.summary.grade}
-                    </div>
-                    <p className="text-blue-200 text-sm mt-1">{reportCard.summary.remark}</p>
-                  </div>
-                </div>
+          {/* Student Selector Bar */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3 print:hidden">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-48">
+                <Select
+                  label="Class"
+                  value={selectedClass}
+                  onChange={(e) => {
+                    setSelectedClass(e.target.value);
+                    setSelectedStudent('');
+                  }}
+                  options={classesData.map((c: any) => ({
+                    value: c.id,
+                    label: `${c.name} ${c.section ? `(${c.section})` : ''}`,
+                  }))}
+                />
               </div>
 
-              {/* Summary Bar */}
-              <div className="grid grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">
-                {[
-                  { label: 'Total Score', value: reportCard.summary.totalScore?.toFixed(1) },
-                  { label: 'Average', value: `${reportCard.summary.averageScore?.toFixed(1)}%` },
-                  { label: 'Position', value: reportCard.summary.position ? `${reportCard.summary.position}/${reportCard.summary.classSize}` : '—' },
-                  { label: 'Subjects', value: reportCard.summary.totalSubjects },
-                ].map((s) => (
-                  <div key={s.label} className="p-4 text-center">
-                    <p className="text-lg font-bold text-slate-900">{s.value}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{s.label}</p>
-                  </div>
-                ))}
+              <div className="w-44">
+                <Select
+                  label="Term"
+                  value={selectedTerm}
+                  onChange={(e) => setSelectedTerm(e.target.value)}
+                  options={termsData.map((t: any) => ({
+                    value: t.id,
+                    label: t.name,
+                  }))}
+                />
               </div>
 
-              {/* Scores Table */}
-              <div className="p-6">
-                <h3 className="font-bold text-slate-900 mb-4">Subject Scores</h3>
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Subject</th>
-                      <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase">CA1</th>
-                      <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase">CA2</th>
-                      <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Exam</th>
-                      <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Total</th>
-                      <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Grade</th>
-                      <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Remark</th>
-                      <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Pos.</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {reportCard.results.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-slate-50">
-                        <td className="py-3 px-3 font-medium text-slate-800">{r.subject?.name}</td>
-                        <td className="py-3 px-3 text-center text-slate-600">{r.ca1Score ?? '—'}</td>
-                        <td className="py-3 px-3 text-center text-slate-600">{r.ca2Score ?? '—'}</td>
-                        <td className="py-3 px-3 text-center text-slate-600">{r.examScore ?? '—'}</td>
-                        <td className="py-3 px-3 text-center font-bold text-slate-900">{r.totalScore?.toFixed(1)}</td>
-                        <td className="py-3 px-3 text-center">
-                          <span className={`font-bold ${getGradeColor(r.grade)}`}>{r.grade}</span>
-                        </td>
-                        <td className="py-3 px-3 text-sm text-slate-500">{r.remark}</td>
-                        <td className="py-3 px-3 text-center text-slate-500">{r.position ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="px-6 pb-6 flex justify-end">
-                <Button variant="secondary" icon={<FileText size={16} />} onClick={() => window.print()}>
-                  Print Report Card
-                </Button>
+              <div className="w-64">
+                <Select
+                  label="Select Student"
+                  value={selectedStudent}
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  options={classEnrollments.map((s: any) => ({
+                    value: s.studentId,
+                    label: `${s.name} (${s.admissionNumber})`,
+                  }))}
+                  placeholder="Select Student..."
+                />
               </div>
             </div>
+
+            {/* Prev / Next Student Pagination Buttons */}
+            {classEnrollments.length > 0 && (
+              <div className="flex items-center gap-1.5 pt-4">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={currentStudentIndex <= 0}
+                  onClick={handlePrevStudent}
+                  icon={<ChevronLeft size={14} />}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-slate-500 font-mono px-2">
+                  {currentStudentIndex + 1} / {classEnrollments.length}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={currentStudentIndex >= classEnrollments.length - 1}
+                  onClick={handleNextStudent}
+                >
+                  Next
+                  <ChevronRight size={14} />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {!selectedStudent ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 italic">
+              Please select a class and student to generate their official report card.
+            </div>
+          ) : loadingReportCard ? (
+            <PageLoader />
+          ) : (
+            <OfficialReportSheet
+              data={reportCardData}
+              canEndorse={isSchoolAdmin}
+              onEndorse={handleOpenEndorse}
+            />
           )}
         </div>
       )}
 
-      {/* Score Entry Modal */}
-      <Modal open={scoreModal} onClose={() => { setScoreModal(false); reset(); }} title="Enter Student Scores" size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => { setScoreModal(false); reset(); }}>Cancel</Button>
-            <Button loading={enterScoreMutation.isPending} onClick={handleSubmit((d) => enterScoreMutation.mutate(d))}>
-              Save Scores
-            </Button>
-          </>
-        }>
-        <form className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Select label="Student" {...register('studentId', { required: 'Required' })}
-              options={(studentsData || []).map((s: any) => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }))}
-              placeholder="Select student" error={errors.studentId?.message} />
-            <Select label="Term" {...register('termId')}
-              options={(termsData || []).map((t: any) => ({ value: t.id, label: t.name }))}
-              placeholder="Current term" />
+      {/* ─── TAB 4: APPROVAL PIPELINE ─────────────────────────────────────────── */}
+      {tab === 'pipeline' && isSchoolAdmin && (
+        <ApprovalPipelineTab
+          terms={termsData}
+          selectedTerm={selectedTerm}
+          onTermChange={setSelectedTerm}
+          onViewBroadsheet={(clsId) => {
+            setSelectedClass(clsId);
+            setTab('broadsheet');
+          }}
+        />
+      )}
+
+      {/* ─── TAB 5: ANALYTICS & GRADE DISTRIBUTION ────────────────────────────── */}
+      {tab === 'analytics' && (
+        <div className="space-y-6">
+          {/* Top KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Total Recorded Scores"
+              value={resultStats?.total?.toLocaleString() ?? 0}
+              icon={<Award size={20} />}
+              color="blue"
+            />
+            <StatCard
+              title="Overall Pass Rate"
+              value={`${resultStats?.passRate ?? 0}%`}
+              icon={<CheckCircle size={20} />}
+              color="green"
+            />
+            <StatCard
+              title="Average School Mark"
+              value={`${resultStats?.averageScore ?? 0}%`}
+              icon={<TrendingUp size={20} />}
+              color="purple"
+            />
+            <StatCard
+              title="Passed Students"
+              value={resultStats?.passed?.toLocaleString() ?? 0}
+              subtitle={`${resultStats?.failed ?? 0} students below 50%`}
+              icon={<FileText size={20} />}
+              color="orange"
+            />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="label mb-0">Subject Scores</label>
-              <Button variant="secondary" size="sm" icon={<Plus size={14} />}
-                onClick={() => append({ subjectId: '', ca1Score: 0, ca2Score: 0, examScore: 0 })}>
-                Add Subject
-              </Button>
+          {/* Grade Distribution Rechart */}
+          <Card title="Grade Distribution Analysis" subtitle="Standard letter grade frequency across all subjects">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={resultStats?.gradeDistribution || []} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="grade" stroke="#94a3b8" tick={{ fontSize: 12 }} />
+                  <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(v: any) => [`${v} students`, 'Count']}
+                    contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {(resultStats?.gradeDistribution || []).map((entry: any) => (
+                      <Cell key={entry.grade} fill={GRADE_COLORS[entry.grade] || '#2563eb'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ─── TAB 6: TEACHER ASSIGNMENTS ───────────────────────────────────────── */}
+      {tab === 'assignments' && isSchoolAdmin && (
+        <TeacherAssignmentsTab classes={classesData} subjects={subjectsData} />
+      )}
+
+      {/* ─── ENDORSEMENT MODAL (REMARKS & HOLISTIC RATINGS) ───────────────────── */}
+      {endorseModalOpen && (
+        <Modal
+          open={endorseModalOpen}
+          onClose={() => setEndorseModalOpen(false)}
+          title={`Endorse Report Card: ${reportCardData?.student?.fullName}`}
+          size="lg"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setEndorseModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={endorseMutation.isPending}
+                onClick={() => endorseMutation.mutate(endorseForm)}
+              >
+                Save Endorsements
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-5 text-xs text-slate-800 max-h-[70vh] overflow-y-auto pr-1">
+            {/* Remarks Section */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b pb-1">
+                Formal Remarks & Decision
+              </h4>
+
+              <div>
+                <label className="label">Class Master&apos;s Remark</label>
+                <textarea
+                  rows={2}
+                  className="input text-xs w-full p-2"
+                  value={endorseForm.classTeacherRemark}
+                  onChange={(e) =>
+                    setEndorseForm({ ...endorseForm, classTeacherRemark: e.target.value })
+                  }
+                  placeholder="e.g. Excellent conduct and focused academic diligence."
+                />
+              </div>
+
+              {isSchoolAdmin && (
+                <div>
+                  <label className="label">Principal / Head of School&apos;s Remark</label>
+                  <textarea
+                    rows={2}
+                    className="input text-xs w-full p-2"
+                    value={endorseForm.principalRemark}
+                    onChange={(e) =>
+                      setEndorseForm({ ...endorseForm, principalRemark: e.target.value })
+                    }
+                    placeholder="e.g. Approved. Promoted to SS2 on merit of outstanding cumulative performance."
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <Select
+                  label="Promotion / Academic Status"
+                  value={endorseForm.promotionStatus}
+                  onChange={(e) =>
+                    setEndorseForm({ ...endorseForm, promotionStatus: e.target.value })
+                  }
+                  options={[
+                    { value: 'PROMOTED', label: 'Promoted to Next Class' },
+                    { value: 'PROMOTED_ON_TRIAL', label: 'Promoted on Trial' },
+                    { value: 'REPEAT', label: 'To Repeat Class' },
+                    { value: 'PENDING', label: 'Pending Terminal Review' },
+                  ]}
+                />
+
+                <div>
+                  <label className="label">Next Term Resumption Date</label>
+                  <input
+                    type="date"
+                    className="input text-xs w-full p-2"
+                    value={
+                      endorseForm.nextTermResumption
+                        ? new Date(endorseForm.nextTermResumption).toISOString().split('T')[0]
+                        : ''
+                    }
+                    onChange={(e) =>
+                      setEndorseForm({ ...endorseForm, nextTermResumption: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Attendance Days */}
             <div className="space-y-2">
-              {fields.map((field, i) => (
-                <div key={field.id} className="grid grid-cols-5 gap-2 items-center">
-                  <div className="col-span-2">
-                    <select className="input text-sm py-2" {...register(`scores.${i}.subjectId`)}>
-                      <option value="">Subject</option>
-                      {(subjectsData || []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b pb-1">
+                Attendance Record
+              </h4>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="label">Days Opened</label>
+                  <input
+                    type="number"
+                    className="input text-xs w-full p-2"
+                    value={endorseForm.attendanceDaysTotal}
+                    onChange={(e) =>
+                      setEndorseForm({
+                        ...endorseForm,
+                        attendanceDaysTotal: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Days Present</label>
+                  <input
+                    type="number"
+                    className="input text-xs w-full p-2"
+                    value={endorseForm.attendanceDaysPresent}
+                    onChange={(e) =>
+                      setEndorseForm({
+                        ...endorseForm,
+                        attendanceDaysPresent: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Days Absent</label>
+                  <input
+                    type="number"
+                    className="input text-xs w-full p-2"
+                    value={endorseForm.attendanceDaysAbsent}
+                    onChange={(e) =>
+                      setEndorseForm({
+                        ...endorseForm,
+                        attendanceDaysAbsent: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Affective Domain Ratings */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b pb-1 flex justify-between items-center">
+                <span>Affective Domain Ratings</span>
+                <span className="text-[10px] text-slate-500 font-normal">Scale: 1 to 5</span>
+              </h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  { key: 'punctuality', label: 'Punctuality' },
+                  { key: 'neatness', label: 'Neatness & Bearing' },
+                  { key: 'politeness', label: 'Politeness & Courtesy' },
+                  { key: 'honesty', label: 'Honesty & Integrity' },
+                  { key: 'leadership', label: 'Leadership' },
+                  { key: 'attentiveness', label: 'Attentiveness' },
+                  { key: 'cooperation', label: 'Cooperation' },
+                  { key: 'emotionalStability', label: 'Emotional Stability' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-slate-600">{label}:</span>
+                    <select
+                      className="input py-1 px-2 text-xs w-16"
+                      value={endorseForm.affectiveRatings?.[key] ?? 5}
+                      onChange={(e) =>
+                        setEndorseForm({
+                          ...endorseForm,
+                          affectiveRatings: {
+                            ...endorseForm.affectiveRatings,
+                            [key]: parseInt(e.target.value),
+                          },
+                        })
+                      }
+                    >
+                      {[5, 4, 3, 2, 1].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                  <input className="input text-sm py-2 text-center" type="number" placeholder="CA1" {...register(`scores.${i}.ca1Score`, { valueAsNumber: true })} min={0} max={30} />
-                  <input className="input text-sm py-2 text-center" type="number" placeholder="CA2" {...register(`scores.${i}.ca2Score`, { valueAsNumber: true })} min={0} max={30} />
-                  <div className="flex gap-2">
-                    <input className="input text-sm py-2 text-center flex-1" type="number" placeholder="Exam" {...register(`scores.${i}.examScore`, { valueAsNumber: true })} min={0} max={40} />
-                    {fields.length > 1 && (
-                      <button type="button" onClick={() => remove(i)} className="text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-            <p className="text-xs text-slate-400 mt-2">CA1 (30) + CA2 (30) + Exam (40) = 100</p>
+
+            {/* Psychomotor Domain Ratings */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b pb-1 flex justify-between items-center">
+                <span>Psychomotor Domain Ratings</span>
+                <span className="text-[10px] text-slate-500 font-normal">Scale: 1 to 5</span>
+              </h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  { key: 'handwriting', label: 'Handwriting' },
+                  { key: 'sports', label: 'Sports & Games' },
+                  { key: 'crafts', label: 'Crafts & Arts' },
+                  { key: 'publicSpeaking', label: 'Speaking / Fluency' },
+                  { key: 'toolsHandling', label: 'Handling Tools' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-slate-600">{label}:</span>
+                    <select
+                      className="input py-1 px-2 text-xs w-16"
+                      value={endorseForm.psychomotorRatings?.[key] ?? 4}
+                      onChange={(e) =>
+                        setEndorseForm({
+                          ...endorseForm,
+                          psychomotorRatings: {
+                            ...endorseForm.psychomotorRatings,
+                            [key]: parseInt(e.target.value),
+                          },
+                        })
+                      }
+                    >
+                      {[5, 4, 3, 2, 1].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </form>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 }

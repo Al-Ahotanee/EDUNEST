@@ -101,7 +101,7 @@ export class ParentService {
     const studentIds = guardians.map(g => g.studentId);
 
     const results = await this.prisma.result.findMany({
-      where: { studentId: { in: studentIds } },
+      where: { studentId: { in: studentIds }, status: 'PUBLISHED' },
       include: {
         student: { select: { firstName: true, lastName: true, admissionNumber: true } },
         subject: { select: { name: true, code: true } },
