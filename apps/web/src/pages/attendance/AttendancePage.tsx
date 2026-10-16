@@ -1,27 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ClipboardCheck, Save, Users, TrendingDown } from 'lucide-react';
+import {
+  ClipboardCheck, Save, Users, TrendingDown, ChevronLeft, ChevronRight,
+  Calendar, Download, Printer, CheckCircle2, Clock, Check, X
+} from 'lucide-react';
 import { StatCard, Button, Select, PageLoader, Badge } from '../../components/ui';
 import { attendanceApi, academicApi, studentsApi } from '../../services/api';
-import { formatDate } from '../../lib/utils';
-import { cn } from '../../lib/utils';
+import { formatDate, cn } from '../../lib/utils';
+import { useAuthStore } from '../../store/authStore';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
 
-const STATUS_OPTIONS: { value: AttendanceStatus; label: string; color: string }[] = [
-  { value: 'PRESENT', label: 'P', color: 'bg-emerald-500 text-white' },
-  { value: 'ABSENT', label: 'A', color: 'bg-red-500 text-white' },
-  { value: 'LATE', label: 'L', color: 'bg-amber-500 text-white' },
-  { value: 'EXCUSED', label: 'E', color: 'bg-blue-400 text-white' },
+const STATUS_OPTIONS: { value: AttendanceStatus; label: string; short: string; color: string }[] = [
+  { value: 'PRESENT', label: 'Present', short: 'P', color: 'bg-emerald-500 text-white' },
+  { value: 'ABSENT', label: 'Absent', short: 'A', color: 'bg-red-500 text-white' },
+  { value: 'LATE', label: 'Late', short: 'L', color: 'bg-amber-500 text-white' },
+  { value: 'EXCUSED', label: 'Excused', short: 'E', color: 'bg-blue-500 text-white' },
 ];
 
 export default function AttendancePage() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const school = user?.tenant || user?.school || { name: 'EduNest' };
+
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
+  const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<'mark' | 'history'>('mark');
 
   const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => academicApi.classes().then(r => r.data.data || []) });
@@ -43,8 +50,13 @@ export default function AttendancePage() {
   useEffect(() => {
     if (studentsInClass && studentsInClass.length > 0) {
       const initial: Record<string, AttendanceStatus> = {};
-      studentsInClass.forEach((s: any) => { initial[s.id] = 'PRESENT'; });
+      const initialRemarks: Record<string, string> = {};
+      studentsInClass.forEach((s: any) => {
+        initial[s.id] = 'PRESENT';
+        initialRemarks[s.id] = '';
+      });
       setAttendance(initial);
+      setRemarks(initialRemarks);
     }
   }, [studentsInClass]);
 
@@ -70,6 +82,44 @@ export default function AttendancePage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to save attendance'),
   });
 
+  const handlePrevDay = () => {
+    const d = new Date(date);
+    d.setDate(d.getDate() - 1);
+    setDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + 1);
+    setDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleToday = () => {
+    setDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleExportAttendance = () => {
+    const list = historyData || [];
+    if (!list.length) { toast.error('No attendance records to export'); return; }
+    const headers = ['Student Name', 'Admission No', 'Date', 'Status', 'Remarks'];
+    const rows = list.map((r: any) => [
+      `"${r.student?.firstName || ''} ${r.student?.lastName || ''}"`,
+      `"${r.student?.admissionNumber || ''}"`,
+      `"${formatDate(r.date)}"`,
+      `"${r.status || ''}"`,
+      `"${r.remarks || ''}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Attendance_${date}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Attendance records exported as CSV');
+  };
+
   const handleSave = () => {
     if (!selectedClass) { toast.error('Please select a class'); return; }
     if (!Object.keys(attendance).length) { toast.error('No students found'); return; }
@@ -77,17 +127,15 @@ export default function AttendancePage() {
     const records = Object.entries(attendance).map(([studentId, status]) => ({
       studentId,
       status,
+      remarks: remarks[studentId] || undefined,
       termId: selectedTerm || currentTerm?.id,
       date,
     }));
     bulkMarkMutation.mutate({ records });
   };
 
-  const toggleStatus = (studentId: string) => {
-    const statuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'];
-    const current = attendance[studentId] || 'PRESENT';
-    const nextIdx = (statuses.indexOf(current) + 1) % statuses.length;
-    setAttendance(prev => ({ ...prev, [studentId]: statuses[nextIdx] }));
+  const setStatus = (studentId: string, status: AttendanceStatus) => {
+    setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
 
   const markAll = (status: AttendanceStatus) => {
@@ -99,107 +147,212 @@ export default function AttendancePage() {
   const presentCount = Object.values(attendance).filter(s => s === 'PRESENT').length;
   const absentCount = Object.values(attendance).filter(s => s === 'ABSENT').length;
   const lateCount = Object.values(attendance).filter(s => s === 'LATE').length;
+  const excusedCount = Object.values(attendance).filter(s => s === 'EXCUSED').length;
   const total = Object.keys(attendance).length;
+  const presentPct = total > 0 ? Math.round((presentCount / total) * 100) : 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Attendance Management</h1>
-          <p className="page-subtitle">Mark and track student attendance</p>
+          <h1 className="page-title">Attendance & Roll Call</h1>
+          <p className="page-subtitle">Daily roll call registers, student presence tracking, and institutional attendance reports</p>
         </div>
-        {tab === 'mark' && (
-          <Button icon={<Save size={16} />} onClick={handleSave} loading={bulkMarkMutation.isPending} disabled={!selectedClass || !total}>
-            Save Attendance
+        <div className="flex items-center gap-2 flex-wrap">
+          {tab === 'history' && (
+            <Button
+              variant="secondary"
+              icon={<Download size={16} />}
+              onClick={handleExportAttendance}
+            >
+              Export CSV
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            icon={<Printer size={16} />}
+            onClick={() => window.print()}
+          >
+            Print Register
           </Button>
-        )}
+          {tab === 'mark' && (
+            <Button
+              icon={<Save size={16} />}
+              onClick={handleSave}
+              loading={bulkMarkMutation.isPending}
+              disabled={!selectedClass || !total}
+            >
+              Save Attendance
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Present Today" value={presentCount} icon={<ClipboardCheck size={20} />} color="green" />
+      {/* KPI Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard title="Present Today" value={presentCount} subtitle={`${presentPct}% presence`} icon={<ClipboardCheck size={20} />} color="green" />
         <StatCard title="Absent" value={absentCount} icon={<Users size={20} />} color="red" />
-        <StatCard title="Late" value={lateCount} icon={<TrendingDown size={20} />} color="amber" />
-        <StatCard title="Total Students" value={total} icon={<Users size={20} />} color="blue" />
+        <StatCard title="Late Arrivals" value={lateCount} icon={<Clock size={20} />} color="amber" />
+        <StatCard title="Excused" value={excusedCount} icon={<CheckCircle2 size={20} />} color="blue" />
+        <StatCard title="Total Enrolled" value={total} icon={<Users size={20} />} color="purple" />
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['mark', 'history'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            {t === 'mark' ? 'Mark Attendance' : 'History'}
+      {/* Navigation Tabs */}
+      <div className="flex items-center justify-between gap-4 flex-wrap border-b border-slate-200 pb-3">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+          {(['mark', 'history'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn(
+                'px-5 py-2 rounded-lg text-sm font-semibold capitalize transition-all whitespace-nowrap',
+                tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              {t === 'mark' ? 'Daily Roll Call' : 'Attendance History'}
+            </button>
+          ))}
+        </div>
+
+        {/* Date Navigator Controls */}
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-1.5 rounded-xl">
+          <button
+            onClick={handlePrevDay}
+            className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+            title="Previous Day"
+          >
+            <ChevronLeft size={16} />
           </button>
-        ))}
+          <button
+            onClick={handleToday}
+            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white border border-slate-200 text-slate-800 shadow-sm hover:bg-slate-50"
+          >
+            Today
+          </button>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="px-2 py-0.5 text-xs font-medium bg-transparent border-none text-slate-800 focus:outline-none"
+          />
+          <button
+            onClick={handleNextDay}
+            className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+            title="Next Day"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* Class & Term Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <Select
           options={(classesData || []).map((c: any) => ({ value: c.id, label: c.name }))}
-          placeholder="Select Class" value={selectedClass}
-          onChange={e => setSelectedClass(e.target.value)} className="w-44 py-2 text-sm" />
+          placeholder="Select Class *"
+          value={selectedClass}
+          onChange={e => setSelectedClass(e.target.value)}
+          className="w-56 py-2 text-sm"
+        />
         <Select
           options={(termsData || []).map((t: any) => ({ value: t.id, label: t.name }))}
-          placeholder="Current Term" value={selectedTerm}
-          onChange={e => setSelectedTerm(e.target.value)} className="w-48 py-2 text-sm" />
-        {tab === 'mark' && (
-          <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            className="input w-44 py-2 text-sm" />
+          placeholder="Select Term"
+          value={selectedTerm}
+          onChange={e => setSelectedTerm(e.target.value)}
+          className="w-52 py-2 text-sm"
+        />
+        {selectedClass && (
+          <span className="text-xs text-slate-500 font-medium px-3 py-1.5 bg-slate-100 rounded-lg">
+            Date: <strong className="text-slate-800">{formatDate(date)}</strong>
+          </span>
         )}
       </div>
 
-      {/* Mark Attendance Tab */}
+      {/* ─── 1. DAILY ROLL CALL TAB ─────────────────────────────────────────────── */}
       {tab === 'mark' && selectedClass && (
         <div className="card overflow-hidden">
-          {/* Quick actions */}
-          <div className="flex items-center gap-3 p-4 border-b border-slate-100 bg-slate-50">
-            <span className="text-sm font-semibold text-slate-600">Mark all as:</span>
-            {STATUS_OPTIONS.map(s => (
-              <button key={s.value} onClick={() => markAll(s.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${s.color} opacity-80 hover:opacity-100`}>
-                {s.value}
+          {/* Quick Bulk Actions Toolbar */}
+          <div className="flex items-center justify-between gap-4 p-4 border-b border-slate-100 bg-slate-50 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Quick Bulk:</span>
+              <button
+                onClick={() => markAll('PRESENT')}
+                className="btn-sm bg-emerald-600 text-white hover:bg-emerald-700 gap-1"
+              >
+                <Check size={13} />
+                All Present
               </button>
-            ))}
-            <span className="ml-auto text-sm text-slate-500">
-              {presentCount}/{total} present • Attendance: {total ? Math.round((presentCount / total) * 100) : 0}%
-            </span>
+              <button
+                onClick={() => markAll('ABSENT')}
+                className="btn-sm bg-red-600 text-white hover:bg-red-700 gap-1"
+              >
+                <X size={13} />
+                All Absent
+              </button>
+              <button
+                onClick={() => markAll('LATE')}
+                className="btn-sm bg-amber-500 text-white hover:bg-amber-600 gap-1"
+              >
+                <Clock size={13} />
+                All Late
+              </button>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-600">
+              <span className="font-semibold">{presentCount} of {total} present</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">{presentPct}%</span>
+            </div>
           </div>
 
           {loadingStudents ? (
-            <div className="p-8 text-center text-slate-400">Loading students...</div>
+            <div className="p-12 text-center text-slate-400">Loading student roster...</div>
           ) : !studentsInClass?.length ? (
-            <div className="p-8 text-center text-slate-400">No students in this class</div>
+            <div className="p-12 text-center text-slate-400">No students enrolled in this class</div>
           ) : (
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-slate-100">
               {studentsInClass.map((student: any, i: number) => {
-                const status = attendance[student.id] || 'PRESENT';
-                const statusOpt = STATUS_OPTIONS.find(s => s.value === status)!;
+                const currentStatus = attendance[student.id] || 'PRESENT';
                 return (
-                  <div key={student.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
-                    <span className="text-sm text-slate-400 w-7 text-center">{i + 1}</span>
-                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                      {student.firstName[0]}{student.lastName[0]}
+                  <div key={student.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors flex-wrap sm:flex-nowrap">
+                    <span className="text-xs font-mono text-slate-400 w-6 text-center">{i + 1}</span>
+                    <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                      {student.firstName?.[0]}{student.lastName?.[0]}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-slate-900">{student.firstName} {student.lastName}</p>
-                      <p className="text-xs text-slate-400">{student.admissionNumber}</p>
+                    <div className="flex-1 min-w-[140px]">
+                      <p className="font-semibold text-slate-900 leading-tight">
+                        {student.firstName} {student.lastName}
+                      </p>
+                      <p className="text-xs font-mono text-slate-400">{student.admissionNumber}</p>
                     </div>
-                    <button
-                      onClick={() => toggleStatus(student.id)}
-                      className={cn('w-24 py-2 rounded-xl text-sm font-bold transition-all', statusOpt.color)}
-                    >
-                      {status}
-                    </button>
-                    <div className="flex gap-1">
-                      {STATUS_OPTIONS.map(s => (
-                        <button key={s.value}
-                          onClick={() => setAttendance(prev => ({ ...prev, [student.id]: s.value }))}
-                          className={cn('w-8 h-8 rounded-lg text-xs font-bold transition-all',
-                            status === s.value ? s.color : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}>
-                          {s.label}
+
+                    {/* Status Pill Toggle Buttons */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {STATUS_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setStatus(student.id, opt.value)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1',
+                            currentStatus === opt.value
+                              ? `${opt.color} shadow-sm scale-105`
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          )}
+                        >
+                          <span>{opt.short}</span>
+                          <span className="hidden md:inline">{opt.label}</span>
                         </button>
                       ))}
+                    </div>
+
+                    {/* Absence Remarks / Note */}
+                    <div className="w-full sm:w-48 flex-shrink-0">
+                      <input
+                        type="text"
+                        placeholder="Remarks / Note..."
+                        value={remarks[student.id] || ''}
+                        onChange={e => setRemarks(prev => ({ ...prev, [student.id]: e.target.value }))}
+                        className="input py-1 text-xs px-2.5 w-full bg-slate-50 border-slate-200"
+                      />
                     </div>
                   </div>
                 );
@@ -209,43 +362,49 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* History Tab */}
-      {tab === 'history' && (
+      {/* ─── 2. ATTENDANCE HISTORY TAB ──────────────────────────────────────────── */}
+      {tab === 'history' && selectedClass && (
         <div className="card overflow-hidden">
           {loadingHistory ? (
-            <div className="p-8 text-center text-slate-400">Loading history...</div>
+            <div className="p-12 text-center text-slate-400">Loading attendance history...</div>
           ) : !historyData?.length ? (
-            <div className="p-8 text-center text-slate-400">No attendance records found</div>
+            <div className="p-12 text-center text-slate-400">No attendance records found for this selection</div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Student</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {historyData.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium">{r.student?.firstName} {r.student?.lastName}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(r.date)}</td>
-                    <td className="px-4 py-3"><Badge status={r.status} /></td>
-                    <td className="px-4 py-3 text-sm text-slate-500">{r.remarks || '—'}</td>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Student Name</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {historyData.map((r: any) => (
+                    <tr key={r.id}>
+                      <td className="font-medium text-slate-900">
+                        {r.student?.firstName} {r.student?.lastName}
+                      </td>
+                      <td className="text-sm text-slate-600">{formatDate(r.date)}</td>
+                      <td>
+                        <Badge status={r.status} />
+                      </td>
+                      <td className="text-sm text-slate-500">{r.remarks || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
 
       {!selectedClass && (
         <div className="card p-12 text-center">
-          <ClipboardCheck size={40} className="text-slate-300 mx-auto mb-3" />
-          <h3 className="font-semibold text-slate-600">Select a Class to Continue</h3>
-          <p className="text-sm text-slate-400 mt-1">Choose a class from the dropdown above to mark or view attendance</p>
+          <ClipboardCheck size={44} className="text-slate-300 mx-auto mb-3" />
+          <h3 className="font-bold text-slate-700 text-base">Select a Class to Begin Roll Call</h3>
+          <p className="text-sm text-slate-400 mt-1">Choose a class from the dropdown above to load the student attendance roster</p>
         </div>
       )}
     </div>

@@ -3,17 +3,26 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
-import { Plus, DollarSign, AlertCircle, TrendingUp, CreditCard, Eye, Download, Trash2 } from 'lucide-react';
+import {
+  Plus, DollarSign, AlertCircle, TrendingUp, CreditCard, Eye,
+  Download, Trash2, Printer, ShieldCheck, CheckCircle2, FileText
+} from 'lucide-react';
 import {
   StatCard, DataTable, Button, Modal, Input, Select, Badge, PageLoader,
 } from '../../components/ui';
 import { financeApi, studentsApi } from '../../services/api';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { useAuthStore } from '../../store/authStore';
+import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 export default function FinancePage() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const school = user?.tenant || user?.school || { name: 'EduNest Institutional College' };
+
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [feeModal, setFeeModal] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -110,37 +119,73 @@ export default function FinancePage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
+  const handleExportInvoices = () => {
+    const list = invoicesData?.data || [];
+    if (!list.length) { toast.error('No invoices to export'); return; }
+    const headers = ['Invoice #', 'Student Name', 'Admission No', 'Total Invoiced (NGN)', 'Amount Paid (NGN)', 'Balance Due (NGN)', 'Due Date', 'Status'];
+    const rows = list.map((inv: any) => [
+      `"${inv.invoiceNo || ''}"`,
+      `"${inv.student?.firstName || ''} ${inv.student?.lastName || ''}"`,
+      `"${inv.student?.admissionNumber || ''}"`,
+      `"${inv.total || 0}"`,
+      `"${inv.amountPaid || 0}"`,
+      `"${inv.balance || 0}"`,
+      `"${formatDate(inv.dueDate)}"`,
+      `"${inv.status || ''}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `EduNest_Invoices_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Invoices exported as CSV');
+  };
+
   const invoiceColumns = [
     { key: 'invoiceNo', header: 'Invoice #', sortable: true },
     {
       key: 'student', header: 'Student',
       render: (r: any) => (
         <div>
-          <p className="font-medium">{r.student?.firstName} {r.student?.lastName}</p>
-          <p className="text-xs text-slate-400">{r.student?.admissionNumber}</p>
+          <p className="font-semibold text-slate-900 leading-tight">{r.student?.firstName} {r.student?.lastName}</p>
+          <p className="text-xs text-slate-400 font-mono">{r.student?.admissionNumber}</p>
         </div>
       ),
     },
-    { key: 'total', header: 'Total', render: (r: any) => <span className="font-semibold">{formatCurrency(r.total)}</span> },
-    { key: 'amountPaid', header: 'Paid', render: (r: any) => <span className="text-emerald-600 font-medium">{formatCurrency(r.amountPaid)}</span> },
-    { key: 'balance', header: 'Balance', render: (r: any) => <span className={r.balance > 0 ? 'text-red-500 font-medium' : 'text-slate-400'}>{formatCurrency(r.balance)}</span> },
+    { key: 'total', header: 'Total Invoiced', render: (r: any) => <span className="font-bold text-slate-900">{formatCurrency(r.total)}</span> },
+    { key: 'amountPaid', header: 'Amount Paid', render: (r: any) => <span className="text-emerald-600 font-semibold">{formatCurrency(r.amountPaid)}</span> },
+    { key: 'balance', header: 'Balance Due', render: (r: any) => <span className={r.balance > 0 ? 'text-red-500 font-bold' : 'text-slate-400'}>{formatCurrency(r.balance)}</span> },
     { key: 'dueDate', header: 'Due Date', render: (r: any) => formatDate(r.dueDate) },
     { key: 'status', header: 'Status', render: (r: any) => <Badge status={r.status} /> },
     {
-      key: 'actions', header: '',
+      key: 'actions', header: 'Actions',
       render: (r: any) => (
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1.5">
           {r.balance > 0 && (
-            <button onClick={() => { setPaymentModal(r); paymentForm.setValue('amount', r.balance); }}
-              className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-50 transition-all" title="Record Payment">
+            <button
+              onClick={() => { setPaymentModal(r); paymentForm.setValue('amount', r.balance); }}
+              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-all"
+              title="Record Payment"
+            >
               <CreditCard size={15} />
             </button>
           )}
-          <button className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 transition-all" title="View">
+          <button
+            onClick={() => setSelectedInvoice(r)}
+            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-all"
+            title="View Official Receipt"
+          >
             <Eye size={15} />
           </button>
-          <button className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-all" title="Download">
-            <Download size={15} />
+          <button
+            onClick={() => { setSelectedInvoice(r); setTimeout(() => window.print(), 300); }}
+            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-all"
+            title="Print Receipt"
+          >
+            <Printer size={15} />
           </button>
         </div>
       ),
@@ -153,10 +198,13 @@ export default function FinancePage() {
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Finance Management</h1>
-          <p className="page-subtitle">Fees, invoices, payments and financial analytics</p>
+          <h1 className="page-title">Finance & Bursary Management</h1>
+          <p className="page-subtitle">Itemized school fee invoices, official bursary receipts, and financial analytics</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="secondary" icon={<Download size={16} />} onClick={handleExportInvoices}>
+            Export CSV
+          </Button>
           <Button variant="secondary" icon={<Plus size={16} />} onClick={() => setFeeModal(true)}>
             Fee Structure
           </Button>
@@ -406,6 +454,192 @@ export default function FinancePage() {
           <Select label="Billing Type" {...feeForm.register('termBased')}
             options={[{ value: 'true', label: 'Per Term' }, { value: 'false', label: 'One-time' }]} />
         </div>
+      </Modal>
+
+      {/* ─── OFFICIAL INSTITUTIONAL INVOICE & RECEIPT MODAL ───────────────────────── */}
+      <Modal
+        open={!!selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+        title="Official Student Fee Invoice & Bursary Receipt"
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <span className="text-xs text-slate-400">Formal Institutional Bursary Document</span>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setSelectedInvoice(null)}>Close</Button>
+              {selectedInvoice?.balance > 0 && (
+                <Button
+                  variant="secondary"
+                  icon={<CreditCard size={15} />}
+                  onClick={() => {
+                    const inv = selectedInvoice;
+                    setSelectedInvoice(null);
+                    setPaymentModal(inv);
+                    paymentForm.setValue('amount', inv.balance);
+                  }}
+                >
+                  Record Payment
+                </Button>
+              )}
+              <Button icon={<Printer size={16} />} onClick={() => window.print()}>
+                Print / Save PDF
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {selectedInvoice && (
+          <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-800 space-y-6 print:border-none print:shadow-none print:p-0">
+            {/* Header with School Crest */}
+            <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center gap-3">
+                {school.logo ? (
+                  <img src={school.logo} alt="School Logo" className="w-14 h-14 object-contain rounded-xl" />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                    <EduNestIcon size={32} />
+                  </div>
+                )}
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">{school.name}</h2>
+                  <p className="text-xs text-slate-500">{school.address || 'Bursary & Accounts Division'}</p>
+                  <p className="text-xs text-slate-500">{school.phone && `Tel: ${school.phone}`} {school.email && `| Email: ${school.email}`}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={cn(
+                  'px-3 py-1 font-bold text-xs rounded-full uppercase',
+                  selectedInvoice.balance <= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                )}>
+                  {selectedInvoice.status || (selectedInvoice.balance <= 0 ? 'PAID' : 'PAYMENT DUE')}
+                </span>
+                <p className="text-xs font-mono font-bold text-blue-600 mt-1">{selectedInvoice.invoiceNo}</p>
+              </div>
+            </div>
+
+            {/* Document Title */}
+            <div className="text-center py-2 bg-slate-50 rounded-xl border border-slate-100">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                Official Student Fee Invoice & Clearance Receipt
+              </h3>
+            </div>
+
+            {/* Student & Invoice Particulars */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 border border-slate-100">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Information</p>
+                <div className="flex justify-between"><span className="text-slate-500">Student Name:</span><span className="font-bold text-slate-900">{selectedInvoice.student?.firstName} {selectedInvoice.student?.lastName}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Admission No:</span><span className="font-mono font-bold text-blue-600">{selectedInvoice.student?.admissionNumber}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Class:</span><span className="font-semibold text-slate-800">{selectedInvoice.student?.classEnrollments?.[0]?.class?.name || 'Assigned Class'}</span></div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 border border-slate-100">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Billing Reference</p>
+                <div className="flex justify-between"><span className="text-slate-500">Invoice Number:</span><span className="font-mono font-bold text-slate-900">{selectedInvoice.invoiceNo}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Due Date:</span><span className="font-semibold text-slate-800">{formatDate(selectedInvoice.dueDate)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Issued On:</span><span className="font-semibold text-slate-800">{formatDate(selectedInvoice.createdAt || new Date())}</span></div>
+              </div>
+            </div>
+
+            {/* Itemized Fee Breakdown Table */}
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Itemized Fee Breakdown</p>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-xs font-bold text-slate-600 uppercase border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4 text-left">#</th>
+                      <th className="py-2.5 px-4 text-left">Description</th>
+                      <th className="py-2.5 px-4 text-right">Unit Price</th>
+                      <th className="py-2.5 px-4 text-center">Qty</th>
+                      <th className="py-2.5 px-4 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(selectedInvoice.items || [{ description: 'Institutional Tuition & Term Fees', amount: selectedInvoice.total, quantity: 1 }]).map((item: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-4 text-slate-400">{idx + 1}</td>
+                        <td className="py-2.5 px-4 font-medium text-slate-800">{item.description}</td>
+                        <td className="py-2.5 px-4 text-right text-slate-600">{formatCurrency(item.amount)}</td>
+                        <td className="py-2.5 px-4 text-center text-slate-600">{item.quantity || 1}</td>
+                        <td className="py-2.5 px-4 text-right font-bold text-slate-900">{formatCurrency(item.amount * (item.quantity || 1))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Financial Summary */}
+            <div className="flex justify-end">
+              <div className="w-72 space-y-2 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Gross Total:</span><span className="font-bold text-slate-800">{formatCurrency(selectedInvoice.total + (selectedInvoice.discount || 0))}</span></div>
+                {selectedInvoice.discount > 0 && (
+                  <div className="flex justify-between text-emerald-600"><span>Institutional Discount:</span><span>-{formatCurrency(selectedInvoice.discount)}</span></div>
+                )}
+                <div className="flex justify-between border-t border-slate-200 pt-1 font-bold text-slate-900">
+                  <span>Net Invoiced Total:</span>
+                  <span>{formatCurrency(selectedInvoice.total)}</span>
+                </div>
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>Total Amount Paid:</span>
+                  <span>{formatCurrency(selectedInvoice.amountPaid || 0)}</span>
+                </div>
+                <div className="flex justify-between border-t-2 border-slate-900 pt-2 font-black text-base">
+                  <span className={selectedInvoice.balance > 0 ? 'text-red-600' : 'text-slate-900'}>Balance Due:</span>
+                  <span className={selectedInvoice.balance > 0 ? 'text-red-600' : 'text-emerald-600'}>
+                    {selectedInvoice.balance > 0 ? formatCurrency(selectedInvoice.balance) : '₦0 (CLEARED)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment History Log */}
+            {selectedInvoice.payments && selectedInvoice.payments.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Verified Payment Audit Trail</p>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 font-bold text-slate-600 uppercase border-b border-slate-200">
+                      <tr>
+                        <th className="py-2 px-3 text-left">Receipt #</th>
+                        <th className="py-2 px-3 text-left">Date</th>
+                        <th className="py-2 px-3 text-left">Method</th>
+                        <th className="py-2 px-3 text-left">Ref</th>
+                        <th className="py-2 px-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedInvoice.payments.map((p: any) => (
+                        <tr key={p.id}>
+                          <td className="py-2 px-3 font-mono text-blue-600">{p.receiptNo}</td>
+                          <td className="py-2 px-3">{formatDate(p.paymentDate)}</td>
+                          <td className="py-2 px-3 font-semibold">{p.method}</td>
+                          <td className="py-2 px-3 text-slate-400 font-mono">{p.reference || '—'}</td>
+                          <td className="py-2 px-3 text-right font-bold text-emerald-600">{formatCurrency(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Signatures & Official Stamp */}
+            <div className="pt-6 grid grid-cols-2 gap-8 border-t border-slate-200">
+              <div className="text-center">
+                <div className="border-b border-slate-400 h-10 mb-1" />
+                <p className="text-xs font-bold text-slate-800">Authorized Bursar / Accounts Officer</p>
+                <p className="text-[10px] text-slate-400">Signature & Official Stamp</p>
+              </div>
+              <div className="p-3 border border-dashed border-slate-300 rounded-xl text-center flex flex-col items-center justify-center">
+                <ShieldCheck size={20} className="text-emerald-600 mb-1" />
+                <p className="text-xs font-bold text-slate-800">EduNest Official Bursary Seal</p>
+                <p className="text-[10px] text-slate-400">Secured Digital Verification Ledger</p>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

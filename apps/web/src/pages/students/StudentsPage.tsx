@@ -132,6 +132,35 @@ export default function StudentsPage() {
     setModalOpen(true);
   };
 
+  const handleExportStudents = () => {
+    const list = data?.data || [];
+    if (list.length === 0) {
+      toast.error('No student records to export');
+      return;
+    }
+    const headers = ['Admission No', 'First Name', 'Last Name', 'Gender', 'Class', 'Guardian Name', 'Guardian Phone', 'Date of Birth', 'Status'];
+    const rows = list.map((s: any) => [
+      s.admissionNumber || '',
+      `"${s.firstName || ''}"`,
+      `"${s.lastName || ''}"`,
+      s.gender || '',
+      `"${s.classEnrollments?.[0]?.class?.name || ''}"`,
+      `"${s.guardians?.[0] ? `${s.guardians[0].firstName} ${s.guardians[0].lastName}` : ''}"`,
+      `"${s.guardians?.[0]?.phone || ''}"`,
+      s.dateOfBirth ? s.dateOfBirth.split('T')[0] : '',
+      s.status || '',
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `students_roster_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Students roster exported successfully');
+  };
+
   const columns = [
     {
       key: 'student',
@@ -217,14 +246,14 @@ export default function StudentsPage() {
           <h1 className="page-title">Students</h1>
           <p className="page-subtitle">Manage all student records</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => refetch()}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="secondary" icon={<RefreshCw size={15} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="secondary" icon={<Download size={16} />}>
-            Export
+          <Button variant="secondary" icon={<Download size={15} />} onClick={handleExportStudents}>
+            Export CSV
           </Button>
-          <Button icon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
+          <Button icon={<Plus size={15} />} onClick={() => setModalOpen(true)}>
             Register Student
           </Button>
         </div>

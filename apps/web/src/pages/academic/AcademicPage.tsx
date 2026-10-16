@@ -63,7 +63,7 @@ export default function AcademicPage() {
           <h1 className="page-title">Academic Management</h1>
           <p className="page-subtitle">Sessions, terms, classes and subjects</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {tab === 'sessions' && <Button icon={<Plus size={16} />} onClick={() => setSessionModal(true)}>New Session</Button>}
           {tab === 'classes' && <Button icon={<Plus size={16} />} onClick={() => setClassModal(true)}>New Class</Button>}
           {tab === 'subjects' && <Button icon={<Plus size={16} />} onClick={() => setSubjectModal(true)}>New Subject</Button>}
