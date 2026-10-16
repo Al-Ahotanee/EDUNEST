@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, ChevronRight, LogOut, User, Settings, Shield } from 'lucide-react';
+import { Menu, Bell, Search, ChevronRight, LogOut, User, Settings } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../lib/utils';
 import { api } from '../../services/api';
@@ -87,16 +87,6 @@ export function Topbar({
         <Breadcrumbs />
       </div>
       <div className="flex-1" />
-
-      {/* Platform Console Switcher for Super Admins */}
-      {user?.isSuperAdmin && (
-        <Link
-          to="/super-admin/dashboard"
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold transition-all shadow-sm shadow-purple-500/20"
-        >
-          <Shield size={13} /> Platform Console
-        </Link>
-      )}
 
       {/* School name badge */}
       <div className="hidden lg:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">

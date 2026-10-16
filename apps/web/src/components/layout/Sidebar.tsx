@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   DollarSign, UserCog, Monitor, Library, Bed, Heart, Package,
   Calendar, Bell, BarChart3, Settings, ChevronDown, ChevronRight,
-  School, LogOut, ClipboardCheck, Award, FileText, Building2, Shield, X,
+  School, LogOut, ClipboardCheck, Award, FileText, Building2, X,
 } from 'lucide-react';
 import { EduNestIcon } from '../common/EduNestLogo';
 
@@ -147,15 +147,12 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: SidebarProps) {
-  const { user, logout, hasRole } = useAuthStore();
-  const isSuperAdmin = user?.isSuperAdmin || hasRole('Super Admin');
+  const { user, logout } = useAuthStore();
   const isCollapsed = collapsed && !mobileOpen;
 
-  const displayRole = user?.isSuperAdmin
-    ? 'Platform SuperAdmin'
-    : user?.roles?.[0]?.name === 'Super Admin'
+  const displayRole = user?.roles?.[0]?.name === 'Super Admin'
     ? 'School Administrator'
-    : user?.roles?.[0]?.name || 'Management Portal';
+    : user?.roles?.[0]?.name || 'Staff Member';
 
   return (
     <aside
@@ -180,7 +177,7 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <p className="font-bold text-white text-sm truncate">{user?.tenant?.name || user?.school?.name || 'EduNest'}</p>
+              <p className="font-bold text-white text-sm truncate">{user?.school?.name || user?.tenant?.name || 'School Portal'}</p>
               <p className="text-xs text-slate-400 truncate">{displayRole}</p>
             </div>
           )}
@@ -205,29 +202,6 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
             onNavigate={onCloseMobile}
           />
         ))}
-
-        {/* Super Admin section */}
-        {isSuperAdmin && (
-          <div className="pt-2 mt-3 border-t border-white/10">
-            {!isCollapsed && (
-              <p className="text-[11px] font-semibold text-purple-400 uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
-                <Shield size={12} /> SaaS Governance
-              </p>
-            )}
-            <NavLink
-              to="/super-admin/dashboard"
-              title="Platform Console"
-              onClick={onCloseMobile}
-              className={({ isActive }) => cn(
-                'sidebar-item bg-gradient-to-r from-purple-950/60 to-blue-950/60 border border-purple-500/30 text-purple-200 hover:text-white hover:border-purple-400/50',
-                isActive && 'active'
-              )}
-            >
-              <Shield size={18} className="text-purple-400 flex-shrink-0" />
-              {!isCollapsed && <span className="font-semibold text-white">Platform Console</span>}
-            </NavLink>
-          </div>
-        )}
       </nav>
 
       {/* User */}

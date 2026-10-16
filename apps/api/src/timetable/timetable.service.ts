@@ -48,12 +48,50 @@ export class TimetableService {
     return successResponse(null, 'Slot deleted');
   }
 
+  async createBatch(body: { slots: any[]; classIds?: string[] }, schoolId: string) {
+    const { slots, classIds } = body;
+    if (classIds && classIds.length > 0) {
+      await this.prisma.timetableSlot.deleteMany({
+        where: { classId: { in: classIds } },
+      });
+    }
+    if (slots && slots.length > 0) {
+      const sanitized = slots.map(s => ({
+        classId: s.classId,
+        subjectId: s.subjectId,
+        staffId: s.staffId || null,
+        dayOfWeek: Number(s.dayOfWeek),
+        startTime: s.startTime,
+        endTime: s.endTime,
+        room: s.room || null,
+      }));
+      await this.prisma.timetableSlot.createMany({
+        data: sanitized,
+      });
+    }
+    return successResponse({ count: slots?.length || 0 }, 'Timetable slots generated and saved successfully');
+  }
+
+  async clearClassSlots(classId: string, schoolId: string) {
+    const deleted = await this.prisma.timetableSlot.deleteMany({
+      where: { classId },
+    });
+    return successResponse(deleted, 'Class timetable cleared');
+  }
+
+  async clearSchoolSlots(schoolId: string) {
+    const deleted = await this.prisma.timetableSlot.deleteMany({
+      where: { class: { schoolId } },
+    });
+    return successResponse(deleted, 'School timetable cleared');
+  }
+
   async getSchoolTimetable(schoolId: string) {
     const classes = await this.prisma.class.findMany({
       where: { schoolId },
       include: {
         timetableSlots: {
-          include: { subject: { select: { name: true } }, staff: { select: { firstName: true, lastName: true } } },
+          include: { subject: { select: { name: true, code: true } }, staff: { select: { firstName: true, lastName: true } } },
           orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
         },
       },

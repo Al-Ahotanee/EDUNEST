@@ -4,11 +4,15 @@ import {
   LayoutDashboard, Users, BookOpen, CalendarCheck, DollarSign,
   Heart, MessageSquare, Bell, User, LogOut, Menu, X, Eye, EyeOff,
   GraduationCap, TrendingUp, CheckCircle, AlertCircle, ChevronRight,
-  FileText, Clock
+  FileText, Clock, Printer, Download, CreditCard, Send, Calendar,
+  ShieldCheck, CheckCircle2, HelpCircle, PenTool, Receipt, Sparkles,
+  Plus, Search, Check, AlertTriangle
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
+import { formatCurrency, formatDate } from '../../lib/utils';
+import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 function useParentAuth() {
   const [token, setToken] = useState(() => localStorage.getItem('parent_token'));
@@ -36,67 +40,90 @@ function ParentLoginPage({ onLogin }: { onLogin: (t: string, d: any) => void }) 
   };
 
   const school = (() => { try { return JSON.parse(localStorage.getItem('school_theme') || '{}'); } catch { return {}; } })();
-  const primary = school.primaryColor || '#1a56db';
+  const primary = school.primaryColor || '#0f172a';
 
   return (
     <div className="min-h-screen flex">
       {/* Left Panel */}
-      <div className="hidden lg:flex flex-col justify-center w-1/2 p-16 text-white" style={{ background: `linear-gradient(135deg, ${primary}, #7e3af2)` }}>
+      <div className="hidden lg:flex flex-col justify-center w-1/2 p-16 text-white bg-slate-900 border-r border-slate-800">
         <div className="flex items-center gap-3 mb-12">
-          {school.logo ? <img src={school.logo} className="w-12 h-12 object-contain rounded-xl" alt="" /> : <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><GraduationCap size={24} /></div>}
+          <EduNestIcon size={38} />
           <div>
-            <p className="text-lg font-black">{school.name || 'SchoolERP'}</p>
-            {school.motto && <p className="text-white/70 text-sm italic">"{school.motto}"</p>}
+            <p className="text-xl font-black">{school.name || 'EduNest International School'}</p>
+            <p className="text-slate-400 text-xs italic">"Excellence, Character & Global Leadership"</p>
           </div>
         </div>
-        <h1 className="text-4xl font-black mb-4 leading-tight">Parent Portal</h1>
-        <p className="text-white/80 text-lg mb-10">Stay connected with your child's academic journey. Track results, attendance, fees, and more — all in one place.</p>
+        <h1 className="text-4xl font-black mb-4 leading-tight">Parent Self-Service & Communications</h1>
+        <p className="text-slate-300 text-base mb-10 leading-relaxed">
+          Stay seamlessly engaged in your child’s educational journey. Real-time academic results, verified roll call attendance, itemized fee settlements, digital permission slips, and direct teacher messaging.
+        </p>
         <div className="space-y-4">
-          {['View real-time academic results', 'Track attendance daily', 'Pay school fees online', 'Receive instant notifications', 'Message teachers directly'].map(item => (
+          {[
+            'Continuous Assessment & Term Report Cards',
+            'Daily Attendance & Real-Time Absence Notifications',
+            'Itemized Fee Invoices & Instant Bursary Receipts',
+            'Direct Teacher-Parent Secure Messaging',
+            'Digital Field Trip Permission Slips & Consent Forms',
+          ].map(item => (
             <div key={item} className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0"><CheckCircle size={14} /></div>
-              <span className="text-white/90">{item}</span>
+              <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                <CheckCircle size={14} />
+              </div>
+              <span className="text-slate-200 text-sm font-medium">{item}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Right Panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-gray-50">
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
         <div className="w-full max-w-md">
           <div className="lg:hidden text-center mb-8">
-            <div className="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${primary}, #7e3af2)` }}>
-              <GraduationCap size={28} className="text-white" />
-            </div>
-            <h1 className="text-2xl font-black text-gray-900">Parent Portal</h1>
+            <EduNestIcon size={44} className="mx-auto mb-2" />
+            <h1 className="text-2xl font-black text-slate-900">Parent Portal</h1>
           </div>
-          <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-            <h2 className="text-2xl font-black text-gray-900 mb-2">Welcome Back</h2>
-            <p className="text-gray-500 text-sm mb-8">Sign in to your parent account</p>
+          <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200">
+            <h2 className="text-2xl font-black text-slate-900 mb-1">Guardian Sign In</h2>
+            <p className="text-slate-500 text-xs mb-8">Access your enrolled children's records and school portal</p>
             <form onSubmit={onSubmit} className="space-y-5">
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Email Address</label>
-                <input type="email" required autoFocus
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-colors"
-                  placeholder="your@email.com"
-                  value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  className="input py-2.5 text-xs w-full"
+                  placeholder="parent@example.com"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Password</label>
+                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Password</label>
                 <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} required
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-colors pr-12"
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    required
+                    className="input py-2.5 text-xs w-full pr-10"
                     placeholder="••••••••"
-                    value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    value={form.password}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
                     {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
-              <button type="submit" disabled={loading}
-                className="w-full text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 hover:-translate-y-0.5"
-                style={{ background: `linear-gradient(135deg, ${primary}, #7e3af2)` }}>
-                {loading ? 'Signing in...' : 'Sign In'}
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full py-3 text-sm font-bold shadow-md"
+              >
+                {loading ? 'Authenticating...' : 'Sign In to Parent Portal'}
               </button>
             </form>
           </div>
@@ -107,40 +134,43 @@ function ParentLoginPage({ onLogin }: { onLogin: (t: string, d: any) => void }) 
 }
 
 const navItems = [
-  { to: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: 'children', icon: Users, label: 'My Children' },
-  { to: 'results', icon: BookOpen, label: 'Results' },
+  { to: 'dashboard', icon: LayoutDashboard, label: 'Overview' },
+  { to: 'children', icon: Users, label: 'My Wards' },
+  { to: 'results', icon: BookOpen, label: 'Results & Reports' },
   { to: 'attendance', icon: CalendarCheck, label: 'Attendance' },
-  { to: 'fees', icon: DollarSign, label: 'Fees & Payments' },
-  { to: 'health', icon: Heart, label: 'Health Records' },
-  { to: 'messages', icon: MessageSquare, label: 'Messages' },
-  { to: 'notifications', icon: Bell, label: 'Notifications' },
-  { to: 'profile', icon: User, label: 'My Profile' },
+  { to: 'fees', icon: DollarSign, label: 'Fees & Bursary' },
+  { to: 'circulars', icon: FileText, label: 'School Circulars' },
+  { to: 'messages', icon: MessageSquare, label: 'Teacher Messaging' },
+  { to: 'appointments', icon: Calendar, label: 'PTA Appointments' },
+  { to: 'permissions', icon: PenTool, label: 'Permission Slips' },
+  { to: 'inquiries', icon: HelpCircle, label: 'Inquiry & Feedback' },
+  { to: 'profile', icon: User, label: 'Guardian Profile' },
 ];
-
-function StatCard({ label, value, sub, icon: Icon, color, alert }: any) {
-  return (
-    <div className={`bg-white rounded-2xl p-5 border shadow-sm ${alert ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-500">{label}</p>
-          <p className={`text-2xl font-black mt-1 ${alert ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
-          {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-        </div>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon size={20} className="text-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ParentDashboardView({ token, parent }: { token: string; parent: any }) {
   const authHeader = { headers: { Authorization: `Bearer ${token}` } };
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const school = parent?.school || {};
+  const school = parent?.school || { name: 'EduNest International School' };
 
+  // Financial Modals state
+  const [viewInvoice, setViewInvoice] = useState<any>(null);
+  const [receiptModal, setReceiptModal] = useState<any>(null);
+  const [paymentModal, setPaymentModal] = useState<any>(null);
+  const [paymentPlanModal, setPaymentPlanModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'transfer' | 'ussd'>('card');
+
+  // Communication state
+  const [newChatText, setNewChatText] = useState('');
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'Class Teacher (Mrs. Okafor)', text: 'Good day! Daniel did exceptionally well in his Mathematics assessment today.', time: '10:15 AM', isTeacher: true },
+    { sender: 'You', text: 'Thank you Mrs. Okafor! We have been practicing the quadratic equations together.', time: '10:32 AM', isTeacher: false },
+  ]);
+  const [appointmentModal, setAppointmentModal] = useState(false);
+  const [inquiryModal, setInquiryModal] = useState(false);
+  const [signedSlips, setSignedSlips] = useState<Record<string, boolean>>({});
+
+  // Queries
   const { data: dashData } = useQuery({
     queryKey: ['parent-dashboard'],
     queryFn: () => api.get('/parent/dashboard', authHeader).then(r => r.data.data),
@@ -158,539 +188,914 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
   const { data: feesData } = useQuery({
     queryKey: ['parent-fees'],
     queryFn: () => api.get('/parent/fees', authHeader).then(r => r.data.data),
-    enabled: activeTab === 'fees',
+    enabled: activeTab === 'fees' || activeTab === 'dashboard',
   });
 
   const children = dashData?.children || [];
   const notifications = dashData?.notifications || [];
 
+  // Simulated Invoices if empty
+  const invoicesList = (feesData?.length ? feesData : [
+    {
+      id: 'inv_01',
+      invoiceNo: 'EDN-2026-0891',
+      title: 'First Term 2026/2027 Tuition & Compulsory Levies',
+      student: { firstName: children[0]?.firstName || 'Daniel', lastName: children[0]?.lastName || 'Smith', admissionNumber: 'EDN/2024/012' },
+      dueDate: '2026-10-31',
+      total: 345000,
+      paid: 200000,
+      balance: 145000,
+      status: 'PARTIAL',
+      items: [
+        { name: 'First Term Tuition Fee', amount: 220000 },
+        { name: 'Educational Technology & ICT Levy', amount: 45000 },
+        { name: 'Science Laboratory & Practical Kit', amount: 35000 },
+        { name: 'Textbooks & Learning Folio', amount: 25000 },
+        { name: 'Medical & Healthcare Retainer', amount: 20000 },
+      ],
+    },
+    {
+      id: 'inv_02',
+      invoiceNo: 'EDN-2026-0422',
+      title: 'Third Term 2025/2026 Tuition',
+      student: { firstName: children[0]?.firstName || 'Daniel', lastName: children[0]?.lastName || 'Smith', admissionNumber: 'EDN/2024/012' },
+      dueDate: '2026-07-15',
+      total: 320000,
+      paid: 320000,
+      balance: 0,
+      status: 'PAID',
+      items: [
+        { name: 'Tuition Fee', amount: 220000 },
+        { name: 'ICT & STEM Labs', amount: 45000 },
+        { name: 'PTA Development Levy', amount: 30000 },
+        { name: 'End of Year Activities', amount: 25000 },
+      ],
+    },
+  ]);
+
+  const handleSendMessage = () => {
+    if (!newChatText.trim()) return;
+    setChatMessages(prev => [
+      ...prev,
+      { sender: 'You', text: newChatText, time: 'Just now', isTeacher: false },
+    ]);
+    setNewChatText('');
+    toast.success('Message sent to class teacher');
+  };
+
+  const handleSimulatedPayment = () => {
+    toast.success(`Payment of ₦${(paymentModal?.balance || 50000).toLocaleString()} confirmed via ${paymentMethod.toUpperCase()}!`);
+    setReceiptModal({
+      ...paymentModal,
+      receiptNo: `REC-${Date.now().toString().slice(-6)}`,
+      paymentDate: new Date().toISOString(),
+      amountPaid: paymentModal?.balance || 50000,
+    });
+    setPaymentModal(null);
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        const child = children[0];
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-black text-gray-900">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}, {parent.firstName}! 👋</h2>
-              <p className="text-gray-500">{new Date().toLocaleDateString('en-NG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              <h2 className="text-2xl font-black text-slate-900">
+                Welcome back, {parent.firstName}! 👋
+              </h2>
+              <p className="text-slate-500 text-xs">
+                {new Date().toLocaleDateString('en-NG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
             </div>
-            {/* Child Cards */}
-            {children.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {children.map((c: any) => (
-                  <div key={c.id} className="bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl p-5 text-white">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-xl font-black">{c.firstName[0]}</div>
-                      <div>
-                        <p className="font-black text-lg">{c.firstName} {c.lastName}</p>
-                        <p className="text-white/70 text-sm">{c.currentClass || 'Class N/A'} · {c.admissionNumber}</p>
-                      </div>
+
+            {/* Wards Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {children.map((c: any) => (
+                <div key={c.id} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-md border border-slate-700">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-lg font-black">
+                      {c.firstName?.[0]}{c.lastName?.[0]}
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-white/10 rounded-xl p-2.5 text-center">
-                        <p className="text-lg font-black">{c.attendanceRate || 0}%</p>
-                        <p className="text-white/60 text-xs">Attendance</p>
-                      </div>
-                      <div className="bg-white/10 rounded-xl p-2.5 text-center">
-                        <p className="text-lg font-black">{c.averageScore || 0}%</p>
-                        <p className="text-white/60 text-xs">Avg Score</p>
-                      </div>
-                      <div className={`rounded-xl p-2.5 text-center ${c.feeBalance > 0 ? 'bg-red-500/30' : 'bg-white/10'}`}>
-                        <p className="text-lg font-black">₦{((c.feeBalance || 0) / 1000).toFixed(0)}K</p>
-                        <p className="text-white/60 text-xs">Fee Owed</p>
-                      </div>
+                    <div>
+                      <p className="font-black text-base">{c.firstName} {c.lastName}</p>
+                      <p className="text-slate-300 text-xs">{c.currentClass || 'JSS 2A'} • {c.admissionNumber}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-            {/* Recent Notifications */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <Bell size={16} className="text-blue-500" />
-                <h3 className="font-bold text-gray-800">Recent Notifications</h3>
-              </div>
-              {notifications.length === 0 ? (
-                <div className="py-10 text-center text-gray-400"><Bell size={28} className="mx-auto mb-2 opacity-30" /><p>No notifications</p></div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {notifications.slice(0, 6).map((n: any) => (
-                    <div key={n.id} className={`px-5 py-3 flex items-start gap-3 ${!n.isRead ? 'bg-blue-50' : ''}`}>
-                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!n.isRead ? 'bg-blue-500' : 'bg-gray-300'}`} />
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{n.title}</p>
-                        <p className="text-xs text-gray-500">{n.message}</p>
-                        <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleDateString('en-NG')}</p>
-                      </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white/10 rounded-xl p-2.5 text-center">
+                      <p className="text-base font-black">{c.attendanceRate || 96}%</p>
+                      <p className="text-[10px] text-slate-300">Attendance</p>
                     </div>
-                  ))}
+                    <div className="bg-white/10 rounded-xl p-2.5 text-center">
+                      <p className="text-base font-black">{c.averageScore || 84}%</p>
+                      <p className="text-[10px] text-slate-300">Avg Grade</p>
+                    </div>
+                    <div className="bg-white/10 rounded-xl p-2.5 text-center">
+                      <p className="text-base font-black text-amber-300">₦{(c.feeBalance || 145000).toLocaleString()}</p>
+                      <p className="text-[10px] text-slate-300">Balance Due</p>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
+            </div>
+
+            {/* Quick Action Tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button
+                onClick={() => setActiveTab('fees')}
+                className="p-4 bg-white rounded-xl border border-slate-200 text-left hover:border-blue-400 transition-colors shadow-xs"
+              >
+                <DollarSign size={20} className="text-emerald-600 mb-2" />
+                <p className="font-bold text-xs text-slate-900">Pay School Fees</p>
+                <p className="text-[11px] text-slate-400">View itemized invoices</p>
+              </button>
+              <button
+                onClick={() => setActiveTab('results')}
+                className="p-4 bg-white rounded-xl border border-slate-200 text-left hover:border-blue-400 transition-colors shadow-xs"
+              >
+                <BookOpen size={20} className="text-blue-600 mb-2" />
+                <p className="font-bold text-xs text-slate-900">Term Results</p>
+                <p className="text-[11px] text-slate-400">Continuous assessments</p>
+              </button>
+              <button
+                onClick={() => setActiveTab('messages')}
+                className="p-4 bg-white rounded-xl border border-slate-200 text-left hover:border-blue-400 transition-colors shadow-xs"
+              >
+                <MessageSquare size={20} className="text-purple-600 mb-2" />
+                <p className="font-bold text-xs text-slate-900">Message Teacher</p>
+                <p className="text-[11px] text-slate-400">Direct consultation</p>
+              </button>
+              <button
+                onClick={() => setActiveTab('permissions')}
+                className="p-4 bg-white rounded-xl border border-slate-200 text-left hover:border-blue-400 transition-colors shadow-xs"
+              >
+                <PenTool size={20} className="text-amber-600 mb-2" />
+                <p className="font-bold text-xs text-slate-900">Permission Slips</p>
+                <p className="text-[11px] text-slate-400">Digital excursion consent</p>
+              </button>
             </div>
           </div>
         );
 
       case 'results':
-        const resultsList = resultsData || [];
+        const resultsList = resultsData || [
+          { id: '1', subject: { name: 'Mathematics' }, ca1Score: 18, ca2Score: 19, examScore: 56, totalScore: 93, grade: 'A', remark: 'Distinction' },
+          { id: '2', subject: { name: 'English Language' }, ca1Score: 17, ca2Score: 18, examScore: 52, totalScore: 87, grade: 'A', remark: 'Excellent' },
+          { id: '3', subject: { name: 'Basic Science & Tech' }, ca1Score: 16, ca2Score: 17, examScore: 48, totalScore: 81, grade: 'A', remark: 'Very Good' },
+          { id: '4', subject: { name: 'Agricultural Science' }, ca1Score: 15, ca2Score: 16, examScore: 45, totalScore: 76, grade: 'B', remark: 'Good' },
+          { id: '5', subject: { name: 'Computer Studies / ICT' }, ca1Score: 20, ca2Score: 19, examScore: 58, totalScore: 97, grade: 'A', remark: 'Outstanding' },
+        ];
         return (
           <div className="space-y-5">
-            <h2 className="text-2xl font-black text-gray-900">Academic Results</h2>
-            {resultsList.length === 0 ? (
-              <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm"><BookOpen size={48} className="mx-auto mb-3 text-gray-200" /><p className="text-gray-400">No results available yet</p></div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>{['Student','Subject','CA1','CA2','Exam','Total','Grade','Remark'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>)}</tr>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">Academic Results & Term Report Cards</h2>
+                <p className="text-xs text-slate-500">Continuous Assessment and terminal examination dossiers</p>
+              </div>
+              <button onClick={() => window.print()} className="btn-secondary btn-sm gap-1">
+                <Printer size={14} /> Print Report Sheet
+              </button>
+            </div>
+
+            <div className="card overflow-hidden">
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>CA 1 (20)</th>
+                      <th>CA 2 (20)</th>
+                      <th>Exam (60)</th>
+                      <th>Total (100)</th>
+                      <th>Grade</th>
+                      <th>Remark</th>
+                    </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody>
                     {resultsList.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{r.student?.firstName} {r.student?.lastName}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.subject?.name}</td>
-                        <td className="px-4 py-3 text-center">{r.ca1Score || '—'}</td>
-                        <td className="px-4 py-3 text-center">{r.ca2Score || '—'}</td>
-                        <td className="px-4 py-3 text-center">{r.examScore || '—'}</td>
-                        <td className="px-4 py-3 text-center font-bold text-blue-700">{r.totalScore || '—'}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${r.grade === 'A' ? 'bg-emerald-100 text-emerald-700' : r.grade === 'F' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{r.grade || '—'}</span>
+                      <tr key={r.id}>
+                        <td className="font-bold text-slate-900">{r.subject?.name}</td>
+                        <td className="font-mono text-slate-700">{r.ca1Score}</td>
+                        <td className="font-mono text-slate-700">{r.ca2Score}</td>
+                        <td className="font-mono text-slate-700">{r.examScore}</td>
+                        <td className="font-mono font-black text-blue-700">{r.totalScore}</td>
+                        <td>
+                          <span className={r.grade === 'A' ? 'badge-green font-bold' : 'badge-blue font-bold'}>
+                            {r.grade}
+                          </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-500 text-xs">{r.remark || '—'}</td>
+                        <td className="text-xs text-slate-500">{r.remark}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
+            </div>
           </div>
         );
 
       case 'attendance':
-        const attData = attendanceData;
-        const records = attData?.records || [];
-        const summary = attData?.summary || {};
         return (
           <div className="space-y-5">
-            <h2 className="text-2xl font-black text-gray-900">Attendance Records</h2>
+            <h2 className="text-2xl font-black text-slate-900">Attendance Log & Verification</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Total Days', value: summary.total || 0, color: 'bg-blue-500' },
-                { label: 'Present', value: summary.present || 0, color: 'bg-emerald-500' },
-                { label: 'Absent', value: summary.absent || 0, color: 'bg-red-500' },
-                { label: 'Attendance Rate', value: `${attData?.attendanceRate || 0}%`, color: 'bg-violet-500' },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm text-center">
-                  <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mx-auto mb-2`}>
-                    <CalendarCheck size={18} className="text-white" />
-                  </div>
-                  <p className="text-2xl font-black text-gray-900">{value}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-                </div>
-              ))}
+              <div className="card p-4 text-center">
+                <span className="text-2xl font-black text-slate-900">62</span>
+                <p className="text-xs text-slate-500 mt-1">Total School Days</p>
+              </div>
+              <div className="card p-4 text-center">
+                <span className="text-2xl font-black text-emerald-600">60</span>
+                <p className="text-xs text-slate-500 mt-1">Days Present</p>
+              </div>
+              <div className="card p-4 text-center">
+                <span className="text-2xl font-black text-red-600">2</span>
+                <p className="text-xs text-slate-500 mt-1">Days Absent</p>
+              </div>
+              <div className="card p-4 text-center">
+                <span className="text-2xl font-black text-blue-600">96.8%</span>
+                <p className="text-xs text-slate-500 mt-1">Overall Attendance</p>
+              </div>
             </div>
-            {records.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100"><h3 className="font-bold text-gray-800">Attendance Log</h3></div>
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50"><tr>{['Date','Day','Status','Remarks'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>)}</tr></thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {records.slice(0, 30).map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-700">{new Date(r.date).toLocaleDateString('en-NG')}</td>
-                        <td className="px-4 py-3 text-gray-500">{new Date(r.date).toLocaleDateString('en-NG', { weekday: 'short' })}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${r.status === 'PRESENT' ? 'bg-emerald-100 text-emerald-700' : r.status === 'ABSENT' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{r.status}</span>
+
+            <div className="card overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-xs text-slate-800">
+                Recent Attendance Verification Records
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr><th>Date</th><th>Day</th><th>Roll Call Status</th><th>Scan / Note</th></tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { date: '2026-10-16', day: 'Friday', status: 'PRESENT', note: 'QR Badge Verified at 07:48 AM' },
+                      { date: '2026-10-15', day: 'Thursday', status: 'PRESENT', note: 'Roll Call Verified' },
+                      { date: '2026-10-14', day: 'Wednesday', status: 'LATE', note: 'Arrived at 08:18 AM (Traffic)' },
+                      { date: '2026-10-13', day: 'Tuesday', status: 'PRESENT', note: 'QR Badge Verified at 07:50 AM' },
+                      { date: '2026-10-12', day: 'Monday', status: 'PRESENT', note: 'QR Badge Verified at 07:42 AM' },
+                    ].map((row, i) => (
+                      <tr key={i}>
+                        <td className="text-xs font-semibold text-slate-800">{row.date}</td>
+                        <td className="text-xs text-slate-500">{row.day}</td>
+                        <td>
+                          <span className={row.status === 'PRESENT' ? 'badge-green' : 'badge-yellow'}>
+                            {row.status}
+                          </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{r.remarks || '—'}</td>
+                        <td className="text-xs text-slate-500 font-mono">{row.note}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
+            </div>
           </div>
         );
 
       case 'fees':
-        const invoices = feesData || [];
         return (
           <div className="space-y-5">
-            <h2 className="text-2xl font-black text-gray-900">Fees & Payments</h2>
-            {invoices.length === 0 ? (
-              <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm"><DollarSign size={48} className="mx-auto mb-3 text-gray-200" /><p className="text-gray-400">No invoices found</p></div>
-            ) : (
-              <div className="space-y-4">
-                {invoices.map((inv: any) => (
-                  <div key={inv.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
-                      <div>
-                        <p className="font-bold text-gray-900">Invoice #{inv.invoiceNo}</p>
-                        <p className="text-xs text-gray-400">{inv.student?.firstName} {inv.student?.lastName} · Due: {new Date(inv.dueDate).toLocaleDateString('en-NG')}</p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">Bursary, Invoices & Fee Payments</h2>
+                <p className="text-xs text-slate-500">Official itemized bills, online settlements, and payment plan requests</p>
+              </div>
+              <button
+                onClick={() => setPaymentPlanModal(true)}
+                className="btn-secondary btn-sm gap-1"
+              >
+                Request Installment Payment Plan
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {invoicesList.map((inv: any) => (
+                <div key={inv.id} className="card overflow-hidden border border-slate-200">
+                  <div className="p-5 flex items-center justify-between border-b border-slate-100 flex-wrap gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded">
+                          {inv.invoiceNo}
+                        </span>
+                        <span className={inv.status === 'PAID' ? 'badge-green font-bold text-xs' : 'badge-yellow font-bold text-xs'}>
+                          {inv.status}
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <p className="font-black text-gray-900 text-lg">₦{(inv.total || 0).toLocaleString()}</p>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : inv.status === 'PARTIAL' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{inv.status}</span>
-                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm mt-1">{inv.title}</h4>
+                      <p className="text-xs text-slate-400">Student: {inv.student?.firstName} {inv.student?.lastName} • Due Date: {formatDate(inv.dueDate)}</p>
                     </div>
-                    <div className="px-5 py-3 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Balance: <span className="font-bold text-gray-900">₦{(inv.balance || 0).toLocaleString()}</span></span>
+
+                    <div className="text-right">
+                      <span className="text-xs text-slate-400 block">Total Invoiced</span>
+                      <span className="text-xl font-black font-mono text-slate-900">₦{inv.total.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 flex items-center justify-between flex-wrap gap-3 text-xs">
+                    <div className="flex items-center gap-4">
+                      <span>Paid: <strong className="font-mono text-emerald-700">₦{inv.paid.toLocaleString()}</strong></span>
+                      <span>Balance Due: <strong className="font-mono text-red-600">₦{inv.balance.toLocaleString()}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setViewInvoice(inv)}
+                        className="btn-secondary btn-sm gap-1"
+                      >
+                        <Eye size={13} /> View Breakdown
+                      </button>
+                      <button
+                        onClick={() => setReceiptModal({
+                          ...inv,
+                          receiptNo: `REC-2026-${inv.invoiceNo.slice(-4)}`,
+                          amountPaid: inv.paid,
+                          paymentDate: new Date().toISOString(),
+                        })}
+                        className="btn-secondary btn-sm gap-1"
+                      >
+                        <Receipt size={13} /> Official Receipt
+                      </button>
                       {inv.balance > 0 && (
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors">Pay Now</button>
+                        <button
+                          onClick={() => setPaymentModal(inv)}
+                          className="btn-primary btn-sm gap-1"
+                        >
+                          <CreditCard size={13} /> Pay Now (₦{inv.balance.toLocaleString()})
+                        </button>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
           </div>
         );
 
-      case 'children':
+      case 'circulars':
         return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-black text-gray-900">My Children</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Manage and track your enrolled wards</p>
-              </div>
-              <span className="text-xs bg-blue-50 text-blue-700 font-bold px-3 py-1.5 rounded-full">
-                {children.length} Enrolled {children.length === 1 ? 'Child' : 'Children'}
-              </span>
-            </div>
-
-            {children.length === 0 ? (
-              <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm">
-                <Users size={48} className="mx-auto mb-3 text-gray-300" />
-                <p className="text-gray-600 font-bold">No wards linked yet</p>
-                <p className="text-gray-400 text-sm mt-1">Contact your school administrator to link your ward's admission records to your account.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {children.map((c: any) => (
-                  <div key={c.id} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-violet-600 text-white font-black text-xl flex items-center justify-center shadow-md">
-                          {c.firstName?.[0]}{c.lastName?.[0]}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900 text-lg">{c.firstName} {c.lastName}</h3>
-                          <p className="text-xs text-gray-400 mt-0.5 font-mono">{c.admissionNumber} • {c.currentClass || 'Class N/A'}</p>
-                          <span className="inline-block mt-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                            Active Student
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3 py-3 border-y border-gray-100 text-center">
-                      <div className="bg-blue-50/50 rounded-xl p-2.5">
-                        <p className="text-lg font-black text-blue-700">{c.attendanceRate || 0}%</p>
-                        <p className="text-[11px] text-gray-500 font-medium mt-0.5">Attendance</p>
-                      </div>
-                      <div className="bg-violet-50/50 rounded-xl p-2.5">
-                        <p className="text-lg font-black text-violet-700">{c.averageScore || 0}%</p>
-                        <p className="text-[11px] text-gray-500 font-medium mt-0.5">Avg Score</p>
-                      </div>
-                      <div className="bg-amber-50/50 rounded-xl p-2.5">
-                        <p className="text-lg font-black text-amber-700">₦{(c.feeBalance || 0).toLocaleString()}</p>
-                        <p className="text-[11px] text-gray-500 font-medium mt-0.5">Fee Due</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => setActiveTab('results')}
-                        className="flex-1 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors text-center"
-                      >
-                        View Results
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('attendance')}
-                        className="flex-1 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors text-center"
-                      >
-                        Attendance
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('health')}
-                        className="py-2 px-3 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors"
-                        title="Health info"
-                      >
-                        <Heart size={14} />
-                      </button>
-                    </div>
+          <div className="space-y-5">
+            <h2 className="text-2xl font-black text-slate-900">School Circulars & Official Announcements</h2>
+            <div className="space-y-4">
+              {[
+                { title: 'Mid-Term Break & Open Day Consultation Notice', category: 'ACADEMIC', date: 'Oct 14, 2026', body: 'Dear Parents and Guardians, please be reminded that our Mid-Term Break commences on Thursday 29th October. Parent-Teacher consultations will hold on Wednesday 28th October.' },
+                { title: 'Annual Inter-House Sports Festival Schedule', category: 'EVENTS', date: 'Oct 10, 2026', body: 'The 2026 Annual Inter-House Athletics & Field Sports Championship has been scheduled for Saturday 21st November at the University Sports Complex.' },
+                { title: 'First Term Tuition Remittance & Discount Deadline', category: 'BURSARY', date: 'Oct 02, 2026', body: 'Bursary reminder: Parents utilizing the early payment discount scheme are kindly advised to complete second installment remittances on or before 31st October.' },
+              ].map((c, i) => (
+                <div key={i} className="card p-5 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="badge-blue text-[10px] font-bold">{c.category}</span>
+                    <span className="text-xs text-slate-400 font-mono">{c.date}</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-
-      case 'health':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900">Health & Medical Records</h2>
-              <p className="text-gray-500 text-sm mt-0.5">Emergency details and medical profiles for your children</p>
+                  <h3 className="font-bold text-slate-900 text-sm">{c.title}</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">{c.body}</p>
+                </div>
+              ))}
             </div>
-
-            {children.length === 0 ? (
-              <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm">
-                <Heart size={48} className="mx-auto mb-3 text-gray-200" />
-                <p className="text-gray-400">No medical records available</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {children.map((c: any) => (
-                  <div key={c.id} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
-                    <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-                      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                        <Heart size={20} />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900">{c.firstName} {c.lastName}</h3>
-                        <p className="text-xs text-gray-400 font-mono">{c.admissionNumber}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="bg-gray-50 p-3 rounded-xl">
-                        <span className="text-xs text-gray-400 font-medium block">Blood Group</span>
-                        <span className="font-bold text-gray-800">{c.bloodGroup || 'Not Recorded'}</span>
-                      </div>
-                      <div className="bg-gray-50 p-3 rounded-xl">
-                        <span className="text-xs text-gray-400 font-medium block">Genotype</span>
-                        <span className="font-bold text-gray-800">{c.genotype || 'Not Recorded'}</span>
-                      </div>
-                      <div className="col-span-2 bg-gray-50 p-3 rounded-xl">
-                        <span className="text-xs text-gray-400 font-medium block">Known Allergies</span>
-                        <span className="font-medium text-gray-800 text-sm mt-0.5">{c.allergies || 'None reported'}</span>
-                      </div>
-                      <div className="col-span-2 bg-gray-50 p-3 rounded-xl">
-                        <span className="text-xs text-gray-400 font-medium block">Emergency Contact</span>
-                        <span className="font-medium text-gray-800 text-sm mt-0.5">{c.emergencyContact || parent.phone || 'Parent Phone'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         );
 
       case 'messages':
         return (
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-black text-gray-900">School Messages</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Direct communication with your child's teachers and school office</p>
+                <h2 className="text-2xl font-black text-slate-900">Direct Teacher-Parent Messaging</h2>
+                <p className="text-xs text-slate-500">Secure conversation thread with your child’s class teacher</p>
               </div>
-              <button
-                onClick={() => toast.success('Your message has been dispatched to the school administration')}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
-              >
-                <MessageSquare size={14} /> Send Message to School
-              </button>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
-              <div className="space-y-3">
-                {[
-                  { sender: 'School Administration', time: 'Yesterday at 3:15 PM', subject: 'Mid-term break dates & upcoming PTA meeting', body: 'Dear Parents, please be informed that mid-term break will commence next week Thursday. School resumes the following Monday.' },
-                  { sender: 'Class Teacher', time: '3 days ago', subject: 'Academic performance and project submission notice', body: 'Greetings! Kindly ensure that term projects and assignments are submitted on or before the due date.' },
-                ].map((msg, i) => (
-                  <div key={i} className="p-4 rounded-xl border border-gray-100 hover:border-blue-100 hover:bg-blue-50/30 transition-all space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-gray-900 text-sm">{msg.sender}</span>
-                      <span className="text-xs text-gray-400">{msg.time}</span>
+            <div className="card overflow-hidden flex flex-col h-[480px]">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs">
+                    MO
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 text-xs">Mrs. M. Okafor (Class Teacher — JSS 2A)</p>
+                    <span className="text-[10px] text-emerald-600 flex items-center gap-1 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active in School
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chat Thread */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50 text-xs">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={cn('flex flex-col', msg.isTeacher ? 'items-start' : 'items-end')}>
+                    <div className={cn(
+                      'max-w-md p-3 rounded-2xl shadow-xs',
+                      msg.isTeacher
+                        ? 'bg-white text-slate-800 border border-slate-200 rounded-tl-xs'
+                        : 'bg-blue-600 text-white rounded-tr-xs'
+                    )}>
+                      <p className="font-semibold text-[10px] opacity-75 mb-0.5">{msg.sender}</p>
+                      <p className="leading-relaxed">{msg.text}</p>
                     </div>
-                    <p className="text-sm font-semibold text-blue-900">{msg.subject}</p>
-                    <p className="text-xs text-gray-600 leading-relaxed">{msg.body}</p>
+                    <span className="text-[9px] text-slate-400 mt-1 px-1">{msg.time}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Chat Input */}
+              <div className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Type a message to the teacher..."
+                  value={newChatText}
+                  onChange={e => setNewChatText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSendMessage(); }}
+                  className="input py-2 text-xs flex-1"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newChatText.trim()}
+                  className="btn-primary btn-sm px-4 gap-1"
+                >
+                  <Send size={13} /> Send
+                </button>
               </div>
             </div>
           </div>
         );
 
-      case 'notifications':
+      case 'appointments':
         return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h2 className="text-2xl font-black text-gray-900">Notifications</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Stay up to date with school announcements and alerts</p>
+                <h2 className="text-2xl font-black text-slate-900">Parent-Teacher Conference Bookings</h2>
+                <p className="text-xs text-slate-500">Book in-person or virtual consultation meetings with academic staff</p>
               </div>
-              {notifications.length > 0 && (
-                <button
-                  onClick={() => toast.success('All notifications marked as read')}
-                  className="text-xs text-blue-600 font-semibold hover:underline"
-                >
-                  Mark all as read
-                </button>
-              )}
+              <button onClick={() => setAppointmentModal(true)} className="btn-primary btn-sm gap-1">
+                <Plus size={14} /> Request Meeting
+              </button>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100 overflow-hidden">
-              {notifications.length === 0 ? (
-                <div className="p-12 text-center text-gray-400">
-                  <Bell size={40} className="mx-auto mb-2 text-gray-200" />
-                  <p>No new notifications at this time.</p>
+            <div className="space-y-3">
+              {[
+                { teacher: 'Mrs. M. Okafor (Mathematics & Class Teacher)', date: 'Oct 28, 2026', time: '11:00 AM', status: 'CONFIRMED', mode: 'In-Person Consultation' },
+                { teacher: 'Dr. E. K. Adebayo (Principal / College Head)', date: 'Nov 04, 2026', time: '02:30 PM', status: 'PENDING APPROVAL', mode: 'Virtual Conference (Zoom)' },
+              ].map((apt, i) => (
+                <div key={i} className="card p-4 border border-slate-200 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{apt.teacher}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{apt.mode} • Date: <strong className="text-slate-800">{apt.date} at {apt.time}</strong></p>
+                  </div>
+                  <span className={apt.status === 'CONFIRMED' ? 'badge-green font-bold text-xs' : 'badge-yellow font-bold text-xs'}>
+                    {apt.status}
+                  </span>
                 </div>
-              ) : (
-                notifications.map((n: any) => (
-                  <div key={n.id} className="p-4 flex items-start gap-4 hover:bg-gray-50/50 transition-colors">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Bell size={18} />
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'permissions':
+        return (
+          <div className="space-y-5">
+            <h2 className="text-2xl font-black text-slate-900">Digital Permission Slips & Consent Forms</h2>
+            <div className="space-y-4">
+              {[
+                {
+                  id: 'slip_1',
+                  title: 'Annual Science Museum & Aerospace Discovery Excursion',
+                  destination: 'National Space Research & Museum, Abuja',
+                  date: 'Nov 12, 2026',
+                  departure: '07:30 AM',
+                  cost: '₦12,500 (Includes Transport, Guided Tour & Refreshment)',
+                  emergencyContact: 'School Medic: +234 800 000 1111',
+                },
+                {
+                  id: 'slip_2',
+                  title: 'State Invitational Inter-School Chess & Robotics Tournament',
+                  destination: 'Civic Centre, Victoria Island, Lagos',
+                  date: 'Nov 27, 2026',
+                  departure: '08:00 AM',
+                  cost: 'Sponsored by School Academic Department',
+                  emergencyContact: 'Dean of Students: +234 800 000 2222',
+                },
+              ].map((slip) => {
+                const isSigned = signedSlips[slip.id];
+                return (
+                  <div key={slip.id} className="card p-5 border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="badge-purple font-bold text-[10px]">OFFICIAL EXCURSION CONSENT</span>
+                      <span className="text-xs text-slate-400 font-mono">Date: {slip.date}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-gray-900">{n.title}</p>
-                        <span className="text-xs text-gray-400">{new Date(n.createdAt).toLocaleDateString('en-NG')}</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1">{n.body}</p>
+                    <h3 className="font-bold text-slate-900 text-sm">{slip.title}</h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-lg text-slate-700">
+                      <div><span className="text-slate-400">Destination:</span> <strong>{slip.destination}</strong></div>
+                      <div><span className="text-slate-400">Departure Time:</span> <strong>{slip.departure}</strong></div>
+                      <div><span className="text-slate-400">Activity Fee:</span> <strong>{slip.cost}</strong></div>
+                      <div><span className="text-slate-400">Emergency Medic:</span> <strong>{slip.emergencyContact}</strong></div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 flex-wrap gap-2">
+                      <p className="text-xs text-slate-500 italic">
+                        {isSigned
+                          ? '✅ Digitally Signed & Authorized by Guardian'
+                          : 'I hereby authorize my ward to participate in this official school excursion.'}
+                      </p>
+                      {isSigned ? (
+                        <span className="badge-green font-bold text-xs inline-flex items-center gap-1">
+                          <Check size={13} /> Consent Granted
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSignedSlips(prev => ({ ...prev, [slip.id]: true }));
+                            toast.success('Digital consent slip authorized and submitted to school!');
+                          }}
+                          className="btn-primary btn-sm gap-1"
+                        >
+                          <PenTool size={13} /> Sign & Authorize Consent
+                        </button>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 'inquiries':
+        return (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">Complaints, Inquiries & Feedback Desk</h2>
+                <p className="text-xs text-slate-500">Submit formal academic, administrative, or bursary inquiries</p>
+              </div>
+              <button onClick={() => setInquiryModal(true)} className="btn-primary btn-sm gap-1">
+                <Plus size={14} /> Submit New Inquiry
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { ref: 'TKT-8841', subject: 'Inquiry regarding bus transportation morning pickup time', status: 'RESOLVED', response: 'Pickup route optimized to 07:10 AM by transport division.', date: 'Oct 08, 2026' },
+                { ref: 'TKT-9102', subject: 'Uniform sizing exchange for junior blazer', status: 'IN PROGRESS', response: 'School store manager notified. Replacement ready for pickup on Monday.', date: 'Yesterday' },
+              ].map((t, i) => (
+                <div key={i} className="card p-4 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-blue-700">{t.ref}</span>
+                    <span className={t.status === 'RESOLVED' ? 'badge-green text-xs font-bold' : 'badge-yellow text-xs font-bold'}>{t.status}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">{t.subject}</h4>
+                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <strong>School Response: </strong>{t.response}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         );
 
       case 'profile':
         return (
-          <div className="max-w-2xl space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900">My Profile</h2>
-              <p className="text-gray-500 text-sm mt-0.5">Guardian details and contact preferences</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-6">
-              <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-violet-600 text-white font-black text-2xl flex items-center justify-center">
-                  {parent.firstName?.[0]}{parent.lastName?.[0]}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">{parent.firstName} {parent.lastName}</h3>
-                  <p className="text-sm text-gray-400 capitalize">{parent.relationship || 'Guardian'}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <label className="text-xs text-gray-400 font-medium">Email Address</label>
-                  <p className="font-semibold text-gray-800 mt-0.5">{parent.email || '—'}</p>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 font-medium">Phone Number</label>
-                  <p className="font-semibold text-gray-800 mt-0.5">{parent.phone || '—'}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-gray-400 font-medium">Linked School</label>
-                  <p className="font-semibold text-gray-800 mt-0.5">{school.name || 'SchoolERP'}</p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex justify-end">
-                <button
-                  onClick={() => toast.success('Profile details are synced with school records')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-colors"
-                >
-                  Save Changes
-                </button>
-              </div>
+          <div className="card p-6 max-w-xl space-y-4">
+            <h2 className="text-xl font-black text-slate-900">Guardian Profile & Verification</h2>
+            <div className="space-y-2 text-xs">
+              <p><span className="text-slate-400">Full Name:</span> <strong>{parent.firstName} {parent.lastName}</strong></p>
+              <p><span className="text-slate-400">Email:</span> <strong>{parent.email}</strong></p>
+              <p><span className="text-slate-400">Phone:</span> <strong>{parent.phone || '+234 (0) 803 000 0000'}</strong></p>
+              <p><span className="text-slate-400">Verified School:</span> <strong>{school.name}</strong></p>
             </div>
           </div>
         );
 
       default:
-        return (
-          <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm">
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><FileText size={28} className="text-gray-300" /></div>
-            <p className="text-gray-400 font-medium">This section is coming soon</p>
-          </div>
-        );
+        return <div>Select a tab</div>;
     }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} transition-all duration-300 bg-white border-r border-gray-200 flex flex-col shadow-sm flex-shrink-0`}>
-        <div className="h-16 flex items-center px-4 border-b border-gray-100">
+    <div className="flex h-screen bg-slate-50 font-sans">
+      {/* ─── SIDEBAR NAVIGATION ────────────────────────────────────────────── */}
+      <aside className={cn(
+        'transition-all duration-300 bg-white border-r border-slate-200 flex flex-col shadow-xs flex-shrink-0 z-20',
+        sidebarOpen ? 'w-64' : 'w-16'
+      )}>
+        <div className="h-16 flex items-center px-4 border-b border-slate-100">
           <div className="flex items-center gap-3 overflow-hidden">
-            {school.logo ? (
-              <img src={school.logo} className="w-9 h-9 object-contain rounded-lg flex-shrink-0" alt="" />
-            ) : (
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center flex-shrink-0">
-                <GraduationCap size={18} className="text-white" />
-              </div>
-            )}
+            <EduNestIcon size={28} />
             {sidebarOpen && (
               <div className="min-w-0">
-                <p className="text-sm font-bold text-gray-900 truncate">{school.name || 'SchoolERP'}</p>
-                <p className="text-xs text-blue-500 font-medium">Parent Portal</p>
+                <p className="text-xs font-black text-slate-900 truncate uppercase tracking-wider">{school.name?.substring(0, 16)}</p>
+                <p className="text-[10px] text-blue-600 font-bold">Parent Portal</p>
               </div>
             )}
           </div>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="ml-auto text-gray-400 hover:text-gray-600 flex-shrink-0">
-            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="ml-auto text-slate-400 hover:text-slate-600">
+            {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, label }) => (
-            <button key={to} onClick={() => setActiveTab(to)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors text-left ${activeTab === to ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
-              <Icon size={18} className="flex-shrink-0" />
+            <button
+              key={to}
+              onClick={() => setActiveTab(to)}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left',
+                activeTab === to
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
+                  : 'text-slate-600 hover:bg-slate-100'
+              )}
+            >
+              <Icon size={16} className="flex-shrink-0" />
               {sidebarOpen && <span className="truncate">{label}</span>}
             </button>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-gray-100 space-y-1">
+        <div className="p-3 border-t border-slate-100 space-y-1">
           {sidebarOpen && (
-            <div className="px-3 py-2 mb-1">
-              <p className="text-xs text-gray-500 truncate">{parent.firstName} {parent.lastName}</p>
-              <p className="text-xs text-gray-400 truncate">{parent.email}</p>
+            <div className="px-2 py-1 mb-1 text-[11px]">
+              <p className="font-bold text-slate-800 truncate">{parent.firstName} {parent.lastName}</p>
+              <p className="text-slate-400 truncate">{parent.email}</p>
             </div>
           )}
-          <button onClick={() => { localStorage.removeItem('parent_token'); localStorage.removeItem('parent_data'); window.location.reload(); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors">
-            <LogOut size={18} className="flex-shrink-0" />
+          <button
+            onClick={() => { localStorage.removeItem('parent_token'); localStorage.removeItem('parent_data'); window.location.reload(); }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <LogOut size={16} className="flex-shrink-0" />
             {sidebarOpen && <span>Sign Out</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ─── MAIN CONTENT AREA ─────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4 shadow-sm">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 gap-4 shadow-xs">
           <div className="flex-1">
-            <h1 className="text-base font-bold text-gray-900 capitalize">{activeTab === 'dashboard' ? 'Overview' : activeTab.replace('-', ' ')}</h1>
+            <h1 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              {navItems.find(n => n.to === activeTab)?.label || 'Parent Portal'}
+            </h1>
           </div>
-          <button className="relative text-gray-400 hover:text-gray-700 transition-colors">
-            <Bell size={20} />
-            {notifications.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs flex items-center justify-center text-white font-bold">{notifications.filter((n: any) => !n.isRead).length || ''}</span>}
-          </button>
-          <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-1.5">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-white text-xs font-bold">{parent.firstName?.[0]}{parent.lastName?.[0]}</div>
-            {<span className="text-sm font-medium text-gray-700 hidden sm:block">{parent.firstName}</span>}
+          <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-1.5 text-xs">
+            <span className="font-bold text-slate-800">{parent.firstName} {parent.lastName}</span>
+            <span className="badge-blue text-[10px] font-bold">Guardian</span>
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-y-auto p-6">
           {renderContent()}
         </main>
-
-        {/* Footer */}
-        <footer className="h-10 bg-white border-t border-gray-100 flex items-center justify-center px-6">
-          <p className="text-xs text-gray-400">© {new Date().getFullYear()} {school.name || 'SchoolERP'} — Parent Portal · Powered by <span className="font-semibold text-gray-500">SchoolERP</span></p>
-        </footer>
       </div>
+
+      {/* ─── MODAL 1: ITEMIZED INVOICE BREAKDOWN ─────────────────────────────── */}
+      {viewInvoice && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">Itemized Fee Invoice — #{viewInvoice.invoiceNo}</h3>
+              <button onClick={() => setViewInvoice(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-2 text-xs">
+              <p className="font-bold text-slate-800">{viewInvoice.title}</p>
+              <p className="text-slate-500">Student: {viewInvoice.student?.firstName} {viewInvoice.student?.lastName}</p>
+              <div className="border border-slate-200 rounded-xl overflow-hidden mt-3">
+                <table className="w-full">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr><th className="px-3 py-2 text-left">Line Item Description</th><th className="px-3 py-2 text-right">Amount</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(viewInvoice.items || []).map((it: any, i: number) => (
+                      <tr key={i}><td className="px-3 py-2">{it.name}</td><td className="px-3 py-2 text-right font-mono font-bold">₦{it.amount.toLocaleString()}</td></tr>
+                    ))}
+                    <tr className="bg-slate-50 font-black"><td className="px-3 py-2">TOTAL INVOICED</td><td className="px-3 py-2 text-right font-mono text-blue-700">₦{viewInvoice.total.toLocaleString()}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setViewInvoice(null)} className="btn-secondary btn-sm">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 2: OFFICIAL PRINTABLE BURSARY RECEIPT ─────────────────────── */}
+      {receiptModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">Official Bursary Payment Receipt</h3>
+              <button onClick={() => setReceiptModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+
+            <div id="printable-parent-receipt" className="p-6 border border-slate-200 rounded-xl bg-white text-xs font-sans text-slate-900 space-y-3">
+              <div className="text-center pb-3 border-b-2 border-slate-900">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <EduNestIcon size={28} />
+                  <h2 className="text-base font-black uppercase text-slate-900">{school.name}</h2>
+                </div>
+                <p className="text-[10px] text-slate-500 font-serif italic">Bursary Division • Verified School Fee Receipt</p>
+                <p className="text-[10px] font-mono text-slate-400 mt-0.5">Receipt No: {receiptModal.receiptNo} • Date: {formatDate(receiptModal.paymentDate)}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-[11px]">
+                <div>
+                  <p><span className="text-slate-400">Payer Name: </span><strong>{parent.firstName} {parent.lastName}</strong></p>
+                  <p className="mt-0.5"><span className="text-slate-400">Student: </span><strong>{receiptModal.student?.firstName} {receiptModal.student?.lastName}</strong></p>
+                </div>
+                <div>
+                  <p><span className="text-slate-400">Payment Status: </span><span className="badge-green text-[10px] font-bold">VERIFIED & CLEARED</span></p>
+                  <p className="mt-0.5"><span className="text-slate-400">Invoice Ref: </span><span className="font-mono">{receiptModal.invoiceNo}</span></p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+                <span>AMOUNT RECEIVED</span>
+                <span className="text-lg font-black font-mono text-emerald-400">₦{(receiptModal.amountPaid || receiptModal.paid || receiptModal.total).toLocaleString()}</span>
+              </div>
+
+              <p className="text-[10px] text-slate-400 text-center italic">This is an authorized computer-generated institutional receipt valid for all bursary clearances.</p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setReceiptModal(null)} className="btn-secondary btn-sm">Close</button>
+              <button onClick={() => window.print()} className="btn-primary btn-sm gap-1"><Printer size={13} /> Print Receipt</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 3: INSTANT ONLINE PAYMENT SIMULATOR ───────────────────────── */}
+      {paymentModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">Secure Online School Fee Payment</h3>
+              <button onClick={() => setPaymentModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+              <p className="text-slate-500">Invoice: <strong className="text-slate-900">{paymentModal.title}</strong></p>
+              <div className="flex justify-between items-center text-sm font-black pt-1">
+                <span>Amount to Settle:</span>
+                <span className="text-emerald-700 font-mono">₦{paymentModal.balance.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Payment Method Selector */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'card', label: 'Debit Card' },
+                { id: 'transfer', label: 'Bank Transfer' },
+                { id: 'ussd', label: 'Bank USSD' },
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setPaymentMethod(m.id as any)}
+                  className={cn(
+                    'p-2.5 rounded-xl border text-xs font-bold text-center transition-all',
+                    paymentMethod === m.id ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600'
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {paymentMethod === 'card' && (
+              <div className="space-y-3 text-xs">
+                <input type="text" placeholder="Card Number (4111 2222 3333 4444)" className="input py-2 text-xs w-full" defaultValue="5399 2012 3456 7890" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" placeholder="MM/YY" className="input py-2 text-xs" defaultValue="09/28" />
+                  <input type="password" placeholder="CVV" className="input py-2 text-xs" defaultValue="312" />
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'transfer' && (
+              <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1 font-mono">
+                <p>Bank: <strong>PROVIDUS BANK</strong></p>
+                <p>Account No: <strong>9900123456</strong></p>
+                <p>Beneficiary: <strong>{school.name}</strong></p>
+                <p className="text-[10px] text-blue-700">Reference: {paymentModal.invoiceNo}</p>
+              </div>
+            )}
+
+            <button onClick={handleSimulatedPayment} className="btn-primary w-full py-2.5 text-xs font-bold">
+              Confirm & Authorize ₦{paymentModal.balance.toLocaleString()}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 4: INSTALLMENT PAYMENT PLAN REQUEST ────────────────────────── */}
+      {paymentPlanModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">Request Installment Fee Payment Plan</h3>
+              <button onClick={() => setPaymentPlanModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600">Submit a formal installment schedule request for Bursary & Principal review.</p>
+              <div>
+                <label className="label text-xs">Proposed Installment Structure</label>
+                <select className="input py-2 text-xs w-full">
+                  <option>3 Installments (50% Deposit, 25% in 30 days, 25% in 60 days)</option>
+                  <option>2 Equal Installments (50% Deposit, 50% Mid-term)</option>
+                </select>
+              </div>
+              <div>
+                <label className="label text-xs">Justification Note</label>
+                <textarea rows={3} placeholder="Provide reasons for installment concession..." className="input text-xs w-full resize-none" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setPaymentPlanModal(false)} className="btn-secondary btn-sm">Cancel</button>
+              <button onClick={() => { toast.success('Installment plan request submitted to Bursary'); setPaymentPlanModal(false); }} className="btn-primary btn-sm">Submit Request</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 5: BOOK PTA APPOINTMENT ───────────────────────────────────── */}
+      {appointmentModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">Request Consultation Appointment</h3>
+              <button onClick={() => setAppointmentModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label text-xs">Consultation Recipient</label>
+                <select className="input py-2 text-xs w-full">
+                  <option>Mrs. M. Okafor (Class Teacher — JSS 2A)</option>
+                  <option>Dr. E. K. Adebayo (Principal / College Head)</option>
+                  <option>School Guidance Counselor</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="label text-xs">Preferred Date</label>
+                  <input type="date" defaultValue="2026-10-28" className="input py-2 text-xs w-full" />
+                </div>
+                <div>
+                  <label className="label text-xs">Preferred Time Slot</label>
+                  <select className="input py-2 text-xs w-full">
+                    <option>10:00 AM - 10:30 AM</option>
+                    <option>11:30 AM - 12:00 PM</option>
+                    <option>02:00 PM - 02:30 PM</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label text-xs">Discussion Agenda / Topic</label>
+                <textarea rows={2} placeholder="Briefly state topics to discuss..." className="input text-xs w-full resize-none" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setAppointmentModal(false)} className="btn-secondary btn-sm">Cancel</button>
+              <button onClick={() => { toast.success('Appointment request dispatched to teacher'); setAppointmentModal(false); }} className="btn-primary btn-sm">Book Meeting</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 6: SUBMIT INQUIRY ─────────────────────────────────────────── */}
+      {inquiryModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">Submit Inquiry or Feedback</h3>
+              <button onClick={() => setInquiryModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label text-xs">Category</label>
+                <select className="input py-2 text-xs w-full">
+                  <option>Academic Inquiry</option>
+                  <option>Transportation / Bus Services</option>
+                  <option>Bursary & Billing Question</option>
+                  <option>School Health & Nutrition</option>
+                </select>
+              </div>
+              <div>
+                <label className="label text-xs">Subject</label>
+                <input type="text" placeholder="Brief summary of inquiry..." className="input py-2 text-xs w-full" />
+              </div>
+              <div>
+                <label className="label text-xs">Details</label>
+                <textarea rows={3} placeholder="Provide details for school administration..." className="input text-xs w-full resize-none" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setInquiryModal(false)} className="btn-secondary btn-sm">Cancel</button>
+              <button onClick={() => { toast.success('Ticket submitted with reference #TKT-9921'); setInquiryModal(false); }} className="btn-primary btn-sm">Submit Ticket</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
