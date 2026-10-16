@@ -32,17 +32,17 @@
     "helmet": "^7.0.0",
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.1",
+    "@types/node": "^20.0.0",
+    "prisma": "^5.22.0",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
+    "typescript": "^5.0.0",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.0",
-    "@types/node": "^20.0.0",
     "@types/passport-jwt": "^3.0.0",
-    "prisma": "^5.22.0",
     "ts-node": "^10.9.0",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.0.0"
+    "ts-node-dev": "^2.0.0"
   }
 }

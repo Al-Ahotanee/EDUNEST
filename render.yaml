@@ -9,7 +9,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: npm install && npm run build:all
+    buildCommand: npm install --include=dev && npm run build:all
     startCommand: cd apps/api && node dist/main.js
     healthCheckPath: /ping
     envVars:
