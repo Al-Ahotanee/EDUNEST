@@ -176,20 +176,20 @@ export default function SaasRegisterPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans antialiased text-slate-800">
       {/* Top Header */}
-      <header className="h-16 border-b border-slate-200/80 bg-white/95 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+      <header className="h-20 border-b border-slate-200/80 bg-white/95 backdrop-blur-md px-6 sm:px-10 lg:px-16 flex items-center justify-between sticky top-0 z-30">
         <Link to="/" className="flex items-center gap-2">
-          <EduNestLogo size="sm" subtext="School Onboarding" />
+          <EduNestLogo size="md" subtext="School Onboarding" />
         </Link>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3 text-sm">
           <span className="text-slate-500 hidden sm:inline">Already registered?</span>
-          <Link to="/login" className="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
+          <Link to="/login" className="font-bold text-slate-900 hover:text-blue-600 transition-colors">
             Sign In →
           </Link>
         </div>
       </header>
 
       {/* Main Body */}
-      <div className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-10 w-full">
+      <div className="flex-1 max-w-5xl 2xl:max-w-6xl mx-auto px-6 sm:px-10 py-14 w-full">
         {/* Step Progression Bar */}
         <div className="flex items-center justify-center mb-8 max-w-xl mx-auto">
           {STEPS.map(({ id, label, icon: Icon }, i) => (

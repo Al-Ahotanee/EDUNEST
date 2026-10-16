@@ -38,7 +38,7 @@ export function AppLayout() {
           collapsed ? 'md:ml-16' : 'md:ml-64'
         )}
       >
-        <div className="p-4 sm:p-6 max-w-screen-2xl mx-auto">
+        <div className="p-6 sm:p-8 lg:p-10 w-full max-w-7xl 2xl:max-w-[1700px] mx-auto">
           <Outlet />
         </div>
       </main>

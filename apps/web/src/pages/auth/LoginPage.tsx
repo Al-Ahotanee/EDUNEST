@@ -80,11 +80,11 @@ export default function LoginPage() {
       </header>
 
       {/* Main Container */}
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-10">
-        <div className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-16">
+        <div className="w-full max-w-5xl 2xl:max-w-6xl bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[620px]">
           
           {/* Left Hero Column */}
-          <div className="lg:col-span-5 bg-slate-900 text-white p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+          <div className="lg:col-span-5 bg-slate-900 text-white p-10 sm:p-12 flex flex-col justify-between relative overflow-hidden">
             {/* Subtle background graphic */}
             <div className="absolute -top-12 -right-12 w-48 h-48 bg-slate-800 rounded-full blur-3xl opacity-50" />
             <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-blue-900 rounded-full blur-3xl opacity-30" />

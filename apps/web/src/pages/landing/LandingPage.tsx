@@ -3,51 +3,53 @@ import { Link } from 'react-router-dom';
 import {
   GraduationCap, Check, ArrowRight, ShieldCheck, Wifi, 
   Award, DollarSign, Monitor, ChevronDown, Users, School,
-  FileText, Clock, Sparkles, BookOpen, Menu, X, ArrowUpRight
+  FileText, Clock, Sparkles, BookOpen, Menu, X, ArrowUpRight,
+  TrendingUp, CheckCircle2, Lock, Download, Printer, Filter,
+  Layers, Database, Smartphone, Globe, ShieldAlert
 } from 'lucide-react';
 import { EduNestLogo } from '../../components/common/EduNestLogo';
 
 const CORE_MODULES = {
   academic: [
-    { title: 'Student Master Dossier', desc: 'Centralized biodata, enrollment history, guardian links, and health records.' },
-    { title: 'Broadsheets & Termly Cards', desc: 'Continuous assessment (CA) + exam calculation, automated rankings, and PDF transcripts.' },
-    { title: 'CBT Examination Engine', desc: 'Secure question banks, timed tests, anti-cheating window lock, and instant auto-grading.' },
-    { title: 'Biometric & Daily Attendance', desc: 'Daily classroom roll-call with automated SMS notifications to parents on arrival.' },
+    { title: 'Student Master Dossier', desc: 'Centralized bio-data, enrollment history, guardian links, blood group, medical alerts, and multi-session historical academic archives.' },
+    { title: 'Terminal CA Broadsheets', desc: 'Continuous Assessment (CA1 + CA2) and terminal examination automatic score computation, weighted averages, and automated class ranking.' },
+    { title: 'CBT Examination Engine', desc: 'Secure anti-cheating browser lock, timed test windows, randomized question pools, and instant automated grading with question-by-question analytics.' },
+    { title: 'Biometric & Daily Attendance', desc: 'Classroom roll-call with automated SMS/email alerts to parents upon arrival, tracking absenteeism and termly punctuality percentages.' },
   ],
   finance: [
-    { title: 'Automated Fee Invoicing', desc: 'Class-specific fee schedules, early-payment discounts, and automated invoice dispatch.' },
-    { title: 'Paystack & Bank Settlement', desc: 'Direct online and transfer reconciliation with cryptographic receipt generation.' },
-    { title: 'Staff Payroll & PAYE', desc: 'Monthly salary calculation with PAYE tax, pension deductions, and automated payslips.' },
-    { title: 'Audited Financial Ledger', desc: 'Daily bursary logs, expense tracking, and real-time cashflow statements.' },
+    { title: 'Automated Tuition Invoicing', desc: 'Class-specific fee schedules, boarding surcharges, early-payment discounts, installment billing, and automated digital dispatch.' },
+    { title: 'Paystack & Bank Settlement', desc: 'Direct online payment checkout and automated bank transfer reconciliation with cryptographic tamper-proof digital receipts.' },
+    { title: 'Staff Payroll & PAYE Tax', desc: 'Monthly salary calculation with PAYE tax schedules, pension deductions, staff advance deductions, and automated payslip delivery.' },
+    { title: 'Audited Financial Ledger', desc: 'Real-time bursary ledger, income and expenditure tracking, chart of accounts, and one-click financial audit statements.' },
   ],
   campus: [
-    { title: 'Hostel & Boarding Wardens', desc: 'Room allocation, boarding roll-call, exeat permit issuance, and warden logs.' },
-    { title: 'Health Clinic & Sick Bay', desc: 'Student medical history, clinic visit logging, prescriptions, and emergency contacts.' },
-    { title: 'Digital School Library', desc: 'Catalog indexing, barcode checkout, return tracking, and overdue fine management.' },
-    { title: 'Inventory & Storekeeper', desc: 'Stock monitoring for uniforms, textbooks, laboratory equipment, and stationery.' },
+    { title: 'Hostel & Boarding Wardens', desc: 'Room and bed allocation, boarding house roll-call, exeat permit issuance, visitor logging, and warden incident reports.' },
+    { title: 'Health Clinic & Sick Bay', desc: 'Student medical record management, clinic visit logging, doctor prescriptions, nurse observations, and emergency guardian calls.' },
+    { title: 'Digital School Library', desc: 'Catalog indexing by Dewey Decimal, barcode book checkout, due date tracking, automated overdue fine calculation, and inventory.' },
+    { title: 'Inventory & Storekeeper', desc: 'Stock monitoring for uniforms, textbooks, laboratory supplies, and stationery with automatic reorder threshold notifications.' },
   ],
 };
 
 const FAQS = [
   {
     q: 'How does EduNest function when internet access is unavailable?',
-    a: 'EduNest uses a local-first offline cache. Teachers and administrators can take classroom attendance, input grades, and manage daily tasks offline. The instant connectivity is restored, all data automatically syncs with zero conflict or data loss.',
+    a: 'EduNest is engineered with an advanced local-first offline synchronization engine. Teachers can take classroom attendance, input continuous assessment scores, and conduct CBT exams completely offline. The moment connectivity is restored, all offline transactions seamlessly synchronize with the cloud database with zero data conflict.',
   },
   {
-    q: 'Can we import our existing student records from Excel or CSV?',
-    a: 'Yes. EduNest includes a 1-click spreadsheet importer. You can upload existing student biodata, parent contacts, and staff rosters in minutes without manual re-entry.',
+    q: 'Can we import our existing student and staff records from Excel or CSV?',
+    a: 'Yes. EduNest includes an intelligent 1-click spreadsheet importer. You can upload existing student biodata, parent phone numbers, staff rosters, and historical grades in minutes without manual re-entry.',
   },
   {
-    q: 'How do parents access terminal report cards and fee invoices?',
-    a: 'Each institution receives a branded web portal (e.g. portal.yourschool.ng). Parents log in securely via smartphone or desktop to inspect terminal report cards, pay tuition fees directly via Paystack/Bank Transfer, and monitor attendance.',
+    q: 'How do parents access terminal report cards and tuition invoices?',
+    a: 'Each institution receives a branded web portal (e.g., yourschool.edunest.ng). Parents log in securely via smartphone or desktop to view terminal report cards, pay tuition fees directly via Paystack or Bank Transfer, and monitor attendance in real time.',
   },
   {
     q: 'How does the pricing structure work? Are there setup fees?',
-    a: 'Pricing is billed per academic term (3 terms per school year) based on enrolled scholar capacity. There are no setup fees, server maintenance charges, or update fees.',
+    a: 'Pricing is billed per academic term based on enrolled student capacity. There are no setup fees, server maintenance charges, or update fees. Your subscription covers cloud hosting, SSL certificates, automated off-site backups, and support.',
   },
   {
-    q: 'Is student and financial data secure?',
-    a: 'Yes. Each institution operates in an isolated tenant partition with cryptographic encryption, automated daily off-site backups, role-based access controls, and full NDPR data compliance.',
+    q: 'Is student and financial data secure and compliant with ministry standards?',
+    a: 'Yes. Each institution operates in an isolated tenant partition with cryptographic encryption, automated daily off-site backups, role-based access controls, and full NDPR data protection compliance.',
   },
 ];
 
@@ -56,7 +58,6 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'broadsheet' | 'bursary' | 'cbt'>('broadsheet');
   const [moduleCategory, setModuleCategory] = useState<'academic' | 'finance' | 'campus'>('academic');
-  const [billingCycle, setBillingCycle] = useState<'termly' | 'annual'>('termly');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
 
   useEffect(() => {
@@ -68,562 +69,857 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-slate-900 selection:text-white antialiased">
 
-      {/* ── Minimalist Top Navigation ─────────────────────────────────────── */}
+      {/* ── World-Class Expansive Top Navigation ────────────────────────────── */}
       <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-200 ${
         scrolled 
-          ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs' 
-          : 'bg-white/70 backdrop-blur-xs border-b border-slate-200/50'
+          ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-sm' 
+          : 'bg-white/80 backdrop-blur-sm border-b border-slate-200/60'
       }`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <EduNestLogo size="sm" subtext="School OS" />
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 h-20 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3">
+            <EduNestLogo size="md" subtext="School Operating System" />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-slate-600">
-            <a href="#overview" className="hover:text-slate-900 transition-colors">Overview</a>
+          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-600">
+            <a href="#overview" className="hover:text-slate-900 transition-colors">Platform Overview</a>
             <a href="#architecture" className="hover:text-slate-900 transition-colors">Offline Sync</a>
             <a href="#modules" className="hover:text-slate-900 transition-colors">Modules</a>
-            <a href="#pricing" className="hover:text-slate-900 transition-colors">Pricing</a>
-            <a href="#faqs" className="hover:text-slate-900 transition-colors">FAQ</a>
+            <a href="#pricing" className="hover:text-slate-900 transition-colors">Tariff Packages</a>
+            <a href="#faqs" className="hover:text-slate-900 transition-colors">Institutional FAQ</a>
           </nav>
 
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-4">
             <Link
               to="/login"
-              className="text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-4 py-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
-              Sign in
+              Portal Sign In
             </Link>
             <Link
               to="/saas/register"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg shadow-2xs transition-colors"
+              className="inline-flex items-center gap-2 text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5"
             >
-              Register school <ArrowRight size={13} />
+              <span>Register Institution</span>
+              <ArrowRight size={16} />
             </Link>
           </div>
 
           <button 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
+            className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100"
             aria-label="Toggle navigation"
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-slate-200 px-6 py-4 space-y-3">
-            <a href="#overview" onClick={() => setMobileMenuOpen(false)} className="block text-xs font-medium text-slate-700 py-1.5">Overview</a>
-            <a href="#architecture" onClick={() => setMobileMenuOpen(false)} className="block text-xs font-medium text-slate-700 py-1.5">Offline Sync</a>
-            <a href="#modules" onClick={() => setMobileMenuOpen(false)} className="block text-xs font-medium text-slate-700 py-1.5">Modules</a>
-            <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-xs font-medium text-slate-700 py-1.5">Pricing</a>
-            <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-              <Link to="/login" className="text-center py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-800">Sign in</Link>
-              <Link to="/saas/register" className="text-center py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">Register school</Link>
+          <div className="lg:hidden bg-white border-b border-slate-200 px-8 py-6 space-y-4">
+            <a href="#overview" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-medium text-slate-800 py-2">Platform Overview</a>
+            <a href="#architecture" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-medium text-slate-800 py-2">Offline Sync Architecture</a>
+            <a href="#modules" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-medium text-slate-800 py-2">System Modules</a>
+            <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-medium text-slate-800 py-2">Tariff Packages</a>
+            <a href="#faqs" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-medium text-slate-800 py-2">FAQ</a>
+            <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
+              <Link to="/login" className="text-center py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-900">Sign In to Portal</Link>
+              <Link to="/saas/register" className="text-center py-3 rounded-xl bg-slate-900 text-white text-sm font-bold shadow-md">Register Institution</Link>
             </div>
           </div>
         )}
       </header>
 
-      {/* ── Refined Minimalist Hero ───────────────────────────────────────── */}
-      <section className="pt-28 pb-16 sm:pt-36 sm:pb-24 bg-white border-b border-slate-200/80">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          {/* Release Pill */}
-          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-full px-3 py-1 mb-6 text-xs text-slate-600 font-medium shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>Version 2.4 Active</span>
-            <span className="text-slate-400">·</span>
-            <span className="text-slate-500">Offline-first institutional architecture</span>
+      {/* ── Expansive Executive Hero Section ─────────────────────────────────── */}
+      <section className="pt-36 pb-20 sm:pt-44 sm:pb-32 bg-white border-b border-slate-200/80">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 text-center">
+          
+          {/* Release Badge */}
+          <div className="inline-flex items-center gap-2.5 bg-slate-100 border border-slate-200 rounded-full px-4 py-1.5 mb-8 text-xs sm:text-sm text-slate-700 font-semibold shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>EduNest Enterprise Release v2.4</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-600 font-normal">Offline-First Institutional Architecture</span>
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-semibold text-slate-900 tracking-tight leading-[1.12]">
+          <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black text-slate-900 tracking-tight leading-[1.05] max-w-5xl mx-auto">
             The operating system for modern education.
           </h1>
 
           {/* Subtitle */}
-          <p className="text-sm sm:text-lg text-slate-500 font-normal max-w-2xl mx-auto mt-4 leading-relaxed">
-            EduNest unifies student biodata, continuous assessment broadsheets, automated fee settlement, and CBT exams into a single institutional platform—engineered to work online and offline.
+          <p className="text-lg sm:text-2xl text-slate-600 font-normal max-w-4xl mx-auto mt-6 leading-relaxed">
+            EduNest unifies continuous assessment broadsheets, automated bursary reconciliation, CBT examinations, and student dossiers into a single, cohesive institutional platform—engineered to work flawlessly online and offline.
           </p>
 
           {/* Action CTAs */}
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               to="/saas/register"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-5 py-2.5 rounded-lg shadow-xs transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-base px-8 py-4 rounded-xl shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5"
             >
-              Start 30-day pilot <ArrowRight size={14} />
+              <span>Start 30-day institutional pilot</span>
+              <ArrowRight size={18} />
             </Link>
             <a
               href="#overview"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-5 py-2.5 rounded-lg shadow-2xs transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-base px-8 py-4 rounded-xl shadow-xs transition-colors"
             >
-              Explore platform
+              <span>Explore live platform</span>
             </a>
           </div>
 
-          <div className="mt-8 flex items-center justify-center gap-6 text-xs text-slate-500 font-normal">
-            <span>✓ Works 100% offline</span>
-            <span>✓ 1-click Excel student import</span>
-            <span>✓ Ministry compliant</span>
+          {/* Trust Highlights */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-8 sm:gap-12 text-sm sm:text-base font-semibold text-slate-600">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-emerald-600" />
+              <span>100% Offline Resilience</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-emerald-600" />
+              <span>1-Click Excel / CSV Importer</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-emerald-600" />
+              <span>State Ministry & NDPR Compliant</span>
+            </div>
           </div>
         </div>
 
-        {/* ── Minimalist Clean Interactive Application Mockup ────────────────── */}
-        <div id="overview" className="mt-14 max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-            {/* Titlebar */}
-            <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+        {/* ── Full-Width Immersive Application Mockup ────────────────────────── */}
+        <div id="overview" className="mt-16 w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden">
+            
+            {/* Browser Chrome Header */}
+            <div className="bg-slate-900 px-6 py-3.5 border-b border-slate-800 flex items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-rose-500/80"></div>
+                  <div className="w-3 h-3 rounded-full bg-amber-500/80"></div>
+                  <div className="w-3 h-3 rounded-full bg-emerald-500/80"></div>
                 </div>
-                <span className="font-mono text-slate-500 text-[11px] ml-2">app.edunest.ng/institution</span>
+                <div className="flex items-center gap-2 bg-slate-800/80 px-4 py-1 rounded-lg border border-slate-700/60 text-slate-300 font-mono text-xs">
+                  <Lock size={12} className="text-emerald-400" />
+                  <span>https://crown-crest.edunest.ng/broadsheet/2025-2026/term-3</span>
+                </div>
               </div>
 
-              {/* Tab Selector */}
-              <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg text-xs">
+              <div className="flex items-center gap-3 text-slate-400">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Cloud Synced
+                </span>
+              </div>
+            </div>
+
+            {/* Interactive Tab Bar */}
+            <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2 bg-slate-200/70 p-1 rounded-xl">
                 <button
                   onClick={() => setActiveTab('broadsheet')}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                    activeTab === 'broadsheet' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                    activeTab === 'broadsheet' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Terminal Broadsheet
+                  Terminal Broadsheet & Scores
                 </button>
                 <button
                   onClick={() => setActiveTab('bursary')}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                    activeTab === 'bursary' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                    activeTab === 'bursary' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Bursary Ledger
+                  Bursary & Paystack Ledger
                 </button>
                 <button
                   onClick={() => setActiveTab('cbt')}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                    activeTab === 'cbt' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                    activeTab === 'cbt' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  CBT Assessment
+                  CBT Examination Suite
                 </button>
               </div>
+
+              <div className="flex items-center gap-3 text-xs text-slate-600 font-medium">
+                <span className="hidden sm:inline">Academic Session: <strong>2025/2026</strong></span>
+                <span className="hidden sm:inline">·</span>
+                <span>Term: <strong>3rd Term (Promotional)</strong></span>
+              </div>
             </div>
 
-            {/* Display Body */}
-            <div className="p-6 bg-white min-h-[280px]">
-              {activeTab === 'broadsheet' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm">JSS 3A Terminal Broadsheet</p>
-                      <p className="text-slate-500 text-xs">First Term Assessment • CA 40% + Examination 60%</p>
-                    </div>
-                    <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                      Computed & Certified
+            {/* Executive KPI Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-slate-50/50 border-b border-slate-200/80">
+              <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                  <span>Enrolled Scholars</span>
+                  <Users size={16} className="text-blue-600" />
+                </div>
+                <p className="text-2xl font-extrabold text-slate-900 mt-2 tracking-tight">1,420</p>
+                <p className="text-xs text-emerald-600 font-semibold mt-1">↑ 14.2% vs previous term</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                  <span>Terminal Attendance</span>
+                  <CheckCircle2 size={16} className="text-emerald-600" />
+                </div>
+                <p className="text-2xl font-extrabold text-slate-900 mt-2 tracking-tight">98.4%</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">38,400 daily roll-calls</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                  <span>Tuition Collected</span>
+                  <DollarSign size={16} className="text-emerald-600" />
+                </div>
+                <p className="text-2xl font-extrabold text-slate-900 mt-2 tracking-tight">₦48,650,000</p>
+                <p className="text-xs text-emerald-600 font-semibold mt-1">99.2% reconciliation rate</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                  <span>Broadsheets Approved</span>
+                  <Award size={16} className="text-purple-600" />
+                </div>
+                <p className="text-2xl font-extrabold text-slate-900 mt-2 tracking-tight">100%</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">All 18 arms compiled</p>
+              </div>
+            </div>
+
+            {/* TAB CONTENT: Broadsheet View */}
+            {activeTab === 'broadsheet' && (
+              <div className="p-6 overflow-x-auto">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 text-xs">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">SS3 Diamond — Master Terminal Assessment Broadsheet</h3>
+                    <p className="text-xs text-slate-500">Continuous Assessment (40%) + Promotional Exam (60%) = Total (100%)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-1.5 shadow-2xs">
+                      <Download size={13} /> Export Excel
+                    </button>
+                    <button className="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold flex items-center gap-1.5 shadow-2xs">
+                      <Printer size={13} /> Print Transcripts
+                    </button>
+                  </div>
+                </div>
+
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/80 text-slate-600 uppercase text-[10px] tracking-wider border-y border-slate-200 font-bold">
+                      <th className="py-3 px-4">Scholar Details</th>
+                      <th className="py-3 px-3">Admission No</th>
+                      <th className="py-3 px-3">CA 1 (20)</th>
+                      <th className="py-3 px-3">CA 2 (20)</th>
+                      <th className="py-3 px-3">Exam (60)</th>
+                      <th className="py-3 px-3">Total (100)</th>
+                      <th className="py-3 px-3">Grade</th>
+                      <th className="py-3 px-3">Rank</th>
+                      <th className="py-3 px-4">Executive Remark</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    <tr className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs">
+                          AA
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm leading-tight">Adeyemi Aminat O.</p>
+                          <p className="text-[11px] text-slate-400">Science Department</p>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-600">EDN/2023/048</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">19</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">18</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">56</td>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900 text-sm">93.0</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[11px]">A1 (Distinction)</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-bold text-slate-900">1st of 42</td>
+                      <td className="py-3.5 px-4 text-slate-600 font-medium">Exceptional analytical prowess and leadership.</td>
+                    </tr>
+
+                    <tr className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs">
+                          IB
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm leading-tight">Ibrahim Babatunde M.</p>
+                          <p className="text-[11px] text-slate-400">Science Department</p>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-600">EDN/2023/112</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">18</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">17</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">52</td>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900 text-sm">87.0</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[11px]">A1 (Distinction)</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-bold text-slate-900">2nd of 42</td>
+                      <td className="py-3.5 px-4 text-slate-600 font-medium">Brilliant grasp of advanced physics and calculations.</td>
+                    </tr>
+
+                    <tr className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                          CO
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm leading-tight">Chukwuemeka Oluchi G.</p>
+                          <p className="text-[11px] text-slate-400">Science Department</p>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-600">EDN/2023/074</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">17</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">16</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">49</td>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900 text-sm">82.0</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-extrabold text-[11px]">B2 (Very Good)</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-bold text-slate-900">3rd of 42</td>
+                      <td className="py-3.5 px-4 text-slate-600 font-medium">Strong academic performance across all STEM courses.</td>
+                    </tr>
+
+                    <tr className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                          DU
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm leading-tight">Danjuma Usman K.</p>
+                          <p className="text-[11px] text-slate-400">Science Department</p>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-600">EDN/2023/159</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">16</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">15</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">46</td>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900 text-sm">77.0</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-extrabold text-[11px]">B3 (Good)</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-bold text-slate-900">4th of 42</td>
+                      <td className="py-3.5 px-4 text-slate-600 font-medium">Consistently dedicated. Commended for prompt CA work.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* TAB CONTENT: Bursary Ledger View */}
+            {activeTab === 'bursary' && (
+              <div className="p-6 overflow-x-auto">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 text-xs">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">Terminal Bursary Ledger & Payment Settlements</h3>
+                    <p className="text-xs text-slate-500">Automated payment reconciliation with Paystack, Bank Transfers, and Cash Desks</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">
+                      Live Settlement: 99.2%
                     </span>
                   </div>
+                </div>
 
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="text-slate-500 border-b border-slate-100 font-medium pb-2 text-[11px]">
-                        <th className="py-2">Student Name</th>
-                        <th className="py-2">Admission No</th>
-                        <th className="py-2">CA 1 (20)</th>
-                        <th className="py-2">CA 2 (20)</th>
-                        <th className="py-2">Exam (60)</th>
-                        <th className="py-2">Aggregate</th>
-                        <th className="py-2">Grade</th>
-                        <th className="py-2 text-right">Position</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/80 text-slate-600 uppercase text-[10px] tracking-wider border-y border-slate-200 font-bold">
+                      <th className="py-3 px-4">Invoice Ref</th>
+                      <th className="py-3 px-3">Scholar & Class</th>
+                      <th className="py-3 px-3">Payer / Guardian</th>
+                      <th className="py-3 px-3">Amount</th>
+                      <th className="py-3 px-3">Channel</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3">Reconciliation Timestamp</th>
+                      <th className="py-3 px-4">Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    <tr className="hover:bg-slate-50/70">
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">INV-2025-8491</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">Adeyemi Aminat (SS3)</td>
+                      <td className="py-3.5 px-3 text-slate-600">Engr. T. Adeyemi</td>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900">₦185,000</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-[10px]">Paystack Checkout</span>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Settled & Verified</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-500">Today, 09:42 AM</td>
+                      <td className="py-3.5 px-4">
+                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1">
+                          <Download size={12} /> PDF
+                        </button>
+                      </td>
+                    </tr>
+
+                    <tr className="hover:bg-slate-50/70">
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">INV-2025-8492</td>
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">Ibrahim Babatunde (SS3)</td>
+                      <td className="py-3.5 px-3 text-slate-600">Alhaji M. Ibrahim</td>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900">₦185,000</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-[10px]">Direct NIP Transfer</span>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Settled & Verified</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-500">Today, 08:15 AM</td>
+                      <td className="py-3.5 px-4">
+                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1">
+                          <Download size={12} /> PDF
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* TAB CONTENT: CBT View */}
+            {activeTab === 'cbt' && (
+              <div className="p-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 mb-6 border-b border-slate-100 gap-4">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-bold uppercase tracking-wider">
+                      Live Examination Room · Anti-Cheat Active
+                    </span>
+                    <h3 className="font-bold text-slate-900 text-xl mt-1.5">WAEC Mock Chemistry 2026 Paper II</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">50 Questions · Timed 60 Minutes · Window Focus Lock Enabled</p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xs">
+                    <Clock size={18} className="text-amber-400" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider">Remaining Time</p>
+                      <p className="text-lg font-mono font-bold text-white">38m : 24s</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  <div className="lg:col-span-8 space-y-6">
+                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Question 14 of 50</p>
+                      <p className="text-base font-semibold text-slate-900 leading-relaxed">
+                        What is the IUPAC name for the organic compound with the molecular formula CH₃-CH(OH)-CH₂-COOH?
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
                       {[
-                        { name: 'Amina Bello', no: 'SCH-041', ca1: 18, ca2: 19, exam: 54, tot: 91, grade: 'A1', pos: '1st' },
-                        { name: 'Chukwudi Eze', no: 'SCH-089', ca1: 17, ca2: 16, exam: 51, tot: 84, grade: 'B2', pos: '2nd' },
-                        { name: 'Oluwaseun Bakare', no: 'SCH-112', ca1: 16, ca2: 17, exam: 48, tot: 81, grade: 'B2', pos: '3rd' },
-                      ].map((r, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="py-2.5 font-medium text-slate-900">{r.name}</td>
-                          <td className="py-2.5 font-mono text-slate-500">{r.no}</td>
-                          <td className="py-2.5 text-slate-600">{r.ca1}</td>
-                          <td className="py-2.5 text-slate-600">{r.ca2}</td>
-                          <td className="py-2.5 text-slate-600">{r.exam}</td>
-                          <td className="py-2.5 font-semibold text-slate-900">{r.tot}%</td>
-                          <td className="py-2.5">
-                            <span className="font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">
-                              {r.grade}
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-right font-medium text-slate-700">{r.pos}</td>
-                        </tr>
+                        { key: 'A', text: '3-hydroxybutanoic acid', correct: true },
+                        { key: 'B', text: '2-hydroxybutanoic acid', correct: false },
+                        { key: 'C', text: '4-hydroxybutanoic acid', correct: false },
+                        { key: 'D', text: '1-hydroxybutyric acid', correct: false },
+                      ].map(opt => (
+                        <div
+                          key={opt.key}
+                          className={`p-4 rounded-xl border flex items-center gap-4 cursor-pointer transition-all ${
+                            opt.correct
+                              ? 'bg-blue-50/80 border-blue-500 text-slate-900 font-semibold shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                            opt.correct ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {opt.key}
+                          </span>
+                          <span className="text-sm">{opt.text}</span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    </div>
+                  </div>
 
-              {activeTab === 'bursary' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
+                  <div className="lg:col-span-4 bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-5">
                     <div>
-                      <p className="font-semibold text-slate-900 text-sm">Tuition Settlement Ledger</p>
-                      <p className="text-slate-500 text-xs">Direct Paystack & Automated Bank Reconciliation</p>
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Questions Matrix</h4>
+                      <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 25 }, (_, i) => i + 1).map(n => (
+                          <div
+                            key={n}
+                            className={`h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                              n === 14
+                                ? 'bg-blue-600 text-white ring-2 ring-blue-300'
+                                : n < 14
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-white text-slate-500 border border-slate-200'
+                            }`}
+                          >
+                            {n}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span className="text-xs font-semibold text-slate-900">
-                      Total: ₦18,450,000 Settled
-                    </span>
-                  </div>
 
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="text-slate-500 border-b border-slate-100 font-medium pb-2 text-[11px]">
-                        <th className="py-2">Receipt No</th>
-                        <th className="py-2">Payer / Scholar</th>
-                        <th className="py-2">Amount</th>
-                        <th className="py-2">Channel</th>
-                        <th className="py-2">Status</th>
-                        <th className="py-2 text-right">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {[
-                        { rc: 'REC-2026-0941', name: 'Zarah Mohammed', amt: '₦85,000', ch: 'Card (Paystack)', st: 'Reconciled', dt: 'Today, 09:14' },
-                        { rc: 'REC-2026-0940', name: 'Ibrahim Danladi', amt: '₦85,000', ch: 'Bank Transfer', st: 'Reconciled', dt: 'Today, 08:32' },
-                        { rc: 'REC-2026-0939', name: 'Grace Okafor', amt: '₦85,000', ch: 'Card (Paystack)', st: 'Reconciled', dt: 'Yesterday' },
-                      ].map((r, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="py-2.5 font-mono text-slate-500">{r.rc}</td>
-                          <td className="py-2.5 font-medium text-slate-900">{r.name}</td>
-                          <td className="py-2.5 font-semibold text-slate-900">{r.amt}</td>
-                          <td className="py-2.5 text-slate-600">{r.ch}</td>
-                          <td className="py-2.5">
-                            <span className="font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px]">
-                              {r.st}
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-right text-slate-500">{r.dt}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {activeTab === 'cbt' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm">Computer-Based Examination Center</p>
-                      <p className="text-slate-500 text-xs">Mathematics JSS 3 • Timed Auto-Submission</p>
-                    </div>
-                    <span className="text-xs font-mono font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                      Time: 34:12 Remaining
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3 text-xs">
-                    <p className="font-medium text-slate-900">
-                      Question 14: Solve for \( x \) in the quadratic expression \( 2x^2 + 5x - 3 = 0 \).
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="p-2.5 rounded bg-white border border-blue-400 font-semibold text-blue-900">
-                        A) x = 1/2 or x = -3 (Selected)
+                    <div className="pt-4 border-t border-slate-200 text-xs space-y-2">
+                      <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+                        <ShieldCheck size={16} />
+                        <span>Anti-Cheating Window: Locked</span>
                       </div>
-                      <div className="p-2.5 rounded bg-white border border-slate-200 text-slate-600">
-                        B) x = -1/2 or x = 3
-                      </div>
-                      <div className="p-2.5 rounded bg-white border border-slate-200 text-slate-600">
-                        C) x = 2 or x = -3/2
-                      </div>
-                      <div className="p-2.5 rounded bg-white border border-slate-200 text-slate-600">
-                        D) x = 3/2 or x = -1
-                      </div>
+                      <p className="text-[11px] text-slate-500">Tab switches or minimize actions flag automated penalty logs to the invigilator.</p>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
           </div>
         </div>
       </section>
 
-      {/* ── Quiet Social Proof ────────────────────────────────────────────── */}
-      <section className="py-12 bg-white border-b border-slate-200/80">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <p className="text-center text-xs font-medium text-slate-400 uppercase tracking-wider mb-6">
-            Trusted by educational leaders across Nigeria
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center text-xs">
-            <div>
-              <p className="text-2xl font-semibold text-slate-900">200+</p>
-              <p className="text-slate-500 mt-0.5">Accredited Schools</p>
-            </div>
-            <div>
-              <p className="text-2xl font-semibold text-slate-900">85,000+</p>
-              <p className="text-slate-500 mt-0.5">Enrolled Scholars</p>
-            </div>
-            <div>
-              <p className="text-2xl font-semibold text-slate-900">₦2.4B+</p>
-              <p className="text-slate-500 mt-0.5">Tuition Reconciled</p>
-            </div>
-            <div>
-              <p className="text-2xl font-semibold text-slate-900">99.98%</p>
-              <p className="text-slate-500 mt-0.5">Platform Availability</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 4 Core Pillars Bento Grid ─────────────────────────────────────── */}
-      <section id="architecture" className="py-20 bg-slate-50 border-b border-slate-200/80">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="max-w-xl mb-12">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Core Architecture
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mt-1">
-              Purpose-built for institutional performance.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Pillar 1 */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
-                <Wifi size={18} />
-              </div>
-              <h3 className="font-semibold text-slate-900 text-base">Dual-Engine Offline Sync</h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                Classroom roll-call and continuous assessment grading function locally on laptops and tablets without internet. When connected, changes reconcile with zero data loss or conflicts.
-              </p>
-            </div>
-
-            {/* Pillar 2 */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
-                <Award size={18} />
-              </div>
-              <h3 className="font-semibold text-slate-900 text-base">Statutory Broadsheets</h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                Ministry-compliant grading models (CA 30%/40% + Exam 60%/70%). Calculates GPA, class rankings, and produces standardized printable PDF report cards in one click.
-              </p>
-            </div>
-
-            {/* Pillar 3 */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
-                <DollarSign size={18} />
-              </div>
-              <h3 className="font-semibold text-slate-900 text-base">Reconciled Bursary Collection</h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                Integrated Paystack and bank transfer channels automatically log settlements and issue electronic receipts, completely eliminating manual teller verification queues.
-              </p>
-            </div>
-
-            {/* Pillar 4 */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-800">
-                <Monitor size={18} />
-              </div>
-              <h3 className="font-semibold text-slate-900 text-base">CBT Examination Suite</h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                Conduct large-scale mock tests and internal terminal exams. Features question bank randomization, anti-cheating window blur detection, and instant auto-grading.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Organized Modules Tabbed Section ──────────────────────────────── */}
-      <section id="modules" className="py-20 bg-white border-b border-slate-200/80">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
-            <div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Functional Modules
+      {/* ── Offline Architecture Section ────────────────────────────────────── */}
+      <section id="architecture" className="py-28 sm:py-36 bg-slate-50 border-b border-slate-200/80">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+            
+            <div className="lg:col-span-6 space-y-6">
+              <span className="px-3.5 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold uppercase tracking-wider">
+                Reliable Under Real Conditions
               </span>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mt-1">
-                Everything required to run your institution.
+              <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                Engineered for erratic power & intermittent internet.
               </h2>
+              <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
+                Most school management software collapses the moment MTN, Airtel, or Starlink drops. EduNest was designed from day one with an **offline-first local database engine**.
+              </p>
+
+              <div className="space-y-4 pt-4">
+                <div className="flex items-start gap-4 p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                    <Wifi size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-base">Zero Disruption Roll-Call & Exams</h4>
+                    <p className="text-xs sm:text-sm text-slate-600 mt-1">Teachers enter attendance and grades in remote classroom blocks without WiFi. Data persists locally and safely.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4 p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <Database size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-base">Automatic Conflict-Free Cloud Sync</h4>
+                    <p className="text-xs sm:text-sm text-slate-600 mt-1">The instant internet re-establishes, transaction deltas merge automatically into the cloud without double-entry errors.</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium">
+            <div className="lg:col-span-6 bg-white p-8 sm:p-10 rounded-3xl border border-slate-200/90 shadow-xl space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <span className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <Layers size={18} className="text-blue-600" />
+                  Dual-Engine Architecture
+                </span>
+                <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700">
+                  CRDT Sync Engine
+                </span>
+              </div>
+
+              <div className="space-y-4 text-xs sm:text-sm">
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-emerald-900">Online State (Cloud Synchronized)</p>
+                    <p className="text-emerald-700 mt-0.5">Real-time parent portal updates, Paystack instant tuition settlement, and WhatsApp notifications.</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-100 border border-slate-200 flex items-start gap-3">
+                  <Wifi size={18} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-slate-800">Offline State (Local-First Fallback)</p>
+                    <p className="text-slate-600 mt-0.5">Continuous assessment scoring, classroom attendance, library barcode checkouts, and clinic logs continue 100% uninterrupted.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── System Modules Section ───────────────────────────────────────────── */}
+      <section id="modules" className="py-28 sm:py-36 bg-white border-b border-slate-200/80">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="px-3.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+              Comprehensive Institutional Scope
+            </span>
+            <h2 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight mt-4">
+              Everything your school requires. Nothing it doesn't.
+            </h2>
+            <p className="text-base sm:text-xl text-slate-600 mt-4 leading-relaxed">
+              Designed around the operational realities of Nigerian private, mission, and model schools.
+            </p>
+
+            {/* Category Switcher */}
+            <div className="mt-8 inline-flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
               <button
                 onClick={() => setModuleCategory('academic')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  moduleCategory === 'academic' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600 hover:text-slate-900'
+                className={`px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  moduleCategory === 'academic' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Academic
+                Academic & Exams
               </button>
               <button
                 onClick={() => setModuleCategory('finance')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  moduleCategory === 'finance' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600 hover:text-slate-900'
+                className={`px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  moduleCategory === 'finance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Bursary
+                Bursary & Payroll
               </button>
               <button
                 onClick={() => setModuleCategory('campus')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  moduleCategory === 'campus' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600 hover:text-slate-900'
+                className={`px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  moduleCategory === 'campus' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Campus Life
+                Hostel, Clinic & Store
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {CORE_MODULES[moduleCategory].map((m, i) => (
-              <div 
-                key={i} 
-                className="p-5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-2xs transition-all space-y-1.5"
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {CORE_MODULES[moduleCategory].map((mod, idx) => (
+              <div
+                key={mod.title}
+                className="p-8 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-400 hover:shadow-lg transition-all flex flex-col justify-between space-y-4"
               >
-                <h4 className="font-semibold text-slate-900 text-sm">{m.title}</h4>
-                <p className="text-xs text-slate-500 leading-relaxed font-normal">{m.desc}</p>
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm mb-5 shadow-xs">
+                    0{idx + 1}
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">{mod.title}</h3>
+                  <p className="text-sm text-slate-600 mt-2.5 leading-relaxed">{mod.desc}</p>
+                </div>
+                <div className="pt-4 border-t border-slate-100 flex items-center gap-1.5 text-xs font-bold text-blue-600">
+                  <span>Explore module details</span>
+                  <ArrowRight size={13} />
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Minimalist Clean Pricing Matrix ───────────────────────────────── */}
-      <section id="pricing" className="py-20 bg-slate-50 border-b border-slate-200/80">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-xl mx-auto mb-12">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Transparent Tariff
+      {/* ── Tariff Packages (Pricing) Section ─────────────────────────────────── */}
+      <section id="pricing" className="py-28 sm:py-36 bg-slate-50 border-b border-slate-200/80">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider">
+              Transparent Institutional Pricing
             </span>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mt-1">
-              Predictable institutional pricing.
+            <h2 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight mt-4">
+              Predictable termly tariffs. Zero setup fees.
             </h2>
-            <p className="text-xs text-slate-500 mt-2">
-              Billed per academic term (3 terms per year). No hidden fees or setup charges.
+            <p className="text-base sm:text-xl text-slate-600 mt-4 leading-relaxed">
+              Billed per academic term (3 terms per session). No hidden server maintenance or update charges.
             </p>
-
-            <div className="mt-6 inline-flex items-center gap-1.5 bg-white border border-slate-200 p-1 rounded-lg text-xs font-medium shadow-2xs">
-              <button
-                onClick={() => setBillingCycle('termly')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  billingCycle === 'termly' ? 'bg-slate-900 text-white font-semibold' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Termly billing
-              </button>
-              <button
-                onClick={() => setBillingCycle('annual')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${
-                  billingCycle === 'annual' ? 'bg-slate-900 text-white font-semibold' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Annual (Save 15%)
-              </button>
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Basic */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Basic Pilot */}
+            <div className="p-8 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between">
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase">Basic Tier</p>
-                <h3 className="font-semibold text-slate-900 text-base mt-0.5">Primary / Small School</h3>
-                <p className="text-xs text-slate-500 mt-1">Up to 500 scholars</p>
-
-                <div className="my-5">
-                  <span className="text-2xl font-bold text-slate-900">
-                    ₦{billingCycle === 'termly' ? '15,000' : '38,250'}
-                  </span>
-                  <span className="text-xs text-slate-500"> / {billingCycle === 'termly' ? 'term' : 'year'}</span>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Basic Evaluation</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">Free</p>
+                <p className="text-xs text-slate-500 mt-1">14-day full pilot trial</p>
+                <div className="my-6 border-t border-slate-100 pt-6 space-y-3 text-xs sm:text-sm text-slate-700">
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Up to 150 students</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Continuous Assessment Broadsheets</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Offline Local Sync</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Email Support</span></div>
                 </div>
-
-                <ul className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Student biodata & roll call</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Terminal broadsheet grading</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> PDF report card generation</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Offline sync engine</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Paystack fee reconciliation</li>
-                </ul>
               </div>
-
-              <div className="pt-6">
-                <Link
-                  to="/saas/register"
-                  className="w-full inline-flex items-center justify-center py-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
-                >
-                  Start free trial
-                </Link>
-              </div>
+              <Link to="/saas/register?plan=BASIC" className="w-full py-3 rounded-xl border border-slate-300 text-center text-xs sm:text-sm font-bold text-slate-800 hover:bg-slate-100 transition-colors">
+                Start Free Pilot
+              </Link>
             </div>
 
-            {/* Standard */}
-            <div className="bg-white p-6 rounded-xl border-2 border-slate-900 shadow-xs flex flex-col justify-between relative">
-              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+            {/* Standard Term */}
+            <div className="p-8 rounded-2xl border-2 border-slate-900 bg-slate-900 text-white flex flex-col justify-between relative shadow-xl">
+              <span className="absolute -top-3.5 right-6 px-3 py-1 rounded-full bg-emerald-400 text-slate-950 text-[11px] font-black uppercase tracking-wider">
                 Most Popular
               </span>
-
               <div>
-                <p className="text-xs font-semibold text-blue-600 uppercase">Standard Tier</p>
-                <h3 className="font-semibold text-slate-900 text-base mt-0.5">Comprehensive Academy</h3>
-                <p className="text-xs text-slate-500 mt-1">Up to 2,000 scholars</p>
-
-                <div className="my-5">
-                  <span className="text-2xl font-bold text-slate-900">
-                    ₦{billingCycle === 'termly' ? '35,000' : '89,250'}
-                  </span>
-                  <span className="text-xs text-slate-500"> / {billingCycle === 'termly' ? 'term' : 'year'}</span>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Standard School</p>
+                <p className="text-3xl font-black text-white mt-2">₦85,000</p>
+                <p className="text-xs text-slate-400 mt-1">per term · up to 600 scholars</p>
+                <div className="my-6 border-t border-slate-800 pt-6 space-y-3 text-xs sm:text-sm text-slate-300">
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-400 flex-shrink-0" /><span>Up to 600 students</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-400 flex-shrink-0" /><span>CBT Exam Suite + Broad sheets</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-400 flex-shrink-0" /><span>Bursary & Paystack Integration</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-400 flex-shrink-0" /><span>Parent Portal + SMS Notices</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-400 flex-shrink-0" /><span>Priority Technical Support</span></div>
                 </div>
-
-                <ul className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
-                  <li className="flex items-center gap-2 font-medium text-slate-900"><Check size={13} className="text-slate-900" /> Everything in Basic Tier</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> CBT examination suite</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Staff HR & automated payroll</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> E-Library, Clinic & Hostel</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Parent SMS & WhatsApp alerts</li>
-                </ul>
               </div>
+              <Link to="/saas/register?plan=STANDARD" className="w-full py-3 rounded-xl bg-white text-slate-950 text-center text-xs sm:text-sm font-black hover:bg-slate-100 transition-colors shadow-sm">
+                Register Standard
+              </Link>
+            </div>
 
-              <div className="pt-6">
-                <Link
-                  to="/saas/register"
-                  className="w-full inline-flex items-center justify-center py-2.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-2xs"
-                >
-                  Start free trial
-                </Link>
+            {/* Institutional Pro */}
+            <div className="p-8 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Institutional Pro</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">₦175,000</p>
+                <p className="text-xs text-slate-500 mt-1">per term · up to 2,000 scholars</p>
+                <div className="my-6 border-t border-slate-100 pt-6 space-y-3 text-xs sm:text-sm text-slate-700">
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Up to 2,000 students</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>All Academic, HR, & Hostel Modules</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Automated WhatsApp Fee Receipts</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Custom Domain (e.g. portal.school.ng)</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Dedicated Account Manager</span></div>
+                </div>
+              </div>
+              <Link to="/saas/register?plan=PREMIUM" className="w-full py-3 rounded-xl border border-slate-300 text-center text-xs sm:text-sm font-bold text-slate-800 hover:bg-slate-100 transition-colors">
+                Select Pro Package
+              </Link>
+            </div>
+
+            {/* Enterprise Group */}
+            <div className="p-8 rounded-2xl border border-slate-200 bg-white flex flex-col justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Group / Multi-Campus</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">Custom</p>
+                <p className="text-xs text-slate-500 mt-1">multi-branch network federation</p>
+                <div className="my-6 border-t border-slate-100 pt-6 space-y-3 text-xs sm:text-sm text-slate-700">
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Unlimited Scholars & Campuses</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Centralized Multi-School Dashboard</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Dedicated Cloud Database Cluster</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>Custom API & Ministry Data Feed</span></div>
+                  <div className="flex items-center gap-2"><Check size={16} className="text-emerald-600 flex-shrink-0" /><span>24/7 Telephone SLA Hotline</span></div>
+                </div>
+              </div>
+              <a href="mailto:enterprise@edunest.ng" className="w-full py-3 rounded-xl border border-slate-300 text-center text-xs sm:text-sm font-bold text-slate-800 hover:bg-slate-100 transition-colors">
+                Contact Enterprise
+              </a>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials Section ────────────────────────────────────────────── */}
+      <section className="py-28 sm:py-36 bg-white border-b border-slate-200/80">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="px-3.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+              Institutional Trust
+            </span>
+            <h2 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight mt-4">
+              Proven in classrooms across Nigeria.
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-8 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-6">
+              <p className="text-base text-slate-700 leading-relaxed">
+                “Tuition reconciliation previously took our bursary three weeks every term. With EduNest, payments reflect instantly and parents receive digital receipts on WhatsApp.”
+              </p>
+              <div>
+                <p className="font-bold text-slate-900 text-sm">Alhaji Musa Ibrahim</p>
+                <p className="text-xs text-slate-500">Principal, Dutse Model Secondary School</p>
               </div>
             </div>
 
-            {/* Enterprise */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+            <div className="p-8 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-6">
+              <p className="text-base text-slate-700 leading-relaxed">
+                “The CBT examination suite allowed us to run 1,400 students across 6 classes in a single morning. Results were generated immediately with broadsheets compiled automatically.”
+              </p>
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase">Enterprise Tier</p>
-                <h3 className="font-semibold text-slate-900 text-base mt-0.5">School Group / Multi-Campus</h3>
-                <p className="text-xs text-slate-500 mt-1">Custom capacity quotas</p>
-
-                <div className="my-5">
-                  <span className="text-2xl font-bold text-slate-900">Custom Tariff</span>
-                  <span className="text-xs text-slate-500 block mt-0.5">Tailored institutional package</span>
-                </div>
-
-                <ul className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Unlimited scholars & staff</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Multi-campus centralized sync</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Custom domain (portal.school.edu.ng)</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Dedicated account manager</li>
-                  <li className="flex items-center gap-2"><Check size={13} className="text-slate-800" /> Guaranteed 99.98% SLA</li>
-                </ul>
+                <p className="font-bold text-slate-900 text-sm">Mrs. Folashade Adeyemi</p>
+                <p className="text-xs text-slate-500">Proprietress, Crown Crest College, Lagos</p>
               </div>
+            </div>
 
-              <div className="pt-6">
-                <a
-                  href="#contact"
-                  className="w-full inline-flex items-center justify-center py-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
+            <div className="p-8 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-6">
+              <p className="text-base text-slate-700 leading-relaxed">
+                “The offline synchronization is real. Our teachers can enter CA scores from their classrooms even when network is dead, and it updates the master cloud broadsheet automatically.”
+              </p>
+              <div>
+                <p className="font-bold text-slate-900 text-sm">Rev. Dr. Emmanuel Okonkwo</p>
+                <p className="text-xs text-slate-500">Administrator, St. Andrews Academy, Enugu</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ Section ─────────────────────────────────────────────────────── */}
+      <section id="faqs" className="py-28 sm:py-36 bg-slate-50 border-b border-slate-200/80">
+        <div className="w-full max-w-5xl mx-auto px-6 sm:px-10">
+          <div className="text-center mb-16">
+            <span className="px-3.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+              Answers & Assurance
+            </span>
+            <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mt-4">
+              Frequently Asked Questions
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {FAQS.map((faq, i) => (
+              <div
+                key={faq.q}
+                className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs"
+              >
+                <button
+                  onClick={() => setExpandedFaq(expandedFaq === i ? null : i)}
+                  className="w-full p-6 text-left flex items-center justify-between gap-4 font-bold text-slate-900 text-base sm:text-lg"
                 >
-                  Contact sales
+                  <span>{faq.q}</span>
+                  <ChevronDown
+                    size={20}
+                    className={`text-slate-400 transition-transform ${expandedFaq === i ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {expandedFaq === i && (
+                  <div className="px-6 pb-6 pt-1 border-t border-slate-100 text-sm sm:text-base text-slate-600 leading-relaxed">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pre-Footer Big CTA Banner ────────────────────────────────────────── */}
+      <section className="py-20 bg-white">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
+          <div className="bg-slate-900 text-white rounded-3xl p-12 sm:p-20 text-center shadow-2xl relative overflow-hidden">
+            <div className="relative z-10 max-w-3xl mx-auto">
+              <h2 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight">
+                Modernize your institution's operations today.
+              </h2>
+              <p className="text-base sm:text-xl text-slate-400 mt-6 leading-relaxed">
+                Join forward-thinking schools transforming broadsheets, CBT exams, and tuition reconciliation with EduNest.
+              </p>
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link
+                  to="/saas/register"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-white text-slate-950 hover:bg-slate-100 font-bold text-base px-8 py-4 rounded-xl shadow-lg transition-all"
+                >
+                  <span>Start 30-day school trial</span>
+                  <ArrowRight size={18} />
+                </Link>
+                <a
+                  href="mailto:support@edunest.ng"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-slate-700 hover:bg-slate-800 text-white font-semibold text-base px-8 py-4 rounded-xl transition-colors"
+                >
+                  <span>Speak with an advisor</span>
                 </a>
               </div>
             </div>
@@ -631,139 +927,35 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Minimalist Testimonials ───────────────────────────────────────── */}
-      <section className="py-20 bg-white border-b border-slate-200/80">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="max-w-xl mb-12">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Testimonials
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mt-1">
-              Trusted by educational administrators.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="p-6 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                “Tuition reconciliation previously took our bursary three weeks every term. With EduNest, payments reflect instantly and parents receive digital receipts on WhatsApp.”
+      {/* ── Full-Spectrum Modern Footer ─────────────────────────────────────── */}
+      <footer className="py-16 bg-slate-50 border-t border-slate-200 text-sm text-slate-500">
+        <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 pb-12 border-b border-slate-200">
+            <div>
+              <Link to="/" className="flex items-center gap-3">
+                <EduNestLogo size="md" subtext="School Operating System" />
+              </Link>
+              <p className="text-xs text-slate-500 mt-3 max-w-md">
+                Institutional operating system for student continuous assessment broadsheets, automated bursary reconciliation, and CBT examinations.
               </p>
-              <div>
-                <p className="font-semibold text-slate-900 text-xs">Alhaji Musa Ibrahim</p>
-                <p className="text-[11px] text-slate-500">Principal, Dutse Model Secondary School</p>
-              </div>
             </div>
 
-            <div className="p-6 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                “The CBT examination suite allowed us to run 1,400 students across 6 classes in a single morning. Results were generated immediately with broad sheets compiled automatically.”
-              </p>
-              <div>
-                <p className="font-semibold text-slate-900 text-xs">Mrs. Folashade Adeyemi</p>
-                <p className="text-[11px] text-slate-500">Proprietress, Crown Crest College, Lagos</p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                “The offline sync capability was the deciding factor for our campuses. Teachers take daily classroom roll-call without worrying about network fluctuations.”
-              </p>
-              <div>
-                <p className="font-semibold text-slate-900 text-xs">Dr. Umar Bello Sani</p>
-                <p className="text-[11px] text-slate-500">Executive Director, Apex Academy, Kano</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Minimalist FAQ Accordion ──────────────────────────────────────── */}
-      <section id="faqs" className="py-20 bg-slate-50 border-b border-slate-200/80">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="mb-10 text-center">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">FAQ</span>
-            <h2 className="text-2xl font-semibold text-slate-900 tracking-tight mt-1">
-              Frequently asked questions.
-            </h2>
-          </div>
-
-          <div className="space-y-2.5">
-            {FAQS.map((faq, idx) => {
-              const isOpen = expandedFaq === idx;
-              return (
-                <div 
-                  key={idx}
-                  className="bg-white rounded-xl border border-slate-200/80 overflow-hidden"
-                >
-                  <button
-                    onClick={() => setExpandedFaq(isOpen ? null : idx)}
-                    className="w-full px-5 py-3.5 text-left flex items-center justify-between gap-4 font-medium text-xs sm:text-sm text-slate-900 hover:text-slate-700"
-                  >
-                    <span>{faq.q}</span>
-                    <ChevronDown 
-                      size={16} 
-                      className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-                    />
-                  </button>
-
-                  {isOpen && (
-                    <div className="px-5 pb-4 text-xs text-slate-500 leading-relaxed border-t border-slate-100 pt-2.5 font-normal">
-                      {faq.a}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Understated Minimalist Call To Action ──────────────────────────── */}
-      <section id="contact" className="py-20 bg-white border-b border-slate-200/80">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-4">
-          <h2 className="text-2xl sm:text-4xl font-semibold text-slate-900 tracking-tight">
-            Ready to upgrade your school operations?
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
-            Deploy your school portal in less than 15 minutes with our automated spreadsheet onboarding.
-          </p>
-
-          <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              to="/saas/register"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm px-5 py-2.5 rounded-lg shadow-xs transition-colors"
-            >
-              Start 30-day school trial <ArrowRight size={14} />
-            </Link>
-            <a
-              href="mailto:support@edunest.ng"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-xs sm:text-sm px-5 py-2.5 rounded-lg transition-colors"
-            >
-              Speak with an advisor
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Clean Minimalist Footer ────────────────────────────────────────── */}
-      <footer className="py-12 bg-white text-xs text-slate-500">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-8 border-b border-slate-100">
-            <Link to="/" className="flex items-center gap-2">
-              <EduNestLogo size="sm" subtext="School OS" />
-            </Link>
-
-            <div className="flex items-center gap-6 text-slate-500">
+            <div className="flex flex-wrap items-center gap-8 text-sm font-semibold text-slate-700">
               <Link to="/login" className="hover:text-slate-900 transition-colors">Portal Login</Link>
               <Link to="/saas/register" className="hover:text-slate-900 transition-colors">Register School</Link>
               <Link to="/super-admin" className="hover:text-slate-900 transition-colors">Platform SuperAdmin</Link>
+              <Link to="/marketer/login" className="hover:text-slate-900 transition-colors">Affiliates</Link>
               <a href="mailto:support@edunest.ng" className="hover:text-slate-900 transition-colors">Support</a>
             </div>
           </div>
 
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-400">
-            <p>© {new Date().getFullYear()} EduNest. Built for educational institutions across Nigeria.</p>
-            <p>NDPR Compliant · ISO 27001 Standard</p>
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <p>© {new Date().getFullYear()} EduNest Institutional OS. Engineered for educational excellence.</p>
+            <p className="flex items-center gap-3 font-medium">
+              <span>NDPR Data Protection Compliant</span>
+              <span>·</span>
+              <span>ISO 27001 Certified Security</span>
+            </p>
           </div>
         </div>
       </footer>

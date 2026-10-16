@@ -153,8 +153,8 @@ export default function SuperAdminLayout() {
         </header>
 
         {/* Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 bg-slate-50">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto p-6 sm:p-8 lg:p-10 bg-slate-50">
+          <div className="w-full max-w-7xl 2xl:max-w-[1700px] mx-auto">
             <Outlet />
           </div>
         </main>
