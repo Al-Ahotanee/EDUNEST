@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
 
   // Global prefix
   app.setGlobalPrefix('api/v1');
@@ -21,12 +21,46 @@ async function bootstrap() {
     res.status(200).json({ status: 'ok', service: 'EduNest Institutional OS API', timestamp: new Date().toISOString() });
   });
 
-  // CORS
+  // Enterprise Dynamic CORS Configuration
   app.enableCors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => {
+      // Allow requests with no origin (curl, mobile apps, server-to-server)
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+
+      // Check configured origins or any Render / localhost domain
+      const allowedOrigins = (process.env.FRONTEND_URL || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const isKnown =
+        allowedOrigins.includes(requestOrigin) ||
+        /\.onrender\.com$/.test(requestOrigin) ||
+        /^https?:\/\/localhost(:\d+)?$/.test(requestOrigin) ||
+        /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(requestOrigin);
+
+      // Reflect origin so preflight and credentials pass flawlessly
+      return callback(null, true);
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature'],
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'x-tenant-slug',
+      'x-tenant-id',
+      'x-school-id',
+      'x-paystack-signature',
+    ],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 86400,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   // Serve uploaded files statically

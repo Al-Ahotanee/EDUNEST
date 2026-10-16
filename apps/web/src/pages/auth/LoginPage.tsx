@@ -8,10 +8,10 @@ import toast from 'react-hot-toast';
 import { EduNestLogo } from '../../components/common/EduNestLogo';
 
 const DEMO_PRESETS = [
-  { label: 'School Admin', email: 'admin@demo.school', pass: 'Admin@123' },
-  { label: 'Teacher', email: 'teacher@demo.school', pass: 'Teacher@123' },
-  { label: 'Accountant', email: 'bursar@demo.school', pass: 'Bursar@123' },
-  { label: 'Student', email: 'student@demo.school', pass: 'Student@123' },
+  { label: 'School Admin', email: 'admin@demo.com', pass: 'password123' },
+  { label: 'Subject Teacher', email: 'teacher.math@demo.com', pass: 'password123' },
+  { label: 'Class Master', email: 'classmaster.jss1@demo.com', pass: 'password123' },
+  { label: 'Super Admin', email: 'superadmin@schoolerp.com', pass: 'password123' },
 ];
 
 export default function LoginPage() {

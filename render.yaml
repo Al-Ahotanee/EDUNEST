@@ -26,7 +26,7 @@ services:
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
       - key: FRONTEND_URL
-        value: https://edunest-web.onrender.com
+        value: https://edunest-web-ctlm.onrender.com,https://edunest-web.onrender.com
       - key: SUPER_ADMIN_EMAIL
         value: admin@schoolerp.com
       - key: SUPER_ADMIN_PASSWORD
