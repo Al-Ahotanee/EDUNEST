@@ -9,7 +9,7 @@ services:
     region: frankfurt
     buildCommand: npm install && cd apps/api && npm install && npx prisma generate && npm run build
     startCommand: cd apps/api && npx prisma migrate deploy && node dist/main.js
-    healthCheckPath: /api/v1/health
+    healthCheckPath: /api/v1/ping
     envVars:
       - key: NODE_ENV
         value: production

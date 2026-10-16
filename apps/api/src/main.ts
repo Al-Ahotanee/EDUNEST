@@ -13,6 +13,14 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
+  // Root uptime probe endpoints (for Render, Docker, or K8s probes at root domain)
+  app.use('/ping', (_req: any, res: any) => {
+    res.status(200).json({ status: 'ok', service: 'EduNest Institutional OS API', timestamp: new Date().toISOString() });
+  });
+  app.use('/healthz', (_req: any, res: any) => {
+    res.status(200).json({ status: 'ok', service: 'EduNest Institutional OS API', timestamp: new Date().toISOString() });
+  });
+
   // CORS
   app.enableCors({
     origin: process.env.FRONTEND_URL || '*',

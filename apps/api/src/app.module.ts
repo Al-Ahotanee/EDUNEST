@@ -26,10 +26,10 @@ import { TimetableModule } from './timetable/timetable.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SchoolsModule } from './schools/schools.module';
 import { UsersModule } from './users/users.module';
-import { HealthController } from './health.controller';
+import { PingController } from './health.controller';
 
 @Module({
-  controllers: [HealthController],
+  controllers: [PingController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([
@@ -58,6 +58,8 @@ export class AppModule {
         { path: 'api/v1/public/(.*)', method: RequestMethod.ALL },
         { path: 'api/v1/parent/auth/login', method: RequestMethod.POST },
         { path: 'api/v1/marketer/auth/login', method: RequestMethod.POST },
+        { path: 'api/v1/ping', method: RequestMethod.GET },
+        { path: 'api/v1/health-check', method: RequestMethod.GET },
         { path: 'api/v1/health', method: RequestMethod.GET },
         { path: 'api/v1/super-admin/(.*)', method: RequestMethod.ALL },
       )
