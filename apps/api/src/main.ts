@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as express from 'express';
+import * as fs from 'fs';
 import { join } from 'path';
 
 async function bootstrap() {
@@ -45,6 +46,27 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
+
+  // Serve frontend static build if available (supports unified single-service deployment)
+  const candidateDists = [
+    join(process.cwd(), '../web/dist'),
+    join(process.cwd(), 'apps/web/dist'),
+    join(__dirname, '../../web/dist'),
+  ];
+  for (const clientDist of candidateDists) {
+    if (fs.existsSync(clientDist)) {
+      app.use(express.static(clientDist));
+      app.use((req: any, res: any, next: any) => {
+        if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+          res.sendFile(join(clientDist, 'index.html'));
+        } else {
+          next();
+        }
+      });
+      console.log(`📦 Serving frontend static bundle from: ${clientDist}`);
+      break;
+    }
+  }
 
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
