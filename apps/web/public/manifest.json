@@ -1,0 +1,19 @@
+{
+  "short_name": "EduNest",
+  "name": "EduNest — Institutional School Operating System",
+  "description": "Enterprise multi-tenant operating system for modern academic institutions, finance, admissions, and platform governance",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/app/dashboard",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity", "finance"]
+}

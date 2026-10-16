@@ -1,0 +1,14 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" rx="10" fill="#0f172a"/>
+  <!-- Outer Nest Platform Base -->
+  <path d="M12 28.5L24 35.5L36 28.5L40 31L24 40.5L8 31L12 28.5Z" fill="#ffffff"/>
+  <!-- Open Knowledge Pages / Wings -->
+  <path d="M14 18.5V28L24 33.5V24L14 18.5Z" fill="#38bdf8"/>
+  <path d="M34 18.5V28L24 33.5V24L34 18.5Z" fill="#0284c7"/>
+  <!-- Center Knowledge Crest -->
+  <path d="M24 23.5L20 21L24 18.5L28 21L24 23.5Z" fill="#10b981"/>
+  <!-- Mortarboard Cap Apex -->
+  <path d="M24 6L11 13.5L24 21L37 13.5L24 6Z" fill="#ffffff"/>
+  <!-- Tassel -->
+  <path d="M37 13.5V19.5" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+</svg>
