@@ -99,7 +99,7 @@ async function bootstrap() {
     if (fs.existsSync(clientDist)) {
       app.use(express.static(clientDist));
       app.use((req: any, res: any, next: any) => {
-        if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+        if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/ping') && !req.path.startsWith('/healthz')) {
           res.sendFile(join(clientDist, 'index.html'));
         } else {
           next();

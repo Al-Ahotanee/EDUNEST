@@ -13,14 +13,24 @@ export function resolveApiBase(): string {
     } catch {}
 
     const stored = localStorage.getItem('EDUNEST_API_URL');
-    if (stored) return stored;
+    if (stored) {
+      if (stored.includes('edunest-api.onrender.com')) {
+        localStorage.removeItem('EDUNEST_API_URL');
+      } else {
+        return stored;
+      }
+    }
+  }
+
+  const envApi = import.meta.env.VITE_API_URL;
+  if (envApi && !envApi.includes('edunest-api.onrender.com')) {
+    return envApi;
   }
 
   return (
-    import.meta.env.VITE_API_URL ||
-    (typeof window !== 'undefined' && window.location.port === '5173'
+    typeof window !== 'undefined' && window.location.port === '5173'
       ? 'http://localhost:3000/api/v1'
-      : '/api/v1')
+      : '/api/v1'
   );
 }
 
