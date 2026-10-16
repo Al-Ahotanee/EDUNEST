@@ -382,6 +382,14 @@ export class ResultsService {
 
   // ─── 3. APPROVAL & PUBLISHING PIPELINE ───────────────────────────────────────
   async getApprovalPipelineOverview(termId: string, schoolId: string) {
+    if (!schoolId) {
+      const term = await this.prisma.term.findUnique({
+        where: { id: termId },
+        include: { session: true },
+      });
+      schoolId = term?.session?.schoolId || '';
+    }
+
     const classes = await this.prisma.class.findMany({
       where: { schoolId },
       include: {
@@ -461,6 +469,14 @@ export class ResultsService {
     schoolId: string,
     user: any,
   ) {
+    if (!schoolId && data.termId) {
+      const term = await this.prisma.term.findUnique({
+        where: { id: data.termId },
+        include: { session: true },
+      });
+      schoolId = term?.session?.schoolId || '';
+    }
+
     await this.checkTeacherAccess(user, schoolId, data.classId || '', data.subjectId, 'approve');
 
     const where: any = {
@@ -504,6 +520,14 @@ export class ResultsService {
     schoolId: string,
     user: any,
   ) {
+    if (!schoolId && data.termId) {
+      const term = await this.prisma.term.findUnique({
+        where: { id: data.termId },
+        include: { session: true },
+      });
+      schoolId = term?.session?.schoolId || '';
+    }
+
     await this.checkTeacherAccess(user, schoolId, data.classId || '', data.subjectId, 'publish');
 
     const where: any = {

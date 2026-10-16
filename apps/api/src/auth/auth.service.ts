@@ -219,10 +219,8 @@ export class AuthService {
 
   async generateTokens(user: any, isSuperAdmin: boolean) {
     const payload: any = { sub: user.id, email: user.email, isSuperAdmin };
-    if (!isSuperAdmin) {
-      payload.tenantId = user.tenantId;
-      payload.schoolId = user.schoolId;
-    }
+    if (user.tenantId) payload.tenantId = user.tenantId;
+    if (user.schoolId) payload.schoolId = user.schoolId;
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshTokenValue = uuidv4();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

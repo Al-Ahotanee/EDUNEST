@@ -58,7 +58,7 @@ export class ParentService {
           include: {
             classEnrollments: { include: { class: true }, orderBy: { createdAt: 'desc' }, take: 1 },
             invoices: { where: { status: { not: 'PAID' } } },
-            results: { orderBy: { createdAt: 'desc' }, take: 10, include: { subject: true } },
+            results: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 10, include: { subject: true } },
             attendances: { orderBy: { date: 'desc' }, take: 30 },
           },
         },
