@@ -1,10 +1,30 @@
 import axios from 'axios';
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.port === '5173'
-    ? 'http://localhost:3000/api/v1'
-    : '/api/v1');
+export function resolveApiBase(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryApi = params.get('api');
+      if (queryApi) {
+        const clean = queryApi.replace(/\/+$/, '');
+        localStorage.setItem('EDUNEST_API_URL', clean);
+        return clean;
+      }
+    } catch {}
+
+    const stored = localStorage.getItem('EDUNEST_API_URL');
+    if (stored) return stored;
+  }
+
+  return (
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== 'undefined' && window.location.port === '5173'
+      ? 'http://localhost:3000/api/v1'
+      : '/api/v1')
+  );
+}
+
+export const API_BASE = resolveApiBase();
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -12,9 +32,15 @@ export const api = axios.create({
   timeout: 30000,
 });
 
-// Request interceptor - attach token
+// Request interceptor - attach token and dynamic baseURL
 api.interceptors.request.use(
   (config) => {
+    if (typeof window !== 'undefined') {
+      const customApi = localStorage.getItem('EDUNEST_API_URL');
+      if (customApi) {
+        config.baseURL = customApi;
+      }
+    }
     const token = localStorage.getItem('accessToken');
     if (token) config.headers.Authorization = `Bearer ${token}`;
     const tenantSlug = localStorage.getItem('tenantSlug');

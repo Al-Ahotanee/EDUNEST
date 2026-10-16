@@ -4,6 +4,7 @@
  */
 
 import Dexie, { Table } from 'dexie';
+import { resolveApiBase } from '../services/api';
 
 // ─── Local DB Schema ─────────────────────────────────────────────────────────
 
@@ -125,7 +126,9 @@ export const connectivity = new ConnectivityManager();
 class SyncEngine {
   private isSyncing = false;
   private syncInterval: ReturnType<typeof setInterval> | null = null;
-  private apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+  private get apiBase() {
+    return resolveApiBase();
+  }
 
   constructor() {
     // Auto-sync every 30 seconds when online
