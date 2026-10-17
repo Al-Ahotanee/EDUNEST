@@ -39,10 +39,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         status = HttpStatus.NOT_FOUND;
         message = 'Record not found';
       } else {
-        message = 'Database operation failed';
+        message = `Database operation failed: ${exception.code} - ${exception.message}`;
       }
+    } else if (exception instanceof Prisma.PrismaClientValidationError) {
+      status = HttpStatus.BAD_REQUEST;
+      message = `Validation error: ${exception.message.split('\n').slice(-3).join(' ')}`;
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
+      message = exception.message || 'Internal server error';
     }
 
     response.status(status).json({
