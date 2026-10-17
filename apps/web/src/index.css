@@ -222,6 +222,130 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    /* ─── Round 5 fixes: button rows that overflow horizontally ───────────── */
+
+    /* All horizontal button groups should wrap on mobile (use [class*="flex"] to avoid Tailwind circular dep) */
+    .page-header > div,
+    .page-header > [class*="flex"],
+    [class*="items-center"].gap-1,
+    [class*="items-center"].gap-2,
+    [class*="items-center"].gap-3,
+    [class*="items-center"].justify-between.gap-2,
+    [class*="flex"][class*="flex-wrap"] {
+      flex-wrap: wrap !important;
+    }
+
+    /* Buttons in row layouts: shrink to fit + truncate text if needed */
+    .btn, .btn-sm, button[class*="rounded"] {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .btn > *,
+    button[class*="rounded"] > * {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Long button labels get truncated */
+    button {
+      max-width: calc(100vw - 2rem);
+    }
+
+    /* Filter bars / mode toggles wrap */
+    [class*="items-center"]:has(button),
+    [class*="gap-1"]:has(button),
+    [class*="gap-2"]:has(button) {
+      flex-wrap: wrap !important;
+    }
+
+    /* Attendance mode buttons (Student Daily / Subject-Level / Staff & Teachers) */
+    [class*="items-center"].gap-1.bg-slate-100,
+    [class*="items-center"].gap-2.bg-slate-100,
+    .gap-1.bg-slate-100 {
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    [class*="items-center"].gap-1.bg-slate-100 button,
+    [class*="items-center"].gap-2.bg-slate-100 button,
+    .gap-1.bg-slate-100 button {
+      flex: 1 1 calc(50% - 0.25rem);
+      min-width: 0;
+      font-size: 0.7rem;
+      padding: 0.4rem 0.5rem;
+    }
+
+    /* Reports tab buttons (overview/enrollment/finance/attendance) */
+    .gap-1.bg-slate-100.p-1 {
+      width: 100%;
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      -webkit-overflow-scrolling: touch;
+    }
+    .gap-1.bg-slate-100.p-1 button {
+      flex-shrink: 0;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.75rem;
+    }
+
+    /* Timetable view tabs — allow horizontal scroll */
+    [class*="items-center"].gap-2.overflow-x-auto,
+    .gap-2.overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+    }
+
+    /* Timetable action buttons wrap into grid on mobile */
+    [class*="items-center"].justify-between [class*="items-center"].gap-2 {
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    /* Settings tabs wrap */
+    [class*="flex-col"].gap-1,
+    [class*="flex-col"].gap-2 {
+      width: 100%;
+    }
+    [class*="flex-col"].gap-1 button,
+    [class*="flex-col"].gap-2 button {
+      width: 100%;
+      text-align: left;
+    }
+
+    /* Settings form inputs: stack label + input vertically */
+    [class*="items-center"].gap-3:has(input),
+    [class*="items-center"].gap-2:has(input) {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    [class*="items-center"].gap-3:has(input) > *,
+    [class*="items-center"].gap-2:has(input) > * {
+      width: 100%;
+    }
+
+    /* Fix Change Logo / Website input rows in Settings */
+    [class*="items-center"].gap-2:has(input[type="text"]),
+    [class*="items-center"].gap-3:has(input[type="text"]) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+
+    /* Generic: any button row wider than viewport should wrap */
+    [class*="items-center"].gap-2 > button,
+    [class*="items-center"].gap-3 > button {
+      flex-shrink: 1;
+      min-width: 0;
+    }
+
+    /* Long button text gets ellipsis */
+    button > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
   }
 
   /* Very small screens (<360px) — single column stats */
