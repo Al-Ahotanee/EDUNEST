@@ -36,8 +36,8 @@ export class AdmissionsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Patch(':id/approve')
-  approve(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
-    return this.admissionsService.approveApplication(id, schoolId);
+  approve(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string, @Body() body?: { classId?: string }) {
+    return this.admissionsService.approveApplication(id, schoolId, body);
   }
 
   @ApiBearerAuth()

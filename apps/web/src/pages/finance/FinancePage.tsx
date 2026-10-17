@@ -137,6 +137,16 @@ export default function FinancePage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to publish'),
   });
 
+  const generateInvoicesMutation = useMutation({
+    mutationFn: (classId: string) => financeApi.generateInvoicesFromClass(classId),
+    onSuccess: (resp: any) => {
+      const data = resp.data?.data || resp.data;
+      toast.success(`Generated ${data.invoicesCreated} invoice(s) from ${data.feeItems} fee item(s). Skipped ${data.duplicatesSkipped} duplicates.`);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to generate invoices'),
+  });
+
   const handleExportInvoices = () => {
     const list = invoicesData?.data || [];
     if (!list.length) { toast.error('No invoices to export'); return; }
@@ -460,6 +470,18 @@ export default function FinancePage() {
               <p className="text-xs text-slate-400 mt-3">
                 This breakdown is what parents of students in this class will see in their portal.
                 Only PUBLISHED fee items are visible to parents.
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                className="mt-3"
+                loading={generateInvoicesMutation.isPending}
+                onClick={() => generateInvoicesMutation.mutate(selectedClassForFees)}
+              >
+                Generate Invoices for This Class
+              </Button>
+              <p className="text-xs text-slate-400 mt-1">
+                Creates invoices for all active students in this class from published fee items.
               </p>
             </div>
           )}

@@ -132,6 +132,7 @@ export const financeApi = {
   createFeeStructure: (data: any) => api.post('/finance/fee-structures', data),
   publishFeeStructure: (id: string) => api.patch(`/finance/fee-structures/${id}/publish`),
   getFeeStructuresByClass: (classId: string) => api.get(`/finance/fee-structures/by-class/${classId}`),
+  generateInvoicesFromClass: (classId: string) => api.post(`/finance/fee-structures/generate-invoices/${classId}`),
   invoices: (params?: any) => api.get('/finance/invoices', { params }),
   getInvoice: (id: string) => api.get(`/finance/invoices/${id}`),
   createInvoice: (data: any) => api.post('/finance/invoices', data),

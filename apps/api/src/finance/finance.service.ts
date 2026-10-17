@@ -88,6 +88,83 @@ export class FinanceService {
     return successResponse({ fees, total });
   }
 
+  // ─── Generate invoices from published fee structures ──────────────────────
+  async generateInvoicesFromClass(classId: string, schoolId: string) {
+    // Get all published fee structures for this class
+    const fees = await this.prisma.feeStructure.findMany({
+      where: {
+        schoolId,
+        status: 'PUBLISHED',
+        OR: [
+          { classId },
+          { classId: null },
+        ],
+      },
+    });
+
+    if (fees.length === 0) {
+      throw new BadRequestException('No published fee structures found for this class. Publish fee items first.');
+    }
+
+    // Get all active students enrolled in this class
+    const enrollments = await this.prisma.classEnrollment.findMany({
+      where: { classId, student: { status: 'ACTIVE', deletedAt: null } },
+      include: { student: true },
+    });
+
+    if (enrollments.length === 0) {
+      throw new BadRequestException('No active students found in this class.');
+    }
+
+    const totalAmount = fees.reduce((sum, f) => sum + (f.amount || 0), 0);
+    let invoicesCreated = 0;
+    let duplicatesSkipped = 0;
+
+    for (const enrollment of enrollments) {
+      // Check if invoice already exists for this student with the same fee items this term
+      const existingInvoice = await this.prisma.invoice.findFirst({
+        where: {
+          studentId: enrollment.studentId,
+          createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        },
+      });
+
+      if (existingInvoice) {
+        duplicatesSkipped++;
+        continue;
+      }
+
+      const invoiceNo = await this.generateInvoiceNumber(schoolId);
+      await this.prisma.invoice.create({
+        data: {
+          studentId: enrollment.studentId,
+          invoiceNo,
+          totalAmount,
+          balance: totalAmount,
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          status: 'UNPAID',
+          items: {
+            create: fees.map(fee => ({
+              description: fee.name,
+              amount: fee.amount,
+              quantity: 1,
+              feeStructureId: fee.id,
+            })),
+          },
+        },
+      });
+      invoicesCreated++;
+    }
+
+    return successResponse({
+      invoicesCreated,
+      duplicatesSkipped,
+      totalStudents: enrollments.length,
+      totalAmount,
+      feeItems: fees.length,
+    }, `Generated ${invoicesCreated} invoice(s) from ${fees.length} fee item(s).`);
+  }
+
   // ─── INVOICES ────────────────────────────────────────────────────────────────
 
   async createInvoice(data: any, schoolId: string) {

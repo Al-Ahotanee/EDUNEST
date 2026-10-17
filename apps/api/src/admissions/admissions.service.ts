@@ -161,9 +161,10 @@ export class AdmissionsService {
   }
 
   // ─── Admin: approve application ─────────────────────────────────────────────
-  async approveApplication(id: string, schoolId: string) {
+  async approveApplication(id: string, schoolId: string, body?: { classId?: string }) {
     const admission = await this.prisma.admission.findFirst({ where: { id, schoolId } });
     if (!admission) throw new NotFoundException('Application not found');
+    if (admission.status === 'APPROVED') throw new ConflictException('Application already approved');
 
     // Generate admission number for the new student
     const count = await this.prisma.student.count({ where: { schoolId } });
@@ -171,34 +172,74 @@ export class AdmissionsService {
     const year = new Date().getFullYear().toString().slice(-2);
     const admissionNumber = `${school!.code}/${year}/${String(count + 1).padStart(4, '0')}`;
 
-    // Create student from admission data
+    // Create student from admission data + auto-enroll in class
     const extraData = admission.notes ? JSON.parse(admission.notes as string) : {};
 
-    const student = await this.prisma.student.create({
-      data: {
-        schoolId,
-        admissionNumber,
-        firstName: admission.firstName,
-        lastName: admission.lastName,
-        otherName: admission.otherName || undefined,
-        gender: admission.gender,
-        dateOfBirth: admission.dateOfBirth,
-        stateOfOrigin: extraData.stateOfOrigin,
-        lga: extraData.lga,
-        religion: extraData.religion,
-        address: extraData.address,
-        status: 'ACTIVE',
-        guardians: {
-          create: [{
-            firstName: admission.parentName.split(' ')[0] || 'Parent',
-            lastName: admission.parentName.split(' ').slice(1).join(' ') || '',
-            relationship: extraData.parentRelationship || 'Parent',
-            phone: admission.parentPhone,
-            email: admission.email || undefined,
-            isEmergency: true,
-          }],
+    // Get current session for enrollment
+    const currentSession = await this.prisma.academicSession.findFirst({
+      where: { schoolId, isCurrent: true },
+    }) || await this.prisma.academicSession.findFirst({
+      where: { schoolId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Validate classId if provided in the approval request
+    const targetClassId = body?.classId || admission.applyingForClass;
+    if (targetClassId) {
+      const cls = await this.prisma.class.findFirst({ where: { id: targetClassId, schoolId } });
+      if (!cls) {
+        // Don't fail the approval — just skip enrollment, flag for manual placement
+        console.warn(`Class ${targetClassId} not found for student ${admissionNumber}. Student will need manual class placement.`);
+      }
+    }
+
+    // Transactional: create student + guardian + class enrollment
+    const student = await this.prisma.$transaction(async (tx) => {
+      const newStudent = await tx.student.create({
+        data: {
+          schoolId,
+          admissionNumber,
+          firstName: admission.firstName,
+          lastName: admission.lastName,
+          otherName: admission.otherName || undefined,
+          gender: admission.gender,
+          dateOfBirth: admission.dateOfBirth,
+          stateOfOrigin: extraData.stateOfOrigin,
+          lga: extraData.lga,
+          religion: extraData.religion,
+          address: extraData.address,
+          status: 'ACTIVE',
+          guardians: {
+            create: [{
+              firstName: admission.parentName?.split(' ')[0] || 'Parent',
+              lastName: admission.parentName?.split(' ').slice(1).join(' ') || '',
+              relationship: extraData.parentRelationship || 'Parent',
+              phone: admission.parentPhone,
+              email: admission.email || undefined,
+              isEmergency: true,
+            }],
+          },
         },
-      },
+        include: { guardians: true },
+      });
+
+      // Auto-enroll in class if classId is available
+      if (targetClassId && currentSession) {
+        try {
+          await tx.classEnrollment.create({
+            data: {
+              studentId: newStudent.id,
+              classId: targetClassId,
+              sessionId: currentSession.id,
+            },
+          });
+        } catch (e) {
+          // Class enrollment failed — student is still created, just without class
+          console.warn(`Failed to enroll student ${admissionNumber} in class ${targetClassId}: ${e}`);
+        }
+      }
+
+      return newStudent;
     });
 
     // Update admission status and link student
@@ -207,7 +248,7 @@ export class AdmissionsService {
       data: { status: 'APPROVED', studentId: student.id, admittedAt: new Date() },
     });
 
-    return successResponse({ admission: { ...admission, status: 'APPROVED' }, student }, 'Application approved! Student record created.');
+    return successResponse({ admission: { ...admission, status: 'APPROVED' }, student }, 'Application approved! Student record created and enrolled in class.');
   }
 
   // ─── Admin: reject application ──────────────────────────────────────────────

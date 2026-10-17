@@ -196,6 +196,9 @@ export default function TeacherManagementPage() {
           <p className="page-subtitle">Unified workspace for teacher registration, class & subject allocation, ID cards, and profiles</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="secondary" onClick={() => window.location.href = '/app/staff-appointment'} icon={<FileText size={15} />}>
+            Appointment Form
+          </Button>
           <Button icon={<Plus size={15} />} onClick={() => { setEditing(null); staffForm.reset(); setStaffModal(true); }}>
             Register Teacher
           </Button>

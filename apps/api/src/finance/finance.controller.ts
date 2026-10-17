@@ -59,6 +59,13 @@ export class FinanceController {
     return this.financeService.getFeeStructuresByClass(classId, schoolId);
   }
 
+  @Post('fee-structures/generate-invoices/:classId')
+  @Roles('Super Admin')
+  @ApiOperation({ summary: 'Generate invoices for all students in a class from published fee structures' })
+  generateInvoices(@Param('classId') classId: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.financeService.generateInvoicesFromClass(classId, schoolId);
+  }
+
   @Post('invoices')
   @Roles('Super Admin', 'Accountant')
   @ApiOperation({ summary: 'Create invoice' })

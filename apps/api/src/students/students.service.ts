@@ -228,7 +228,7 @@ export class StudentsService {
   }
 
   async getStatistics(schoolId: string) {
-    const [total, active, male, female, byClass] = await Promise.all([
+    const [total, active, male, female, byClassRaw] = await Promise.all([
       this.prisma.student.count({ where: { schoolId, deletedAt: null } }),
       this.prisma.student.count({ where: { schoolId, deletedAt: null, status: 'ACTIVE' } }),
       this.prisma.student.count({ where: { schoolId, deletedAt: null, gender: 'MALE' } }),
@@ -239,6 +239,18 @@ export class StudentsService {
         _count: { studentId: true },
       }),
     ]);
+
+    // Enrich byClass with class names (fixes UUID-as-label bug in Reports chart)
+    const classIds = byClassRaw.map((b: any) => b.classId);
+    const classes = await this.prisma.class.findMany({
+      where: { id: { in: classIds } },
+      select: { id: true, name: true },
+    });
+    const classMap = new Map(classes.map(c => [c.id, c.name]));
+    const byClass = byClassRaw.map((b: any) => ({
+      ...b,
+      className: classMap.get(b.classId) || 'Unknown',
+    }));
 
     return successResponse({ total, active, male, female, byClass });
   }

@@ -205,7 +205,7 @@ export default function ReportsPage() {
           <div className="card p-6">
             <h3 className="font-bold text-slate-900 mb-6">Enrollment by Class</h3>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={(studentStats?.byClass || []).map((b: any) => ({ class: b.classId, count: b._count.studentId }))}>
+              <BarChart data={(studentStats?.byClass || []).map((b: any) => ({ class: b.className || b.classId?.slice(0,8) || '—', count: b._count?.studentId || b._count || 0 }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="class" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
