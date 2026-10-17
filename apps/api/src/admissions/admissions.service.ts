@@ -227,17 +227,29 @@ export class AdmissionsService {
 
   // ─── Admin: admission statistics ────────────────────────────────────────────
   async getAdmissionStats(schoolId: string) {
-    const [total, pending, approved, rejected, screening] = await Promise.all([
+    const [total, pending, approved, rejected, screening, enrolledStudents] = await Promise.all([
       this.prisma.admission.count({ where: { schoolId } }),
       this.prisma.admission.count({ where: { schoolId, status: 'PENDING' } }),
       this.prisma.admission.count({ where: { schoolId, status: 'APPROVED' } }),
       this.prisma.admission.count({ where: { schoolId, status: 'REJECTED' } }),
       this.prisma.admission.count({ where: { schoolId, status: 'SCREENING' } }),
+      // Also count actual enrolled students so the dashboard isn't misleading
+      this.prisma.student.count({ where: { schoolId, deletedAt: null, status: 'ACTIVE' } }),
     ]);
 
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-    return successResponse({ total, pending, approved, rejected, screening, approvalRate });
+    return successResponse({
+      total,
+      pending,
+      approved,
+      rejected,
+      screening,
+      approvalRate,
+      // Include enrolled student count so admin sees real enrollment numbers
+      enrolledStudents,
+      totalStudents: enrolledStudents,
+    });
   }
 
   private generateTempPassword(): string {

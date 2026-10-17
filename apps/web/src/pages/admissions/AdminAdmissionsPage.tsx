@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   FileText, CheckCircle, XCircle, Clock, Eye, Users,
   TrendingUp, RefreshCw, AlertCircle, ChevronRight, Printer, Download,
-  ShieldCheck, Award, Mail, Phone, Calendar
+  ShieldCheck, Award, Mail, Phone, Calendar, GraduationCap
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, StatCard, Badge, PageLoader,
@@ -215,7 +215,8 @@ export default function AdmissionsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <StatCard title="Enrolled Students" value={stats?.enrolledStudents || 0} icon={<GraduationCap size={18} />} color="green" />
         <StatCard title="Total Applications" value={stats?.total || 0} icon={<FileText size={18} />} color="blue" />
         <StatCard title="Pending" value={stats?.pending || 0} icon={<Clock size={18} />} color="amber" />
         <StatCard title="Screening" value={stats?.screening || 0} icon={<Eye size={18} />} color="cyan" />
