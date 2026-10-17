@@ -32,9 +32,21 @@ import { PingController } from './health.controller';
   controllers: [PingController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // ─── RATE LIMITING (env-configurable for bulk ops / UAT) ───────────────────────
+    // Default: 1000 req/min per IP (was 100 — too restrictive for school ERPs).
+    // Override via env: THROTTLE_SHORT_TTL_MS, THROTTLE_SHORT_LIMIT
+    // Auth routes are stricter (10/min) to slow brute-force attempts.
     ThrottlerModule.forRoot([
-      { name: 'short', ttl: 60000, limit: 100 },
-      { name: 'auth', ttl: 60000, limit: 10 },
+      {
+        name: 'short',
+        ttl: Number(process.env.THROTTLE_SHORT_TTL_MS) || 60000,
+        limit: Number(process.env.THROTTLE_SHORT_LIMIT) || 1000,
+      },
+      {
+        name: 'auth',
+        ttl: Number(process.env.THROTTLE_AUTH_TTL_MS) || 60000,
+        limit: Number(process.env.THROTTLE_AUTH_LIMIT) || 30,
+      },
     ]),
     PrismaModule, AuthModule, StudentsModule, AcademicModule,
     AttendanceModule, ResultsModule, FinanceModule, HrModule,

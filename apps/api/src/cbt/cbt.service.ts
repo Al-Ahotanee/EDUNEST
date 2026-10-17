@@ -8,6 +8,46 @@ export class CbtService {
   constructor(private prisma: PrismaService) {}
 
   async createExam(data: any, schoolId: string) {
+    // ─── VALIDATION ─────────────────────────────────────────────────────────────
+    if (!data?.title || typeof data.title !== 'string' || data.title.trim().length < 3) {
+      throw new BadRequestException('Exam title is required (min 3 characters)');
+    }
+
+    const duration = Number(data.duration);
+    if (isNaN(duration) || duration <= 0) {
+      throw new BadRequestException('Duration must be a positive number (minutes)');
+    }
+    if (duration > 600) {
+      throw new BadRequestException('Duration cannot exceed 600 minutes (10 hours)');
+    }
+
+    const totalMarks = Number(data.totalMarks);
+    if (isNaN(totalMarks) || totalMarks <= 0) {
+      throw new BadRequestException('Total marks must be a positive number');
+    }
+
+    const passMark = Number(data.passMark);
+    if (isNaN(passMark) || passMark < 0) {
+      throw new BadRequestException('Pass mark must be a non-negative number');
+    }
+    if (passMark > totalMarks) {
+      throw new BadRequestException(`Pass mark (${passMark}) cannot exceed total marks (${totalMarks})`);
+    }
+
+    const startTime = data.startTime ? new Date(data.startTime) : new Date();
+    const endTime = data.endTime ? new Date(data.endTime) : new Date(Date.now() + duration * 60 * 1000);
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      throw new BadRequestException('Invalid start time or end time');
+    }
+    if (endTime <= startTime) {
+      throw new BadRequestException('End time must be after start time');
+    }
+    // Ensure endTime is at least the duration in minutes after startTime
+    const durationMs = endTime.getTime() - startTime.getTime();
+    if (durationMs < duration * 60 * 1000) {
+      throw new BadRequestException(`End time must be at least ${duration} minutes after start time`);
+    }
+
     // Get latest term for this school
     const term = await this.prisma.term.findFirst({
       where: { session: { schoolId }, isCurrent: true },
@@ -19,13 +59,13 @@ export class CbtService {
     const exam = await this.prisma.examination.create({
       data: {
         termId: data.termId || term?.id,
-        title: data.title,
+        title: data.title.trim(),
         description: data.description,
-        duration: Number(data.duration),
-        totalMarks: Number(data.totalMarks),
-        passMark: Number(data.passMark),
-        startTime: data.startTime ? new Date(data.startTime) : new Date(),
-        endTime: data.endTime ? new Date(data.endTime) : new Date(Date.now() + 3600000),
+        duration,
+        totalMarks,
+        passMark,
+        startTime,
+        endTime,
         isRandomized: data.isRandomized ?? true,
       },
     });

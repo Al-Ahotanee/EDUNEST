@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse } from '../common/dto/pagination.dto';
 import { ResultStatus, TeacherRoleType } from '@prisma/client';
@@ -321,13 +321,39 @@ export class ResultsService {
       ? ResultStatus.APPROVED
       : ResultStatus.DRAFT;
 
+    // ─── SCORE VALIDATION (per Nigerian CA convention: 20/20/20/40 = 100) ──────
+    const MAX_CA = 20;
+    const MAX_EXAM = 40;
+    const validatedScores = scores.map((item, idx) => {
+      const ca1 = Number(item.ca1Score) || 0;
+      const ca2 = Number(item.ca2Score) || 0;
+      const ca3 = Number(item.ca3Score) || 0;
+      const exam = Number(item.examScore) || 0;
+      if (ca1 < 0 || ca2 < 0 || ca3 < 0 || exam < 0) {
+        throw new BadRequestException(`Row ${idx + 1}: Scores cannot be negative`);
+      }
+      if (ca1 > MAX_CA) {
+        throw new BadRequestException(`Row ${idx + 1}: CA1 score ${ca1} exceeds maximum of ${MAX_CA}`);
+      }
+      if (ca2 > MAX_CA) {
+        throw new BadRequestException(`Row ${idx + 1}: CA2 score ${ca2} exceeds maximum of ${MAX_CA}`);
+      }
+      if (ca3 > MAX_CA) {
+        throw new BadRequestException(`Row ${idx + 1}: CA3 score ${ca3} exceeds maximum of ${MAX_CA}`);
+      }
+      if (exam > MAX_EXAM) {
+        throw new BadRequestException(`Row ${idx + 1}: Exam score ${exam} exceeds maximum of ${MAX_EXAM}`);
+      }
+      return { ...item, ca1, ca2, ca3, exam };
+    });
+
     const updatedResults = await Promise.all(
-      scores.map(async (item) => {
-        const ca1 = Number(item.ca1Score) || 0;
-        const ca2 = Number(item.ca2Score) || 0;
-        const ca3 = Number(item.ca3Score) || 0;
-        const exam = Number(item.examScore) || 0;
-        const total = Math.min(100, Math.max(0, ca1 + ca2 + ca3 + exam));
+      validatedScores.map(async (item) => {
+        const ca1 = item.ca1;
+        const ca2 = item.ca2;
+        const ca3 = item.ca3;
+        const exam = item.exam;
+        const total = ca1 + ca2 + ca3 + exam;
 
         const { grade, remark } = await this.resolveGrade(total, schoolId);
 

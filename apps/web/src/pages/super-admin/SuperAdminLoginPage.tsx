@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { EduNestLogo } from '../../components/common/EduNestLogo';
 
 export default function SuperAdminLoginPage() {
-  const [form, setForm] = useState({ email: 'admin@schoolerp.com', password: '' });
+  const [form, setForm] = useState({ email: 'superadmin@schoolerp.com', password: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
@@ -34,7 +34,7 @@ export default function SuperAdminLoginPage() {
   };
 
   const fillDemoAdmin = () => {
-    setForm({ email: 'admin@schoolerp.com', password: 'password123' });
+    setForm({ email: 'superadmin@schoolerp.com', password: 'password123' });
     toast.success('SuperAdmin credentials filled');
   };
 
@@ -73,7 +73,7 @@ export default function SuperAdminLoginPage() {
                 <Sparkles size={13} className="text-amber-500" />
                 <span>Demo SuperAdmin</span>
               </p>
-              <p className="text-[11px] text-slate-500 font-mono">admin@schoolerp.com</p>
+              <p className="text-[11px] text-slate-500 font-mono">superadmin@schoolerp.com</p>
             </div>
             <button
               type="button"

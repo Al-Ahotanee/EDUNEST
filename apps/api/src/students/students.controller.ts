@@ -36,6 +36,12 @@ export class StudentsController {
     return this.studentsService.getStatistics(schoolId);
   }
 
+  @Get('promotion-results')
+  @ApiOperation({ summary: 'Get latest term results for all students (used by Promotions page)' })
+  getPromotionResults(@CurrentUser('schoolId') schoolId: string) {
+    return this.studentsService.getPromotionResults(schoolId);
+  }
+
   @Get('generate-admission-number')
   @ApiOperation({ summary: 'Generate next admission number' })
   generateAdmissionNumber(@CurrentUser('schoolId') schoolId: string) {
@@ -46,6 +52,16 @@ export class StudentsController {
   @ApiOperation({ summary: 'Get student by ID' })
   findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.findOne(id, schoolId);
+  }
+
+  @Post(':id/promote')
+  @ApiOperation({ summary: 'Promote, hold back, or graduate a student' })
+  promote(
+    @Param('id') id: string,
+    @CurrentUser('schoolId') schoolId: string,
+    @Body() body: { action: 'PROMOTED' | 'REPEATED' | 'GRADUATED'; targetClassId?: string },
+  ) {
+    return this.studentsService.promoteStudent(id, schoolId, body);
   }
 
   @Put(':id')

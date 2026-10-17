@@ -6,11 +6,39 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { BarChart3, Download, RefreshCw, TrendingUp, Users, DollarSign, ClipboardCheck } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { StatCard, Button, PageLoader, Select } from '../../components/ui';
 import { reportsApi, financeApi, studentsApi } from '../../services/api';
 import { formatCurrency } from '../../lib/utils';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+function downloadBlob(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function toCsv(rows: Record<string, any>[]): string {
+  if (!rows.length) return '';
+  const headers = Object.keys(rows[0]);
+  const escape = (v: any) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.join(',')];
+  for (const r of rows) {
+    lines.push(headers.map(h => escape(r[h])).join(','));
+  }
+  return lines.join('\n');
+}
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<'overview' | 'enrollment' | 'finance' | 'attendance'>('overview');
@@ -30,6 +58,44 @@ export default function ReportsPage() {
     return { value: String(y), label: String(y) };
   });
 
+  const handleExport = (format: 'csv' | 'json') => {
+    const summary = {
+      reportYear: year,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalStudents: studentStats?.total || 0,
+        activeStudents: studentStats?.active || 0,
+        male: studentStats?.male || 0,
+        female: studentStats?.female || 0,
+        totalRevenue: finStats?.totalCollected || 0,
+        outstandingBalance: finStats?.totalBalance || 0,
+        collectionRate: finStats?.collectionRate || 0,
+      },
+      monthlyTrend: monthlyTrend || [],
+    };
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === 'csv') {
+      const rows = (monthlyTrend || []).map((m: any) => ({
+        Month: m.month || m.label || '',
+        Revenue: m.revenue || m.collected || 0,
+        Outstanding: m.outstanding || 0,
+        Transactions: m.transactions || 0,
+      }));
+      const csv = toCsv(rows.length ? rows : [{ Note: 'No monthly data available' }]);
+      downloadBlob(csv, `edunest-reports-${stamp}.csv`, 'text/csv;charset=utf-8');
+      toast.success(`Exported CSV (${rows.length} rows)`);
+    } else {
+      downloadBlob(JSON.stringify(summary, null, 2), `edunest-reports-${stamp}.json`, 'application/json');
+      toast.success('Exported JSON report');
+    }
+  };
+
+  const handlePrint = () => {
+    toast.success('Opening print dialog for PDF export…');
+    setTimeout(() => window.print(), 300);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
@@ -39,8 +105,9 @@ export default function ReportsPage() {
         </div>
         <div className="flex gap-2">
           <Select options={years} value={String(year)} onChange={e => setYear(Number(e.target.value))} className="w-28 py-2 text-sm" />
-          <Button variant="secondary" icon={<Download size={16} />}>Export PDF</Button>
-          <Button variant="secondary" icon={<Download size={16} />}>Export Excel</Button>
+          <Button variant="secondary" icon={<Download size={16} />} onClick={handlePrint}>Export PDF</Button>
+          <Button variant="secondary" icon={<Download size={16} />} onClick={() => handleExport('csv')}>Export CSV</Button>
+          <Button variant="secondary" icon={<Download size={16} />} onClick={() => handleExport('json')}>Export JSON</Button>
         </div>
       </div>
 

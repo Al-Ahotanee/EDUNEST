@@ -35,6 +35,7 @@ import MarketerDashboard from './pages/marketer/MarketerDashboard';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import StudentsPage from './pages/students/StudentsPage';
 import StudentDetailPage from './pages/students/StudentDetailPage';
+import PromotionsPage from './pages/students/PromotionsPage';
 import AdminAdmissionsPage from './pages/admissions/AdminAdmissionsPage';
 import AcademicPage from './pages/academic/AcademicPage';
 import AttendancePage from './pages/attendance/AttendancePage';
@@ -139,6 +140,7 @@ export default function App() {
             <Route index element={<Navigate to="/app/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="students" element={<StudentsPage />} />
+            <Route path="students/promotions" element={<PromotionsPage />} />
             <Route path="students/:id" element={<StudentDetailPage />} />
             <Route path="admissions" element={<AdminAdmissionsPage />} />
             <Route path="academic/sessions" element={<AcademicPage />} />

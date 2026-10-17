@@ -11,7 +11,7 @@ import {
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
-import { formatCurrency, formatDate } from '../../lib/utils';
+import { formatCurrency, formatDate, cn } from '../../lib/utils';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 function useParentAuth() {

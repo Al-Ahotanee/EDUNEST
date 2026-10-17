@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse, paginate, safeSkip, safeTake, PaginationDto } from '../common/dto/pagination.dto';
 
@@ -27,6 +27,24 @@ export class NotificationsService {
   }
 
   async sendNotification(data: { title: string; message: string; type: string; targetRole?: string }, tenantId: string, schoolId: string) {
+    // ─── VALIDATION ─────────────────────────────────────────────────────────────
+    if (!data?.title || typeof data.title !== 'string' || data.title.trim().length < 1) {
+      throw new BadRequestException('Notification title is required');
+    }
+    if (data.title.length > 200) {
+      throw new BadRequestException('Notification title cannot exceed 200 characters');
+    }
+    if (!data?.message || typeof data.message !== 'string' || data.message.trim().length < 1) {
+      throw new BadRequestException('Notification message is required');
+    }
+    if (data.message.length > 5000) {
+      throw new BadRequestException('Notification message cannot exceed 5000 characters');
+    }
+    const allowedTypes = ['INFO', 'WARNING', 'SUCCESS', 'ERROR', 'SYSTEM'];
+    if (data.type && !allowedTypes.includes(data.type)) {
+      throw new BadRequestException(`Invalid notification type. Allowed: ${allowedTypes.join(', ')}`);
+    }
+
     let users: any[] = [];
     if (data.targetRole) {
       users = await this.prisma.user.findMany({

@@ -1,7 +1,33 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse, PaginationDto, paginate, safeSkip, safeTake } from '../common/dto/pagination.dto';
 import { Prisma } from '@prisma/client';
+
+// Allowlist of writable fields (prevents accidental mass-assignment of relations / read-only fields)
+const STAFF_WRITABLE_FIELDS = new Set([
+  'staffId', 'firstName', 'lastName', 'gender', 'dateOfBirth', 'phone', 'email',
+  'address', 'photo', 'departmentId', 'designation', 'employmentType', 'employmentDate',
+  'salary', 'bankName', 'accountNumber', 'qualification', 'trcnLicense', 'isActive',
+]);
+
+const LEAVE_WRITABLE_FIELDS = new Set([
+  'staffId', 'type', 'startDate', 'endDate', 'reason',
+]);
+
+const DEPARTMENT_WRITABLE_FIELDS = new Set([
+  'name', 'description', 'headId',
+]);
+
+function pickAllowed(data: any, allowed: Set<string>): Record<string, any> {
+  if (!data || typeof data !== 'object') return {};
+  const out: Record<string, any> = {};
+  for (const k of Object.keys(data)) {
+    if (allowed.has(k) && data[k] !== undefined && data[k] !== null && data[k] !== '') {
+      out[k] = data[k];
+    }
+  }
+  return out;
+}
 
 @Injectable()
 export class HrService {
@@ -10,19 +36,34 @@ export class HrService {
   // ─── STAFF ───────────────────────────────────────────────────────────────────
 
   async createStaff(data: any, schoolId: string) {
+    if (!data?.firstName || !data?.lastName || !data?.staffId) {
+      throw new BadRequestException('firstName, lastName, and staffId are required');
+    }
+
+    // Validate departmentId if provided
+    if (data.departmentId) {
+      const dept = await this.prisma.department.findFirst({
+        where: { id: data.departmentId, schoolId },
+      });
+      if (!dept) {
+        throw new BadRequestException('Selected department does not exist in this school');
+      }
+    }
+
     const existing = await this.prisma.staff.findFirst({
       where: { schoolId, staffId: data.staffId },
     });
     if (existing) throw new ConflictException('Staff ID already exists');
 
+    const cleanData = pickAllowed(data, STAFF_WRITABLE_FIELDS);
     const staff = await this.prisma.staff.create({
       data: {
-        ...data,
+        ...cleanData,
         schoolId,
-        salary: data.salary ? Number(data.salary) : null,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        employmentDate: data.employmentDate ? new Date(data.employmentDate) : null,
-      },
+        salary: cleanData.salary ? Number(cleanData.salary) : null,
+        dateOfBirth: cleanData.dateOfBirth ? new Date(cleanData.dateOfBirth) : null,
+        employmentDate: cleanData.employmentDate ? new Date(cleanData.employmentDate) : null,
+      } as any,
       include: { department: true },
     });
     return successResponse(staff, 'Staff created');
@@ -68,12 +109,16 @@ export class HrService {
 
   async updateStaff(id: string, schoolId: string, data: any) {
     await this.getOneStaff(id, schoolId);
+    const cleanData = pickAllowed(data, STAFF_WRITABLE_FIELDS);
+    // Never allow staffId or schoolId to change
+    delete cleanData.staffId;
     const updated = await this.prisma.staff.update({
       where: { id },
       data: {
-        ...data,
-        salary: data.salary ? Number(data.salary) : undefined,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        ...cleanData,
+        salary: cleanData.salary !== undefined ? Number(cleanData.salary) : undefined,
+        dateOfBirth: cleanData.dateOfBirth ? new Date(cleanData.dateOfBirth) : undefined,
+        employmentDate: cleanData.employmentDate ? new Date(cleanData.employmentDate) : undefined,
       },
       include: { department: true },
     });
@@ -98,8 +143,17 @@ export class HrService {
   }
 
   async createDepartment(data: any, schoolId: string) {
-    const dept = await this.prisma.department.create({ data: { ...data, schoolId } });
-    return successResponse(dept, 'Department created');
+    if (!data?.name) throw new BadRequestException('Department name is required');
+    const cleanData = pickAllowed(data, DEPARTMENT_WRITABLE_FIELDS);
+    try {
+      const dept = await this.prisma.department.create({ data: { ...cleanData, schoolId } as any });
+      return successResponse(dept, 'Department created');
+    } catch (err: any) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('A department with this name already exists');
+      }
+      throw err;
+    }
   }
 
   // ─── LEAVES ──────────────────────────────────────────────────────────────────
@@ -125,15 +179,28 @@ export class HrService {
   }
 
   async applyLeave(data: any, schoolId: string) {
+    if (!data?.staffId || !data?.type || !data?.startDate || !data?.endDate || !data?.reason) {
+      throw new BadRequestException('staffId, type, startDate, endDate, and reason are required');
+    }
     const staff = await this.prisma.staff.findFirst({ where: { id: data.staffId, schoolId } });
     if (!staff) throw new NotFoundException('Staff not found');
 
+    const cleanData = pickAllowed(data, LEAVE_WRITABLE_FIELDS);
+    const startDate = new Date(cleanData.startDate);
+    const endDate = new Date(cleanData.endDate);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('Invalid startDate or endDate');
+    }
+    if (endDate < startDate) {
+      throw new BadRequestException('End date must be after start date');
+    }
+
     const leave = await this.prisma.leave.create({
       data: {
-        ...data,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-      },
+        ...cleanData,
+        startDate,
+        endDate,
+      } as any,
       include: { staff: { select: { firstName: true, lastName: true } } },
     });
     return successResponse(leave, 'Leave application submitted');
@@ -175,6 +242,9 @@ export class HrService {
   }
 
   async generatePayroll(data: { month: number; year: number }, schoolId: string) {
+    if (!data?.month || !data?.year) {
+      throw new BadRequestException('month and year are required');
+    }
     const existing = await this.prisma.payroll.findFirst({
       where: { schoolId, month: data.month, year: data.year },
     });

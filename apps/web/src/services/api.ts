@@ -110,6 +110,18 @@ export const studentsApi = {
   results: (id: string, termId?: string) => api.get(`/students/${id}/results`, { params: { termId } }),
   attendance: (id: string, termId?: string) => api.get(`/students/${id}/attendance`, { params: { termId } }),
   addGuardian: (id: string, data: any) => api.post(`/students/${id}/guardians`, data),
+  // Returns latest term results for all students in the school (used by Promotions page)
+  promotionResults: () => api.get('/students/promotion-results').catch(() => ({ data: [] })),
+  promote: (id: string, data: any) => api.post(`/students/${id}/promote`, data),
+};
+
+// ─── Academic (alias: classesApi) ─────────────────────────────────────────────
+export const classesApi = {
+  list: (params?: any) => api.get('/academic/classes', { params }),
+  get: (id: string) => api.get(`/academic/classes/${id}`),
+  create: (data: any) => api.post('/academic/classes', data),
+  update: (id: string, data: any) => api.put(`/academic/classes/${id}`, data),
+  delete: (id: string) => api.delete(`/academic/classes/${id}`),
 };
 
 // ─── Finance ──────────────────────────────────────────────────────────────────

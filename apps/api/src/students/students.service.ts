@@ -196,4 +196,97 @@ export class StudentsService {
     const count = await this.prisma.student.count({ where: { schoolId } });
     return `${school?.code || 'SCH'}/${year}/${String(count + 1).padStart(4, '0')}`;
   }
+
+  /**
+   * Returns latest term results for all students in the school.
+   * Used by the Promotions page to compute average scores and identify promotion candidates.
+   */
+  async getPromotionResults(schoolId: string) {
+    const currentTerm = await this.prisma.term.findFirst({
+      where: { session: { schoolId }, isCurrent: true },
+    }) || await this.prisma.term.findFirst({
+      where: { session: { schoolId } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!currentTerm) return successResponse([]);
+
+    const results = await this.prisma.result.findMany({
+      where: {
+        termId: currentTerm.id,
+        student: { schoolId, deletedAt: null },
+      },
+      select: {
+        studentId: true,
+        totalScore: true,
+        subjectId: true,
+        status: true,
+      },
+    });
+
+    return successResponse(results);
+  }
+
+  /**
+   * Promote, hold back, or graduate a student.
+   * - PROMOTED: student's classEnrollment is updated to the next class
+   * - REPEATED: student stays in the current class for another session
+   * - GRADUATED: student status is set to GRADUATED
+   */
+  async promoteStudent(
+    studentId: string,
+    schoolId: string,
+    data: { action: 'PROMOTED' | 'REPEATED' | 'GRADUATED'; targetClassId?: string },
+  ) {
+    const student = await this.findOne(studentId, schoolId);
+
+    if (data.action === 'GRADUATED') {
+      const updated = await this.prisma.student.update({
+        where: { id: studentId },
+        data: { status: 'GRADUATED' },
+      });
+      return successResponse(updated, 'Student graduated successfully');
+    }
+
+    if (data.action === 'PROMOTED' && data.targetClassId) {
+      // Verify target class belongs to same school
+      const targetClass = await this.prisma.class.findFirst({
+        where: { id: data.targetClassId, schoolId },
+      });
+      if (!targetClass) {
+        throw new NotFoundException('Target class not found in this school');
+      }
+      // Close current enrollment and create new one for target class
+      const currentEnrollment = student.data?.classEnrollments?.[0];
+      if (currentEnrollment) {
+        await this.prisma.classEnrollment.update({
+          where: { id: currentEnrollment.id },
+          data: { isPromoted: true },
+        });
+      }
+      const latestSession = await this.prisma.academicSession.findFirst({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      });
+      const sessionId = latestSession?.id || currentEnrollment?.sessionId || '';
+      if (!sessionId) {
+        throw new NotFoundException('No academic session found for this school');
+      }
+      const enrollment = await this.prisma.classEnrollment.create({
+        data: {
+          studentId,
+          classId: data.targetClassId,
+          sessionId,
+        },
+        include: { class: true },
+      });
+      return successResponse(enrollment, 'Student promoted to next class');
+    }
+
+    if (data.action === 'REPEATED') {
+      return successResponse(student.data, 'Student held back in current class');
+    }
+
+    return successResponse(student.data, 'No action taken');
+  }
 }

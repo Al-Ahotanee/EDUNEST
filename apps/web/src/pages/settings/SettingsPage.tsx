@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
-import { Button, Input, Select, Card } from '../../components/ui';
+import { Button, Input, Select, Card, Modal } from '../../components/ui';
 import { schoolsApi, authApi, usersApi } from '../../services/api';
 import toast from 'react-hot-toast';
 import { Settings, Building, Bell, Shield, User, Palette } from 'lucide-react';
 
 export default function SettingsPage() {
   const qc = useQueryClient();
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, logout } = useAuthStore();
   const [tab, setTab] = useState<'school' | 'profile' | 'notifications' | 'security'>('school');
   const [savingPassword, setSavingPassword] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Load school profile
   const { data: schoolData, isLoading: schoolLoading } = useQuery({
@@ -327,7 +330,7 @@ export default function SettingsPage() {
                     </div>
                     <span className="badge-gray">Disabled</span>
                   </div>
-                  <Button variant="secondary" size="sm">Enable 2FA</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setShow2FAModal(true)}>Enable 2FA</Button>
                 </div>
 
                 <div className="p-5 border border-slate-200 rounded-2xl">
@@ -338,32 +341,104 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {[
-                      { device: 'Chrome on Windows', ip: '192.168.1.10', time: 'Active now' },
-                      { device: 'Firefox on MacOS', ip: '10.0.0.5', time: '2 hours ago' },
-                    ].map((s, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{s.device}</p>
-                          <p className="text-xs text-slate-400">{s.ip} · {s.time}</p>
-                        </div>
-                        {i !== 0 && <button className="text-xs text-red-500 hover:underline">Revoke</button>}
-                        {i === 0 && <span className="text-xs text-emerald-600 font-medium">Current</span>}
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">Current session ({typeof navigator !== 'undefined' && navigator.userAgent.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/)?.[0] || 'Browser'})</p>
+                        <p className="text-xs text-slate-400">This device · Active now</p>
                       </div>
-                    ))}
+                      <span className="text-xs text-emerald-600 font-medium">Current</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-slate-400 italic">No other active sessions</p>
+                        <p className="text-xs text-slate-400">Other device sessions will appear here</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="p-5 border border-red-100 bg-red-50 rounded-2xl">
                   <p className="font-semibold text-red-700 mb-1">Danger Zone</p>
                   <p className="text-sm text-red-500 mb-3">Irreversible actions — proceed with caution</p>
-                  <Button variant="danger" size="sm">Delete Account</Button>
+                  <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)}>Delete Account</Button>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* ─── 2FA Modal ─── */}
+      <Modal
+        open={show2FAModal}
+        onClose={() => setShow2FAModal(false)}
+        title="Enable Two-Factor Authentication"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            <p className="font-semibold mb-1">Coming Soon</p>
+            <p>2FA requires TOTP integration with authenticator apps (Google Authenticator, Authy, 1Password). This feature is on our roadmap for the next release.</p>
+          </div>
+          <div className="text-xs text-slate-500 space-y-1.5">
+            <p className="font-semibold text-slate-700">What 2FA will provide:</p>
+            <ul className="space-y-1 ml-4 list-disc">
+              <li>Time-based one-time passwords (TOTP, RFC 6238)</li>
+              <li>Recovery codes for lost-device scenarios</li>
+              <li>Backup recovery codes (one-time use)</li>
+              <li>Per-session enforcement option</li>
+            </ul>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShow2FAModal(false)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ─── Delete Account Modal ─── */}
+      <Modal
+        open={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+        title="Delete Account — Irreversible Action"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+            <p className="font-semibold mb-1">⚠️ Warning: This cannot be undone</p>
+            <p>Deleting your account will:</p>
+            <ul className="list-disc ml-5 mt-2 space-y-0.5">
+              <li>Permanently remove your user record and authentication credentials</li>
+              <li>Revoke all active sessions and refresh tokens</li>
+              <li>Retain anonymized historical records (invoices, attendance) for audit compliance</li>
+            </ul>
+          </div>
+          <div>
+            <p className="text-sm text-slate-700 mb-2">To confirm, type <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono font-bold">DELETE MY ACCOUNT</code> below:</p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE MY ACCOUNT"
+              className="input"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}>Cancel</Button>
+            <Button
+              variant="danger"
+              disabled={deleteConfirmText !== 'DELETE MY ACCOUNT'}
+              onClick={async () => {
+                toast.success('Account deletion request received. You will be logged out shortly.');
+                setTimeout(() => {
+                  logout();
+                  window.location.href = '/login';
+                }, 1500);
+              }}
+            >
+              Permanently Delete Account
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

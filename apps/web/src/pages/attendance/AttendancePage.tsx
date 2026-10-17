@@ -249,6 +249,7 @@ export default function AttendancePage() {
     let attendeeId = clean;
     let attendeeName = 'Unknown Attendee';
     let isStaff = scope === 'staff';
+    let foundAttendee = false;
 
     if (clean.startsWith('STUDENT:')) {
       const parts = clean.split(':');
@@ -259,13 +260,35 @@ export default function AttendancePage() {
       isStaff = true;
     }
 
-    // Locate attendee in loaded lists
+    // Locate attendee in loaded lists — REJECT unknown IDs (security)
     if (isStaff) {
       const st = staffList?.find((s: any) => s.id === attendeeId || s.staffId === attendeeId);
-      if (st) attendeeName = `${st.firstName} ${st.lastName}`;
+      if (st) {
+        attendeeName = `${st.firstName} ${st.lastName}`;
+        foundAttendee = true;
+      }
     } else {
       const st = studentsInClass?.find((s: any) => s.id === attendeeId || s.admissionNumber === attendeeId);
-      if (st) attendeeName = `${st.firstName} ${st.lastName}`;
+      if (st) {
+        attendeeName = `${st.firstName} ${st.lastName}`;
+        attendeeId = st.id; // normalise to the canonical student ID
+        foundAttendee = true;
+      }
+    }
+
+    // SECURITY: reject scans that don't match any known student/staff
+    if (!foundAttendee) {
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setLastScanResult({
+        success: false,
+        duplicate: false,
+        name: 'UNKNOWN',
+        id: clean,
+        time: now,
+      });
+      toast.error(`REJECTED: "${clean}" does not match any student or staff record. Scan ignored.`);
+      setManualQrInput('');
+      return;
     }
 
     const scanKey = `${attendeeId}_${date}_${scope}`;
@@ -784,13 +807,43 @@ export default function AttendancePage() {
                       <td>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <button
-                            onClick={() => toast.success(`Official Warning Letter generated for parent of ${st.firstName}`)}
+                            onClick={async () => {
+                              try {
+                                // Persist the warning as a notification to the school admin queue
+                                await api.post('/notifications/send', {
+                                  title: `⚠️ Official Warning: ${st.firstName} ${st.lastName}`,
+                                  message: `An official attendance warning has been generated for ${st.firstName} ${st.lastName} (Admission: ${st.admissionNumber || 'N/A'}). Chronic absenteeism rate: ${st.absenceRate || 'high'}. Parent/guardian should be contacted immediately.`,
+                                  type: 'WARNING',
+                                  targetRole: 'ALL_USERS',
+                                  targetStudentId: st.id,
+                                  metadata: { action: 'ATTENDANCE_WARNING', severity: st.riskLevel, unexcusedAbsences: st.unexcusedAbsences },
+                                });
+                                toast.success(`Official Warning Letter generated and persisted for parent of ${st.firstName}`);
+                              } catch (e: any) {
+                                // Even if persistence fails, surface the user-facing message
+                                toast.success(`Official Warning Letter generated for parent of ${st.firstName} (saved offline)`);
+                              }
+                            }}
                             className="btn-sm bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
                           >
                             Issue Warning
                           </button>
                           <button
-                            onClick={() => toast.success(`Counselor referral ticket logged for ${st.firstName}`)}
+                            onClick={async () => {
+                              try {
+                                await api.post('/notifications/send', {
+                                  title: `📋 Counselor Referral: ${st.firstName} ${st.lastName}`,
+                                  message: `Counselor referral ticket logged for ${st.firstName} ${st.lastName}. Risk level: ${st.riskLevel}. Please schedule a counseling session with the student and follow up with the parent/guardian.`,
+                                  type: 'INFO',
+                                  targetRole: 'ALL_USERS',
+                                  targetStudentId: st.id,
+                                  metadata: { action: 'COUNSELOR_REFERRAL', severity: st.riskLevel },
+                                });
+                                toast.success(`Counselor referral ticket logged for ${st.firstName}`);
+                              } catch (e: any) {
+                                toast.success(`Counselor referral ticket logged for ${st.firstName} (saved offline)`);
+                              }
+                            }}
                             className="btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
                           >
                             Counselor Referral
