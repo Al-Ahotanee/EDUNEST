@@ -33,6 +33,9 @@ export class CreateStudentDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() photo?: string;
   @ApiPropertyOptional({ enum: StudentStatus }) @IsOptional() @IsEnum(StudentStatus) status?: StudentStatus;
+  // ─── Round 6: Class assignment at registration time (auto-enrolls student) ──
+  @ApiPropertyOptional() @IsOptional() @IsString() classId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() sessionId?: string;
   @ApiPropertyOptional({ type: [CreateGuardianDto] })
   @IsOptional()
   @IsArray()

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto, paginate, safeSkip, safeTake, successResponse } from '../common/dto/pagination.dto';
@@ -12,25 +13,77 @@ import { Prisma } from '@prisma/client';
 export class StudentsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreateStudentDto, schoolId: string) {
+  async create(dto: CreateStudentDto & { classId?: string; sessionId?: string }, schoolId: string) {
     const existing = await this.prisma.student.findUnique({
       where: { schoolId_admissionNumber: { schoolId, admissionNumber: dto.admissionNumber } },
     });
     if (existing) throw new ConflictException('Admission number already exists');
 
-    const student = await this.prisma.student.create({
-      data: {
-        ...dto,
-        schoolId,
-        dateOfBirth: new Date(dto.dateOfBirth),
-        guardians: dto.guardians
-          ? { create: dto.guardians }
-          : undefined,
-      },
-      include: { guardians: true },
+    // Extract classId/sessionId — not part of Student model, used for auto-enrollment
+    const { classId, sessionId, ...studentData } = dto;
+
+    // Validate classId if provided
+    if (classId) {
+      const cls = await this.prisma.class.findFirst({ where: { id: classId, schoolId } });
+      if (!cls) {
+        throw new BadRequestException('Selected class does not exist in this school');
+      }
+    }
+
+    // Get latest session if not provided
+    let activeSessionId = sessionId;
+    if (!activeSessionId) {
+      const session = await this.prisma.academicSession.findFirst({
+        where: { schoolId, isCurrent: true },
+      }) || await this.prisma.academicSession.findFirst({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      });
+      activeSessionId = session?.id;
+    }
+
+    // Create student + auto-enroll in class if classId provided (transactional)
+    const student = await this.prisma.$transaction(async (tx) => {
+      const newStudent = await tx.student.create({
+        data: {
+          ...studentData,
+          schoolId,
+          dateOfBirth: new Date(studentData.dateOfBirth),
+          guardians: studentData.guardians
+            ? { create: studentData.guardians }
+            : undefined,
+        },
+        include: { guardians: true },
+      });
+
+      // Auto-enroll in class if classId is provided
+      if (classId && activeSessionId) {
+        await tx.classEnrollment.create({
+          data: {
+            studentId: newStudent.id,
+            classId,
+            sessionId: activeSessionId,
+          },
+        });
+      }
+
+      return newStudent;
     });
 
-    return successResponse(student, 'Student created successfully');
+    // Return student with enrollment info
+    const studentWithEnrollment = await this.prisma.student.findUnique({
+      where: { id: student.id },
+      include: {
+        guardians: true,
+        classEnrollments: {
+          include: { class: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    return successResponse(studentWithEnrollment, 'Student created successfully');
   }
 
   async findAll(schoolId: string, query: PaginationDto & { status?: string; classId?: string }) {

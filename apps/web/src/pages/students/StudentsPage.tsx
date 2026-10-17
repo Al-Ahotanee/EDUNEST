@@ -9,7 +9,7 @@ import {
   DataTable, Button, Modal, Input, Select, Badge,
   ConfirmDialog, Avatar, StatCard, PageLoader, Card,
 } from '../../components/ui';
-import { studentsApi, schoolsApi } from '../../services/api';
+import { studentsApi, schoolsApi, academicApi } from '../../services/api';
 import { formatDate, getStatusBadge } from '../../lib/utils';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -29,6 +29,7 @@ const studentSchema = z.object({
   address: z.string().optional(),
   status: z.string().optional(),
   photo: z.string().optional(),
+  classId: z.string().optional(),
 });
 
 type StudentForm = z.infer<typeof studentSchema>;
@@ -59,6 +60,13 @@ export default function StudentsPage() {
       return res.data?.data || res.data;
     },
   });
+
+  // Fetch classes for the registration form dropdown
+  const { data: classesData } = useQuery({
+    queryKey: ['classes-for-registration'],
+    queryFn: () => academicApi.classes().then((r) => r.data?.data || r.data || []),
+  });
+  const classes = Array.isArray(classesData) ? classesData : [];
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['students', page, search, statusFilter],
@@ -571,6 +579,34 @@ setTimeout(function() {
             />
           </div>
           <Input label="Address" {...register('address')} placeholder="Home address" />
+
+          {/* Class Assignment — prevents future unassigned students */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="label">Assign to Class *</label>
+              <select
+                {...register('classId')}
+                className="input"
+                defaultValue=""
+              >
+                <option value="">— Select Class —</option>
+                {classes.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">Student will be auto-enrolled in this class for the current session.</p>
+            </div>
+            <Select
+              label="Status"
+              {...register('status')}
+              options={[
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'INACTIVE', label: 'Inactive' },
+                { value: 'GRADUATED', label: 'Graduated' },
+                { value: 'TRANSFERRED', label: 'Transferred' },
+              ]}
+            />
+          </div>
 
           {/* Photo Upload */}
           <div className="form-group">

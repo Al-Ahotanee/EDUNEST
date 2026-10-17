@@ -386,6 +386,7 @@ model Class {
   teacherAssignments TeacherAssignment[]
   termReportCards    TermReportCard[]
   reliefAssignments  ReliefAssignment[]
+  feeStructures      FeeStructure[]
 
   @@unique([schoolId, name, section])
   @@index([schoolId])
@@ -653,13 +654,21 @@ model FeeStructure {
   amount      Float
   description String?
   termBased   Boolean  @default(true)
+  // ─── Round 6 enhancements: class-scoped, session/term-scoped fee schedules ──
+  classId     String?  // if set, this fee structure applies only to this class
+  sessionId   String?  // if set, applies only to this academic session
+  termId      String?  // if set, applies only to this term
+  feeType     String   @default("TERM") // ONE_TIME | ANNUAL | TERM
+  status      String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   school       School        @relation(fields: [schoolId], references: [id])
+  class        Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
   invoiceItems InvoiceItem[]
 
   @@index([schoolId])
+  @@index([classId])
 }
 
 model Invoice {
