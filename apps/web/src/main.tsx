@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
+// Build version marker (changes per deploy to force bundle cache invalidation)
+console.log('EduNest build v2.5 - RBAC + Relief Desk + Mobile UI');
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
