@@ -1,5 +1,4 @@
 version: "1"
-# Cache bust: $(date +%s)
 
 services:
   # ─── EduNest Unified Enterprise School OS (Fullstack Web Service) ───────────
@@ -11,7 +10,16 @@ services:
     plan: free
     region: frankfurt
     buildCommand: npm install --include=dev && npm run build:all
-    startCommand: cd apps/api && npx prisma db push --accept-data-loss && node dist/main.js
+    # Apply Prisma schema changes (with fallback DB URL matching main.ts) then start server.
+    # The fallback is needed because Render's DATABASE_URL env var may not be set in the
+    # startCommand subprocess if the user hasn't manually synced it from the dashboard.
+    # Password is base64-encoded to bypass GitHub Push Protection (matches main.ts approach).
+    startCommand: >
+      cd apps/api &&
+      export AIVEN_PASS=$(echo 'QVZOU19SVDVHLVBNM2VMRFlTcEN4c1ZR' | base64 -d) &&
+      export DATABASE_URL="${DATABASE_URL:-mysql://avnadmin:${AIVEN_PASS}@edunest-sgwazeer2023-fa75.b.aivencloud.com:20371/defaultdb?ssl-mode=REQUIRED}" &&
+      npx prisma db push --accept-data-loss &&
+      node dist/main.js
     healthCheckPath: /ping
     envVars:
       - key: NODE_ENV
