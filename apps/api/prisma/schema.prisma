@@ -79,6 +79,7 @@ model School {
   teacherAssignments TeacherAssignment[]
   termReportCards    TermReportCard[]
   gradingScales      GradingScale[]
+  reliefAssignments  ReliefAssignment[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -382,6 +383,7 @@ model Class {
   timetableSlots TimetableSlot[]
   teacherAssignments TeacherAssignment[]
   termReportCards    TermReportCard[]
+  reliefAssignments  ReliefAssignment[]
 
   @@unique([schoolId, name, section])
   @@index([schoolId])
@@ -416,6 +418,7 @@ model Subject {
 
   timetableSlots TimetableSlot[]
   results     Result[]
+  reliefAssignments ReliefAssignment[]
   questions   Question[]
   teacherAssignments TeacherAssignment[]
 
@@ -760,6 +763,8 @@ model Staff {
   appraisals      Appraisal[]
   payrollItems    PayrollItem[]
   timetableSlots  TimetableSlot[]
+  reliefAsAbsent  ReliefAssignment[] @relation("AbsentStaffRelief")
+  reliefAsSubstitute ReliefAssignment[] @relation("ReliefStaffRelief")
 
   @@unique([schoolId, staffId])
   @@index([schoolId])
@@ -966,6 +971,39 @@ model TimetableSlot {
   staff       Staff?   @relation(fields: [staffId], references: [id])
 
   @@index([classId])
+}
+
+/// Relief / Substitute Teacher Assignment — persisted record of which teacher
+/// substituted for an absent teacher on a specific day/period. Used by the
+/// Timetable Relief Desk view.
+model ReliefAssignment {
+  id              String   @id @default(uuid())
+  schoolId        String
+  date            DateTime
+  dayOfWeek       String
+  period          String
+  classId         String?
+  className       String
+  subjectId       String?
+  subjectName     String
+  absentStaffId   String?
+  absentTeacherName String
+  reliefStaffId   String?
+  reliefTeacherName String
+  reason          String?
+  status          String   @default("CONFIRMED")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class           Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  subject         Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  absentStaff     Staff?   @relation("AbsentStaffRelief", fields: [absentStaffId], references: [id], onDelete: SetNull)
+  reliefStaff     Staff?   @relation("ReliefStaffRelief", fields: [reliefStaffId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId])
+  @@index([date])
+  @@index([absentStaffId])
 }
 
 // ─── TRANSPORT ────────────────────────────────────────────────────────────────

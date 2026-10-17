@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Patch } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { TimetableService } from './timetable.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -17,5 +17,27 @@ export class TimetableController {
   @Get('school') getSchool(@CurrentUser('schoolId') schoolId: string) { return this.timetableService.getSchoolTimetable(schoolId); }
   @Get('class/:classId') getByClass(@Param('classId') classId: string) { return this.timetableService.getByClass(classId); }
   @Get('staff/:staffId') getByStaff(@Param('staffId') staffId: string) { return this.timetableService.getByStaff(staffId); }
+
+  // ─── RELIEF / SUBSTITUTE TEACHER ENDPOINTS (P0-18 fix) ─────────────────────
+  @Get('relief')
+  listRelief(@CurrentUser('schoolId') schoolId: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.timetableService.listReliefAssignments(schoolId, from, to);
+  }
+
+  @Post('relief')
+  createRelief(@Body() body: any, @CurrentUser('schoolId') schoolId: string) {
+    return this.timetableService.createReliefAssignment(body, schoolId);
+  }
+
+  @Patch('relief/:id')
+  updateRelief(@Param('id') id: string, @Body() body: any, @CurrentUser('schoolId') schoolId: string) {
+    return this.timetableService.updateReliefAssignment(id, body, schoolId);
+  }
+
+  @Delete('relief/:id')
+  deleteRelief(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.timetableService.deleteReliefAssignment(id, schoolId);
+  }
+
   @Delete(':id') remove(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) { return this.timetableService.deleteSlot(id, schoolId); }
 }

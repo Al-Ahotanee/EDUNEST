@@ -144,3 +144,124 @@
     to { opacity: 1; }
   }
 }
+
+/* ─── MOBILE / RESPONSIVE FIXES ──────────────────────────────────────────────
+   Issues addressed:
+   - Tables overflow horizontally on small screens (375px wide)
+   - Page headers with buttons get cut off when buttons wrap incorrectly
+   - Modal content exceeds viewport height/width
+   - Filter bars don't wrap on narrow screens
+   - Stat card grids become too cramped at <360px
+   - Action buttons in tables overlap on narrow screens
+   - Sidebar covers full width on mobile (good) but hamburger is hard to tap
+   - Topbar buttons cluster too tightly
+*/
+
+@layer components {
+  /* Tables: ensure horizontal scroll wrapper doesn't break parent flex layout */
+  .table-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  .table-container table {
+    min-width: 600px; /* Force horizontal scroll on small screens instead of squishing */
+  }
+}
+
+@layer utilities {
+  /* Mobile-only fixes — applied via plain CSS, no @apply to avoid Tailwind circular deps */
+  @media (max-width: 640px) {
+    /* Allow DataTable action buttons to wrap into multiple rows */
+    .table-container td .flex,
+    .table-container td .grid {
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    /* Stats grid: 2 cols on mobile, 4 on desktop */
+    .grid-cols-2.lg\:grid-cols-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* Page title: smaller on mobile */
+    .page-title {
+      font-size: 1.25rem;
+      line-height: 1.5rem;
+    }
+
+    /* Modal: max width = viewport - 2rem, max height = 85vh */
+    .modal-content {
+      max-width: calc(100vw - 2rem) !important;
+      max-height: 85vh !important;
+    }
+
+    /* Modal padding tighter on mobile */
+    .modal-header {
+      padding: 1rem;
+    }
+    .modal-body {
+      padding: 1rem;
+    }
+    .modal-footer {
+      padding: 1rem;
+      flex-direction: column-reverse;
+    }
+    .modal-footer > * {
+      width: 100%;
+    }
+
+    /* Inputs in filter bars take full width on mobile */
+    .input.w-40, .input.w-48, .input.w-28 {
+      width: 100% !important;
+    }
+
+    /* Topbar: truncate user text on mobile */
+    .topbar-user-text {
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  /* Very small screens (<360px) — single column stats */
+  @media (max-width: 360px) {
+    .grid-cols-2.lg\:grid-cols-4 {
+      grid-template-columns: 1fr;
+    }
+    .page-title {
+      font-size: 1.1rem;
+    }
+  }
+
+  /* Touch-friendly: increase tap target sizes on mobile */
+  @media (max-width: 768px) {
+    .btn-sm {
+      padding: 0.5rem 0.75rem;
+      min-height: 36px;
+    }
+    .btn {
+      min-height: 44px;
+    }
+  }
+}
+
+/* Print styles — used by Reports Export PDF and various Print buttons */
+@media print {
+  .sidebar,
+  .topbar,
+  header,
+  footer,
+  button {
+    display: none !important;
+  }
+  main, .max-w-7xl, .max-w-\[1700px\] {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  body {
+    background: white !important;
+  }
+}

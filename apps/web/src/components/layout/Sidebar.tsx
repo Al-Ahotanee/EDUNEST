@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -10,55 +10,69 @@ import {
 } from 'lucide-react';
 import { EduNestIcon } from '../common/EduNestLogo';
 
-const NAV_ITEMS: any[] = [
+// Each item declares the permission(s) needed to see it.
+// Items without `requiredPermission` are visible to all authenticated users.
+// Items with `adminOnly: true` are only visible to users with role 'Super Admin' (or isSuperAdmin flag).
+interface NavItemDef {
+  label: string;
+  path?: string;
+  icon: React.ReactNode;
+  children?: NavItemDef[];
+  adminOnly?: boolean;
+  requiredPermission?: { module: string; action: string };
+}
+
+const NAV_ITEMS: NavItemDef[] = [
   { label: 'Dashboard', path: '/app/dashboard', icon: <LayoutDashboard size={18} /> },
   {
     label: 'Students',
     icon: <GraduationCap size={18} />,
     children: [
-      { label: 'All Students', path: '/app/students', icon: <Users size={16} /> },
-      { label: 'Admissions', path: '/app/admissions', icon: <FileText size={16} /> },
-      { label: 'Promotions', path: '/app/students/promotions', icon: <Award size={16} /> },
+      { label: 'All Students', path: '/app/students', icon: <Users size={16} />, requiredPermission: { module: 'students', action: 'read' } },
+      { label: 'Admissions', path: '/app/admissions', icon: <FileText size={16} />, adminOnly: true },
+      { label: 'Promotions', path: '/app/students/promotions', icon: <Award size={16} />, adminOnly: true },
     ],
   },
   {
     label: 'Academic',
     icon: <BookOpen size={18} />,
     children: [
-      { label: 'Sessions & Terms', path: '/app/academic/sessions', icon: <Calendar size={16} /> },
-      { label: 'Classes', path: '/app/academic/classes', icon: <School size={16} /> },
-      { label: 'Subjects', path: '/app/academic/subjects', icon: <BookOpen size={16} /> },
-      { label: 'Timetable', path: '/app/timetable', icon: <ClipboardList size={16} /> },
+      { label: 'Sessions & Terms', path: '/app/academic/sessions', icon: <Calendar size={16} />, adminOnly: true },
+      { label: 'Classes', path: '/app/academic/classes', icon: <School size={16} />, requiredPermission: { module: 'academic', action: 'read' } },
+      { label: 'Subjects', path: '/app/academic/subjects', icon: <BookOpen size={16} />, requiredPermission: { module: 'academic', action: 'read' } },
+      { label: 'Timetable', path: '/app/timetable', icon: <ClipboardList size={16} />, requiredPermission: { module: 'academic', action: 'read' } },
     ],
   },
-  { label: 'Attendance', path: '/app/attendance', icon: <ClipboardCheck size={18} /> },
-  { label: 'Results', path: '/app/results', icon: <Award size={18} /> },
-  { label: 'CBT Exams', path: '/app/cbt', icon: <Monitor size={18} /> },
+  { label: 'Attendance', path: '/app/attendance', icon: <ClipboardCheck size={18} />, requiredPermission: { module: 'attendance', action: 'read' } },
+  { label: 'Results', path: '/app/results', icon: <Award size={18} />, requiredPermission: { module: 'results', action: 'read' } },
+  { label: 'CBT Exams', path: '/app/cbt', icon: <Monitor size={18} />, requiredPermission: { module: 'academic', action: 'read' } },
   {
     label: 'Finance',
     icon: <DollarSign size={18} />,
+    adminOnly: true,
     children: [
-      { label: 'Overview', path: '/app/finance', icon: <BarChart3 size={16} /> },
-      { label: 'Invoices', path: '/app/finance/invoices', icon: <FileText size={16} /> },
-      { label: 'Fee Structures', path: '/app/finance/fees', icon: <DollarSign size={16} /> },
+      { label: 'Overview', path: '/app/finance', icon: <BarChart3 size={16} />, adminOnly: true },
+      { label: 'Invoices', path: '/app/finance/invoices', icon: <FileText size={16} />, adminOnly: true },
+      { label: 'Fee Structures', path: '/app/finance/fees', icon: <DollarSign size={16} />, adminOnly: true },
     ],
   },
   {
     label: 'Human Resources',
     icon: <UserCog size={18} />,
+    adminOnly: true,
     children: [
-      { label: 'Staff', path: '/app/hr/staff', icon: <Users size={16} /> },
-      { label: 'Departments', path: '/app/hr/departments', icon: <School size={16} /> },
-      { label: 'Leave Management', path: '/app/hr/leaves', icon: <ClipboardList size={16} /> },
-      { label: 'Payroll', path: '/app/hr/payroll', icon: <DollarSign size={16} /> },
+      { label: 'Staff', path: '/app/hr/staff', icon: <Users size={16} />, adminOnly: true },
+      { label: 'Departments', path: '/app/hr/departments', icon: <School size={16} />, adminOnly: true },
+      { label: 'Leave Management', path: '/app/hr/leaves', icon: <ClipboardList size={16} />, adminOnly: true },
+      { label: 'Payroll', path: '/app/hr/payroll', icon: <DollarSign size={16} />, adminOnly: true },
     ],
   },
-  { label: 'Library', path: '/app/library', icon: <Library size={18} /> },
-  { label: 'Hostel', path: '/app/hostel', icon: <Bed size={18} /> },
-  { label: 'Health Records', path: '/app/health', icon: <Heart size={18} /> },
-  { label: 'Inventory', path: '/app/inventory', icon: <Package size={18} /> },
+  { label: 'Library', path: '/app/library', icon: <Library size={18} />, adminOnly: true },
+  { label: 'Hostel', path: '/app/hostel', icon: <Bed size={18} />, adminOnly: true },
+  { label: 'Health Records', path: '/app/health', icon: <Heart size={18} />, adminOnly: true },
+  { label: 'Inventory', path: '/app/inventory', icon: <Package size={18} />, adminOnly: true },
   { label: 'Notifications', path: '/app/notifications', icon: <Bell size={18} /> },
-  { label: 'Reports', path: '/app/reports', icon: <BarChart3 size={18} /> },
+  { label: 'Reports', path: '/app/reports', icon: <BarChart3 size={18} />, adminOnly: true },
   { label: 'Settings', path: '/app/settings', icon: <Settings size={18} /> },
 ];
 
@@ -67,7 +81,7 @@ function NavItemComponent({
   collapsed,
   onNavigate,
 }: {
-  item: any;
+  item: NavItemDef;
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
@@ -150,7 +164,41 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
   const { user, logout } = useAuthStore();
   const isCollapsed = collapsed && !mobileOpen;
 
-  const displayRole = user?.roles?.[0]?.name === 'Super Admin'
+  // Filter nav items based on user role/permissions
+  const visibleNavItems = useMemo(() => {
+    if (!user) return [];
+    const isSuperAdmin = user.isSuperAdmin || user.roles?.some((r) => r.name === 'Super Admin');
+
+    const filterItem = (item: NavItemDef): NavItemDef | null => {
+      // Admin-only items: visible to Super Admin only
+      if (item.adminOnly && !isSuperAdmin) return null;
+
+      // Items requiring a specific permission
+      if (item.requiredPermission) {
+        const hasPermission = isSuperAdmin || user.roles?.some((r) =>
+          r.permissions?.some((p) => p.module === item.requiredPermission!.module && p.action === item.requiredPermission!.action)
+        );
+        if (!hasPermission) return null;
+      }
+
+      // For items with children, filter the children too
+      if (item.children) {
+        const visibleChildren = item.children
+          .map((c) => filterItem(c))
+          .filter((c): c is NavItemDef => c !== null);
+        if (visibleChildren.length === 0) return null;
+        return { ...item, children: visibleChildren };
+      }
+
+      return item;
+    };
+
+    return NAV_ITEMS
+      .map((item) => filterItem(item))
+      .filter((item): item is NavItemDef => item !== null);
+  }, [user]);
+
+  const displayRole = user?.isSuperAdmin
     ? 'School Administrator'
     : user?.roles?.[0]?.name || 'Staff Member';
 
@@ -184,7 +232,7 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
         </div>
         <button
           onClick={onCloseMobile}
-          className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
           aria-label="Close sidebar"
         >
           <X size={18} />
@@ -194,7 +242,7 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         {!isCollapsed && <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-1">School Operations</p>}
-        {NAV_ITEMS.map(item => (
+        {visibleNavItems.map(item => (
           <NavItemComponent
             key={item.label}
             item={item}
@@ -221,7 +269,7 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
                 logout();
               }}
               title="Logout"
-              className="text-slate-400 hover:text-red-400 transition-colors"
+              className="text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
             >
               <LogOut size={16} />
             </button>

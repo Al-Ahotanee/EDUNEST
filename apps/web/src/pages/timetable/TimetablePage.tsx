@@ -25,6 +25,10 @@ const tapi = {
   clearSchool: () => api.post('/timetable/clear-school'),
   delete: (id: string) => api.delete(`/timetable/${id}`),
   school: () => api.get('/timetable/school'),
+  // Relief / Substitute teacher endpoints (P0-18 fix)
+  listRelief: () => api.get('/timetable/relief'),
+  createRelief: (d: any) => api.post('/timetable/relief', d),
+  deleteRelief: (id: string) => api.delete(`/timetable/relief/${id}`),
 };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -606,33 +610,39 @@ export default function TimetablePage() {
     setUpcomingNextPeriod(next || null);
   }, [allSlotsFlat, selectedTeacherId, currentStaffProfile, isTeacher]);
 
-  // ─── SUBSTITUTIONS STATE ───────────────────────────────────────────────────
-  const [substitutions, setSubstitutions] = useState<any[]>([
-    {
-      id: 'sub-1',
-      date: new Date().toISOString().split('T')[0],
-      day: 'Monday',
-      period: '08:45 - 09:30',
-      className: 'JSS 1 Gold',
-      subjectName: 'Mathematics',
-      absentTeacher: 'Mr. Emmanuel Adebayo',
-      reliefTeacher: 'Mrs. Funke Adeleke',
-      reason: 'Medical Leave (Specialist checkup)',
-      status: 'CONFIRMED'
+  // ─── SUBSTITUTIONS / RELIEF DESK STATE (P0-18 fix: API-backed) ──────────────
+  // Previously these were hardcoded fake placeholder rows (Mr. Emmanuel Adebayo etc.)
+  // that didn't exist in the actual DB. Now fetched from /api/v1/timetable/relief.
+  const { data: reliefData, refetch: refetchRelief } = useQuery({
+    queryKey: ['timetable-relief'],
+    queryFn: () => tapi.listRelief().then((r) => r.data?.data || r.data || []),
+    retry: false,
+  });
+  const substitutions = Array.isArray(reliefData) ? reliefData : [];
+
+  const createReliefMutation = useMutation({
+    mutationFn: (data: any) => tapi.createRelief(data),
+    onSuccess: () => {
+      toast.success('Relief teacher assigned and persisted to database!');
+      refetchRelief();
+      setSubstitutionModal(false);
+      reliefForm.reset();
     },
-    {
-      id: 'sub-2',
-      date: new Date().toISOString().split('T')[0],
-      day: 'Wednesday',
-      period: '11:15 - 11:55',
-      className: 'Primary 4 Blue',
-      subjectName: 'Basic Science & Tech',
-      absentTeacher: 'Mr. David Adeleke',
-      reliefTeacher: 'Miss Grace Danladi',
-      reason: 'TRCN Teachers Council Workshop',
-      status: 'CONFIRMED'
-    }
-  ]);
+    onError: (e: any) => {
+      toast.error(e.response?.data?.message || 'Failed to assign relief teacher');
+    },
+  });
+
+  const cancelReliefMutation = useMutation({
+    mutationFn: (id: string) => tapi.deleteRelief(id),
+    onSuccess: () => {
+      toast.success('Relief assignment cancelled');
+      refetchRelief();
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.message || 'Failed to cancel relief assignment');
+    },
+  });
 
   // ─── FORM & MUTATIONS ──────────────────────────────────────────────────────
   const editForm = useForm({
@@ -1790,29 +1800,46 @@ export default function TimetablePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {substitutions.map(sub => (
-                  <tr key={sub.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-medium text-slate-800">
-                      {sub.date} ({sub.day})
-                    </td>
-                    <td className="p-3 font-semibold text-blue-600">{sub.period}</td>
-                    <td className="p-3">
-                      <div className="font-bold text-slate-900">{sub.className}</div>
-                      <div className="text-slate-500 text-[10px]">{sub.subjectName}</div>
-                    </td>
-                    <td className="p-3 text-red-600 font-medium">{sub.absentTeacher}</td>
-                    <td className="p-3 text-emerald-700 font-bold flex items-center gap-1.5">
-                      <CheckCircle2 size={13} className="text-emerald-500" />
-                      {sub.reliefTeacher}
-                    </td>
-                    <td className="p-3 text-slate-500 italic">{sub.reason}</td>
-                    <td className="p-3">
-                      <span className="badge-green text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        {sub.status}
-                      </span>
+                {substitutions.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-400">
+                      No relief assignments yet. Click "Assign Emergency Relief" to create one — it will persist to the database.
                     </td>
                   </tr>
-                ))}
+                )}
+                {substitutions.map((sub: any) => {
+                  const dateStr = sub.date ? new Date(sub.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—';
+                  return (
+                    <tr key={sub.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-medium text-slate-800">
+                        {dateStr} ({sub.dayOfWeek || sub.day})
+                      </td>
+                      <td className="p-3 font-semibold text-blue-600">{sub.period}</td>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-900">{sub.className}</div>
+                        <div className="text-slate-500 text-[10px]">{sub.subjectName}</div>
+                      </td>
+                      <td className="p-3 text-red-600 font-medium">{sub.absentTeacherName || sub.absentTeacher}</td>
+                      <td className="p-3 text-emerald-700 font-bold flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-500" />
+                        {sub.reliefTeacherName || sub.reliefTeacher}
+                      </td>
+                      <td className="p-3 text-slate-500 italic">{sub.reason || '—'}</td>
+                      <td className="p-3 flex items-center gap-2">
+                        <span className="badge-green text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {sub.status}
+                        </span>
+                        <button
+                          onClick={() => cancelReliefMutation.mutate(sub.id)}
+                          title="Cancel relief assignment"
+                          className="text-rose-500 hover:text-rose-700 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2555,23 +2582,19 @@ export default function TimetablePage() {
         >
           <form
             onSubmit={reliefForm.handleSubmit(data => {
-              setSubstitutions([
-                {
-                  id: `sub-${Date.now()}`,
-                  date: new Date().toISOString().split('T')[0],
-                  day: data.day,
-                  period: data.period,
-                  className: data.className,
-                  subjectName: data.subjectName,
-                  absentTeacher: data.absentTeacher,
-                  reliefTeacher: data.reliefTeacher,
-                  reason: data.reason,
-                  status: 'CONFIRMED'
-                },
-                ...substitutions
-              ]);
-              toast.success('Relief teacher assigned and notified via SMS/Portal!');
-              setSubstitutionModal(false);
+              // P0-18 fix: persist via POST /api/v1/timetable/relief
+              // Map the form's "absentTeacher" / "reliefTeacher" / "day" fields to the API's field names
+              createReliefMutation.mutate({
+                date: new Date().toISOString(),
+                dayOfWeek: data.day,
+                period: data.period,
+                className: data.className,
+                subjectName: data.subjectName || '—',
+                absentTeacherName: data.absentTeacher || '—',
+                reliefTeacherName: data.reliefTeacher,
+                reason: data.reason,
+                status: 'CONFIRMED',
+              });
             })}
             className="space-y-4 text-xs"
           >

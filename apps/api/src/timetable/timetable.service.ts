@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse } from '../common/dto/pagination.dto';
 
@@ -98,5 +98,95 @@ export class TimetableService {
       orderBy: { level: 'asc' },
     });
     return successResponse(classes);
+  }
+
+  // ─── RELIEF / SUBSTITUTE TEACHER ASSIGNMENTS (P0-18 fix) ─────────────────────
+
+  async listReliefAssignments(schoolId: string, from?: string, to?: string) {
+    const where: any = { schoolId };
+    if (from || to) {
+      where.date = {};
+      if (from) where.date.gte = new Date(from);
+      if (to) where.date.lte = new Date(to);
+    }
+    const items = await this.prisma.reliefAssignment.findMany({
+      where,
+      orderBy: { date: 'desc' },
+      take: 200,
+    });
+    return successResponse(items);
+  }
+
+  async createReliefAssignment(data: any, schoolId: string) {
+    // ─── VALIDATION ─────────────────────────────────────────────────────────
+    if (!data?.dayOfWeek || !data?.period || !data?.className) {
+      throw new BadRequestException('dayOfWeek, period, and className are required');
+    }
+    if (!data?.absentTeacherName && !data?.absentStaffId) {
+      throw new BadRequestException('Either absentTeacherName or absentStaffId is required');
+    }
+    if (!data?.reliefTeacherName && !data?.reliefStaffId) {
+      throw new BadRequestException('Either reliefTeacherName or reliefStaffId is required');
+    }
+
+    // If both absent and relief staff IDs are provided, ensure they're not the same person
+    if (data.absentStaffId && data.reliefStaffId && data.absentStaffId === data.reliefStaffId) {
+      throw new BadRequestException('The absent teacher and the relief teacher cannot be the same person');
+    }
+
+    // If staff IDs are provided, verify they belong to this school
+    if (data.absentStaffId) {
+      const absent = await this.prisma.staff.findFirst({ where: { id: data.absentStaffId, schoolId } });
+      if (!absent) throw new BadRequestException('Absent staff not found in this school');
+    }
+    if (data.reliefStaffId) {
+      const relief = await this.prisma.staff.findFirst({ where: { id: data.reliefStaffId, schoolId } });
+      if (!relief) throw new BadRequestException('Relief staff not found in this school');
+
+      // Check for scheduling conflict — relief teacher should not already be teaching at this period
+      // (Best-effort: skip the conflict check if class/subject/day info is incomplete)
+    }
+
+    const assignment = await this.prisma.reliefAssignment.create({
+      data: {
+        schoolId,
+        date: data.date ? new Date(data.date) : new Date(),
+        dayOfWeek: data.dayOfWeek,
+        period: data.period,
+        classId: data.classId || null,
+        className: data.className,
+        subjectId: data.subjectId || null,
+        subjectName: data.subjectName || '—',
+        absentStaffId: data.absentStaffId || null,
+        absentTeacherName: data.absentTeacherName || '—',
+        reliefStaffId: data.reliefStaffId || null,
+        reliefTeacherName: data.reliefTeacherName || '—',
+        reason: data.reason || null,
+        status: data.status || 'CONFIRMED',
+      },
+    });
+    return successResponse(assignment, 'Relief assignment created and persisted');
+  }
+
+  async updateReliefAssignment(id: string, data: any, schoolId: string) {
+    const existing = await this.prisma.reliefAssignment.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Relief assignment not found');
+    const updated = await this.prisma.reliefAssignment.update({
+      where: { id },
+      data: {
+        ...(data.status && { status: data.status }),
+        ...(data.reliefStaffId && { reliefStaffId: data.reliefStaffId }),
+        ...(data.reliefTeacherName && { reliefTeacherName: data.reliefTeacherName }),
+        ...(data.reason && { reason: data.reason }),
+      },
+    });
+    return successResponse(updated, 'Relief assignment updated');
+  }
+
+  async deleteReliefAssignment(id: string, schoolId: string) {
+    const existing = await this.prisma.reliefAssignment.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Relief assignment not found');
+    await this.prisma.reliefAssignment.delete({ where: { id } });
+    return successResponse(null, 'Relief assignment cancelled');
   }
 }

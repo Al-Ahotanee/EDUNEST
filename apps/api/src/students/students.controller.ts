@@ -6,16 +6,19 @@ import { StudentsService } from './students.service';
 import { CreateStudentDto, UpdateStudentDto, CreateGuardianDto } from './students.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Students')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('students')
 export class StudentsController {
   constructor(private studentsService: StudentsService) {}
 
   @Post()
+  @Roles('Super Admin')
   @ApiOperation({ summary: 'Create a new student' })
   create(@Body() dto: CreateStudentDto, @CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.create(dto, schoolId);
@@ -43,6 +46,7 @@ export class StudentsController {
   }
 
   @Get('generate-admission-number')
+  @Roles('Super Admin')
   @ApiOperation({ summary: 'Generate next admission number' })
   generateAdmissionNumber(@CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.generateAdmissionNumber(schoolId);
@@ -55,6 +59,7 @@ export class StudentsController {
   }
 
   @Post(':id/promote')
+  @Roles('Super Admin')
   @ApiOperation({ summary: 'Promote, hold back, or graduate a student' })
   promote(
     @Param('id') id: string,
@@ -65,6 +70,7 @@ export class StudentsController {
   }
 
   @Put(':id')
+  @Roles('Super Admin')
   @ApiOperation({ summary: 'Update student' })
   update(
     @Param('id') id: string,
@@ -75,12 +81,14 @@ export class StudentsController {
   }
 
   @Delete(':id')
+  @Roles('Super Admin')
   @ApiOperation({ summary: 'Remove student' })
   remove(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.softDelete(id, schoolId);
   }
 
   @Post(':id/guardians')
+  @Roles('Super Admin')
   @ApiOperation({ summary: 'Add guardian to student' })
   addGuardian(
     @Param('id') studentId: string,
