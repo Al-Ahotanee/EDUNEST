@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Users, UserCheck, Briefcase, Eye, Edit, Trash2, RefreshCw,
   Award, FileText, Printer, Download, ShieldAlert, DollarSign, CheckCircle2,
-  XCircle, Clock, TrendingUp, UserX, Folder, Calendar, BookOpen, Layers
+  XCircle, Clock, TrendingUp, UserX, Folder, Calendar, BookOpen, Layers, Contact
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, ConfirmDialog, Avatar,
@@ -13,6 +13,7 @@ import {
 import { hrApi, academicApi, api } from '../../services/api';
 import { formatDate, formatCurrency, cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
+import { IDCardModal, StaffIDCardData } from '../../components/idcard';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 type HRTab = 'staff' | 'workload' | 'leaves' | 'payroll' | 'documents' | 'appraisals';
@@ -30,6 +31,7 @@ export default function HRStaffPage() {
   const [staffModal, setStaffModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [viewDossier, setViewDossier] = useState<any>(null);
+  const [idCardStaff, setIdCardStaff] = useState<any>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<any>(null);
   const [deactivateReason, setDeactivateReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -261,6 +263,13 @@ export default function HRStaffPage() {
             title="View Dossier"
           >
             <Eye size={15} />
+          </button>
+          <button
+            onClick={() => setIdCardStaff(r)}
+            className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-all"
+            title="View / Print ID Card"
+          >
+            <Contact size={15} />
           </button>
           <button
             onClick={() => setPayslipModal(r)}
@@ -1057,6 +1066,42 @@ export default function HRStaffPage() {
         title="Remove Staff Record"
         message={`Remove ${deleteTarget?.firstName} ${deleteTarget?.lastName} from institutional staff records?`}
         danger
+      />
+
+      {/* ─── Staff ID Card Modal ─── */}
+      <IDCardModal
+        open={!!idCardStaff}
+        onClose={() => setIdCardStaff(null)}
+        type="staff"
+        canPrint={
+          user?.isSuperAdmin ||
+          user?.roles?.some((r) => r.name === 'Super Admin')
+        }
+        viewerRoleLabel={user?.isSuperAdmin ? 'School Admin' : user?.roles?.[0]?.name || 'User'}
+        staffData={idCardStaff ? {
+          schoolName: school?.name || 'EduNest School',
+          schoolLogo: school?.logo,
+          schoolMotto: school?.motto,
+          schoolAddress: school?.address,
+          schoolPhone: school?.phone,
+          schoolEmail: school?.email,
+          primaryColor: school?.primaryColor || '#0f766e',
+          secondaryColor: school?.secondaryColor || '#ca8a04',
+          staffId: idCardStaff.id,
+          staffIdNumber: idCardStaff.staffId,
+          firstName: idCardStaff.firstName,
+          lastName: idCardStaff.lastName,
+          gender: idCardStaff.gender,
+          designation: idCardStaff.designation,
+          department: idCardStaff.department?.name,
+          employmentType: idCardStaff.employmentType,
+          phone: idCardStaff.phone,
+          email: idCardStaff.email,
+          photo: idCardStaff.photo,
+          issueDate: idCardStaff.employmentDate || new Date().toISOString(),
+          expiryDate: '2027-08-31',
+          signatureLine: 'Principal / HR',
+        } : undefined}
       />
     </div>
   );

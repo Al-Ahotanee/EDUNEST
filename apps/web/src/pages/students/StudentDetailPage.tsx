@@ -17,15 +17,30 @@ import {
   XCircle,
   Clock,
   FileText,
+  Contact,
+  Printer,
 } from 'lucide-react';
-import { studentsApi } from '../../services/api';
+import { studentsApi, schoolsApi } from '../../services/api';
 import { PageLoader, Badge, Card, Button } from '../../components/ui';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { useAuthStore } from '../../store/authStore';
+import { IDCardModal, StudentIDCardData } from '../../components/idcard';
 
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'academic' | 'guardians' | 'finance' | 'attendance'>('overview');
+  const [showIDCard, setShowIDCard] = useState(false);
+
+  // Fetch school branding for the ID card
+  const { data: school } = useQuery({
+    queryKey: ['current-school'],
+    queryFn: async () => {
+      const res = await schoolsApi.current();
+      return res.data?.data || res.data;
+    },
+  });
 
   const { data: student, isLoading, isError } = useQuery({
     queryKey: ['student', id],
@@ -111,6 +126,13 @@ export default function StudentDetailPage() {
             <Link to={`/app/finance/invoices?studentId=${student.id}`} className="btn btn-primary text-xs">
               <CreditCard size={16} /> Invoices
             </Link>
+            <button
+              onClick={() => setShowIDCard(true)}
+              className="btn btn-secondary text-xs"
+              title="View / Print ID Card"
+            >
+              <Contact size={16} /> ID Card
+            </button>
           </div>
         </div>
 
@@ -421,6 +443,42 @@ export default function StudentDetailPage() {
           </Card>
         </div>
       )}
+
+      {/* ─── ID Card Modal ─── */}
+      <IDCardModal
+        open={showIDCard}
+        onClose={() => setShowIDCard(false)}
+        type="student"
+        canPrint={
+          user?.isSuperAdmin ||
+          user?.roles?.some((r) => r.name === 'Super Admin' || r.name === 'Class Master')
+        }
+        viewerRoleLabel={user?.isSuperAdmin ? 'School Admin' : user?.roles?.[0]?.name || 'User'}
+        studentData={{
+          schoolName: school?.name || user?.school?.name || user?.tenant?.name || 'EduNest School',
+          schoolLogo: school?.logo || user?.tenant?.logo,
+          schoolMotto: school?.motto,
+          schoolAddress: school?.address,
+          schoolPhone: school?.phone,
+          schoolEmail: school?.email,
+          primaryColor: user?.tenant?.primaryColor || '#2563eb',
+          secondaryColor: user?.tenant?.secondaryColor || '#7e3af2',
+          studentId: student.id,
+          admissionNumber: student.admissionNumber,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          otherName: student.middleName || student.otherName,
+          gender: student.gender,
+          dateOfBirth: student.dateOfBirth,
+          bloodGroup: student.bloodGroup,
+          className: currentEnrollment?.class?.name || className,
+          status: student.status,
+          photo: student.photo,
+          issueDate: student.admissionDate || new Date().toISOString(),
+          expiryDate: '2027-08-31',
+          signatureLine: 'Principal',
+        }}
+      />
     </div>
   );
 }
