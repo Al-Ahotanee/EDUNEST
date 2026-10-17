@@ -46,13 +46,25 @@ export default function PromotionsPage() {
   // Fetch results to compute average score per student
   const { data: resultsData } = useQuery({
     queryKey: ['promotion-results'],
-    queryFn: () => studentsApi.promotionResults().then((r) => r.data.data || r.data || []),
+    queryFn: () =>
+      studentsApi
+        .promotionResults()
+        .then((r) => {
+          // promotionResults already catches errors and returns { data: [] }
+          // The shape can be r.data (already an array) or r.data.data (array inside an object)
+          const d = r?.data;
+          if (Array.isArray(d)) return d;
+          if (d && Array.isArray(d.data)) return d.data;
+          return [];
+        }),
     // soft-fail; endpoint may not exist yet
     retry: false,
   });
   const resultsByStudent = useMemo(() => {
     const m: Record<string, { total: number; count: number }> = {};
-    (resultsData || []).forEach((r: any) => {
+    const results = Array.isArray(resultsData) ? resultsData : [];
+    results.forEach((r: any) => {
+      if (!r || !r.studentId) return;
       if (!m[r.studentId]) m[r.studentId] = { total: 0, count: 0 };
       m[r.studentId].total += Number(r.totalScore) || 0;
       m[r.studentId].count += 1;
@@ -62,8 +74,9 @@ export default function PromotionsPage() {
 
   // Build promotion candidate rows
   const promotionRows: PromotionRow[] = useMemo(() => {
-    return students
-      .filter((s: any) => s.status === 'ACTIVE')
+    const arr = Array.isArray(students) ? students : [];
+    return arr
+      .filter((s: any) => s && s.status === 'ACTIVE')
       .map((s: any) => {
         const cls = s.classEnrollments?.[0]?.class;
         const avgData = resultsByStudent[s.id];
