@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Award, ArrowUpCircle, ArrowDownCircle, CheckCircle2, XCircle, GraduationCap, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { studentsApi, classesApi } from '../../services/api';
-import { Button, Badge, DataTable, PageLoader, Modal, Select, Card } from '../../components/ui';
+import { Button, DataTable, PageLoader, Modal, Card } from '../../components/ui';
 
 type PromoStatus = 'PENDING' | 'PROMOTED' | 'REPEATED' | 'GRADUATED';
 
@@ -27,6 +27,13 @@ function safeArray<T>(value: any): T[] {
   if (value && Array.isArray(value.data?.data)) return value.data.data as T[];
   return [];
 }
+
+const STATUS_BADGE_CLASS: Record<PromoStatus, string> = {
+  PENDING: 'badge-yellow',
+  PROMOTED: 'badge-green',
+  REPEATED: 'badge-red',
+  GRADUATED: 'badge-blue',
+};
 
 export default function PromotionsPage() {
   const queryClient = useQueryClient();
@@ -150,15 +157,9 @@ export default function PromotionsPage() {
     {
       key: 'status',
       header: 'PROMOTION STATUS',
-      render: (r: PromotionRow) => {
-        const map: Record<PromoStatus, string> = {
-          PENDING: 'badge-yellow',
-          PROMOTED: 'badge-green',
-          REPEATED: 'badge-red',
-          GRADUATED: 'badge-blue',
-        };
-        return <Badge className={map[r.status]}>{r.status}</Badge>;
-      },
+      render: (r: PromotionRow) => (
+        <span className={`badge ${STATUS_BADGE_CLASS[r.status] || 'badge-gray'}`}>{r.status}</span>
+      ),
     },
     {
       key: 'actions',
@@ -223,24 +224,24 @@ export default function PromotionsPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-slate-400" />
-          <Select
+          <select
             value={classFilter}
             onChange={(e) => setClassFilter(e.target.value)}
-            className="w-48"
+            className="input w-48 py-2 text-sm"
           >
             <option value="">All Classes</option>
             {classes.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
-          </Select>
-          <Select
+          </select>
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-40"
+            className="input w-40 py-2 text-sm"
           >
             <option value="">All Status</option>
             {PROMOTION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </Select>
+          </select>
         </div>
       </div>
 
@@ -269,16 +270,6 @@ export default function PromotionsPage() {
               <div><span className="font-semibold">Avg Score:</span> {decisionModal.student.averageScore || '—'}</div>
               <div><span className="font-semibold">Decision:</span> {decisionModal.action}</div>
             </div>
-            {decisionModal.action === 'PROMOTED' && (
-              <Select
-                label="Target Class (next class)"
-                onChange={() => {}}
-              >
-                {classes
-                  .filter((c: any) => c.id !== decisionModal.student.currentClassId)
-                  .map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
-            )}
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setDecisionModal(null)}>Cancel</Button>
               <Button
