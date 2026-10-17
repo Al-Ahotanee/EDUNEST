@@ -25,6 +25,7 @@ import { PageLoader, Badge, Card, Button } from '../../components/ui';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { IDCardModal, StudentIDCardData } from '../../components/idcard';
+import { StudentDocumentModal } from '../../components/documents/StudentDocumentModal';
 
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +33,7 @@ export default function StudentDetailPage() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'academic' | 'guardians' | 'finance' | 'attendance'>('overview');
   const [showIDCard, setShowIDCard] = useState(false);
+  const [showDocuments, setShowDocuments] = useState(false);
 
   // Fetch school branding for the ID card
   const { data: school } = useQuery({
@@ -132,6 +134,13 @@ export default function StudentDetailPage() {
               title="View / Print ID Card"
             >
               <Contact size={16} /> ID Card
+            </button>
+            <button
+              onClick={() => setShowDocuments(true)}
+              className="btn btn-secondary text-xs"
+              title="Admission Letter & Enrollment Form"
+            >
+              <FileText size={16} /> Documents
             </button>
           </div>
         </div>
@@ -478,6 +487,14 @@ export default function StudentDetailPage() {
           expiryDate: '2027-08-31',
           signatureLine: 'Principal',
         }}
+      />
+
+      {/* ─── Admission Letter & Enrollment Form Modal ─── */}
+      <StudentDocumentModal
+        open={showDocuments}
+        onClose={() => setShowDocuments(false)}
+        student={student}
+        school={school}
       />
     </div>
   );

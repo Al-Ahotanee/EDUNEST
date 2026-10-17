@@ -47,6 +47,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: 'Results', path: '/app/results', icon: <Award size={18} />, requiredPermission: { module: 'results', action: 'read' } },
   { label: 'CBT Exams', path: '/app/cbt', icon: <Monitor size={18} />, requiredPermission: { module: 'academic', action: 'read' } },
   { label: 'Teacher Management', path: '/app/teacher-management', icon: <Briefcase size={18} />, adminOnly: true },
+  { label: 'Staff Documents', path: '/app/staff-documents', icon: <FileText size={18} />, adminOnly: true },
   {
     label: 'Finance',
     icon: <DollarSign size={18} />,
