@@ -227,6 +227,8 @@ interface DataTableProps<T> {
 export function DataTable<T extends Record<string, any>>({
   data, columns, loading, pagination, onSearch, searchPlaceholder = 'Search...', actions, emptyMessage = 'No records found', onSort,
 }: DataTableProps<T>) {
+  const safeData = Array.isArray(data) ? data : [];
+  const safeColumns = Array.isArray(columns) ? columns : [];
   const [sortKey, setSortKey] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [search, setSearch] = useState('');
@@ -267,7 +269,7 @@ export function DataTable<T extends Record<string, any>>({
         <table>
           <thead>
             <tr>
-              {columns.map((col) => (
+              {safeColumns.map((col) => (
                 <th key={col.key} style={col.width ? { width: col.width } : {}}>
                   <div className="flex items-center gap-1">
                     {col.header}
@@ -288,19 +290,19 @@ export function DataTable<T extends Record<string, any>>({
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {columns.map((col) => (
+                  {safeColumns.map((col) => (
                     <td key={col.key}><div className="skeleton h-4 w-full" /></td>
                   ))}
                 </tr>
               ))
-            ) : data.length === 0 ? (
+            ) : safeData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="text-center py-12 text-slate-400">{emptyMessage}</td>
+                <td colSpan={safeColumns.length} className="text-center py-12 text-slate-400">{emptyMessage}</td>
               </tr>
             ) : (
-              data.map((row, i) => (
+              safeData.map((row, i) => (
                 <tr key={row.id || i}>
-                  {columns.map((col) => (
+                  {safeColumns.map((col) => (
                     <td key={col.key}>{col.render ? col.render(row) : row[col.key] ?? '—'}</td>
                   ))}
                 </tr>
