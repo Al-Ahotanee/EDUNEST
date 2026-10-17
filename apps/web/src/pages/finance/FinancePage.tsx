@@ -10,7 +10,7 @@ import {
 import {
   StatCard, DataTable, Button, Modal, Input, Select, Badge, PageLoader,
 } from '../../components/ui';
-import { financeApi, studentsApi } from '../../services/api';
+import { financeApi, studentsApi, academicApi } from '../../services/api';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
@@ -24,6 +24,7 @@ export default function FinancePage() {
   const [paymentModal, setPaymentModal] = useState<any>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [feeModal, setFeeModal] = useState(false);
+  const [selectedClassForFees, setSelectedClassForFees] = useState('');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -82,7 +83,15 @@ export default function FinancePage() {
   // Payment form
   const paymentForm = useForm({ defaultValues: { amount: 0, method: 'CASH', reference: '', notes: '' } });
   // Fee form
-  const feeForm = useForm({ defaultValues: { name: '', amount: 0, description: '', termBased: true } });
+  const feeForm = useForm({ defaultValues: { name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'DRAFT' } });
+
+  // Fetch classes for fee structure dropdown
+  const { data: classesData } = useQuery({
+    queryKey: ['classes-for-fees'],
+    queryFn: () => academicApi.classes().then((r) => r.data?.data || r.data || []),
+    enabled: tab === 'fees',
+  });
+  const classes = Array.isArray(classesData) ? classesData : [];
 
   const createInvoiceMutation = useMutation({
     mutationFn: (data: any) => financeApi.createInvoice(data),
@@ -114,9 +123,18 @@ export default function FinancePage() {
       toast.success('Fee structure created!');
       queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
       setFeeModal(false);
-      feeForm.reset();
+      feeForm.reset({ name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'DRAFT' });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
+  });
+
+  const publishFeeMutation = useMutation({
+    mutationFn: (id: string) => financeApi.publishFeeStructure(id),
+    onSuccess: () => {
+      toast.success('Fee structure published — now visible to parents');
+      queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to publish'),
   });
 
   const handleExportInvoices = () => {
@@ -316,25 +334,135 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* Fee Structures Tab */}
+      {/* Fee Structures Tab — Comprehensive Class-Based Fee Management */}
       {tab === 'fees' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(feesData?.data || []).map((fee: any) => (
-            <div key={fee.id} className="card p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><DollarSign size={18} /></div>
-                <Badge status={fee.termBased ? 'ACTIVE' : 'INACTIVE'} label={fee.termBased ? 'Per Term' : 'One-time'} />
-              </div>
-              <h3 className="font-bold text-slate-900">{fee.name}</h3>
-              <p className="text-2xl font-bold text-blue-600 mt-1">{formatCurrency(fee.amount)}</p>
-              {fee.description && <p className="text-xs text-slate-500 mt-1">{fee.description}</p>}
+        <div className="space-y-4">
+          {/* Class filter + Add button */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <select
+                value={selectedClassForFees}
+                onChange={(e) => setSelectedClassForFees(e.target.value)}
+                className="input w-56 py-2 text-sm"
+              >
+                <option value="">All Classes</option>
+                {classes.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
-          ))}
-          <button onClick={() => setFeeModal(true)}
-            className="card p-5 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-blue-600 hover:border-blue-300 transition-all cursor-pointer min-h-[140px]">
-            <Plus size={24} />
-            <span className="text-sm font-medium">Add Fee Structure</span>
-          </button>
+            <Button icon={<Plus size={15} />} onClick={() => setFeeModal(true)}>
+              Add Fee Item
+            </Button>
+          </div>
+
+          {/* Fee Items Table */}
+          <div className="card overflow-hidden">
+            <div className="table-container">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Fee Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Class</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {(feesData?.data || [])
+                    .filter((fee: any) => !selectedClassForFees || fee.classId === selectedClassForFees)
+                    .map((fee: any) => (
+                      <tr key={fee.id} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-900 text-sm">{fee.name}</div>
+                          {fee.description && <div className="text-xs text-slate-400">{fee.description}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{fee.class?.name || 'All Classes'}</td>
+                        <td className="px-4 py-3 text-right font-bold text-blue-600 text-sm">{formatCurrency(fee.amount)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`badge ${fee.feeType === 'ONE_TIME' ? 'badge-purple' : fee.feeType === 'ANNUAL' ? 'badge-blue' : 'badge-green'}`}>
+                            {fee.feeType || 'TERM'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`badge ${fee.status === 'PUBLISHED' ? 'badge-green' : 'badge-yellow'}`}>
+                            {fee.status || 'DRAFT'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {fee.status !== 'PUBLISHED' && (
+                            <button
+                              onClick={() => publishFeeMutation.mutate(fee.id)}
+                              disabled={publishFeeMutation.isPending}
+                              className="text-xs text-emerald-600 hover:text-emerald-800 font-semibold transition-colors"
+                            >
+                              Publish
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  {(feesData?.data || []).filter((fee: any) => !selectedClassForFees || fee.classId === selectedClassForFees).length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
+                        No fee structures yet. Click "Add Fee Item" to create one.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {(feesData?.data || []).length > 0 && (
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50">
+                      <td colSpan={2} className="px-4 py-3 font-bold text-slate-900 text-sm">Total (all items):</td>
+                      <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">
+                        {formatCurrency((feesData?.data || []).reduce((sum: number, f: any) => sum + (f.amount || 0), 0))}
+                      </td>
+                      <td colSpan={3}></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+
+          {/* Fee Breakdown Preview by Class */}
+          {selectedClassForFees && (
+            <div className="card p-6">
+              <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <FileText size={18} className="text-blue-600" />
+                Fee Breakdown — {classes.find((c: any) => c.id === selectedClassForFees)?.name || 'Selected Class'}
+              </h3>
+              <div className="space-y-2">
+                {(feesData?.data || [])
+                  .filter((fee: any) => fee.classId === selectedClassForFees || (!fee.classId && fee.status === 'PUBLISHED'))
+                  .map((fee: any) => (
+                    <div key={fee.id} className="flex items-center justify-between py-2 border-b border-slate-50">
+                      <div>
+                        <span className="text-sm font-medium text-slate-700">{fee.name}</span>
+                        <span className="ml-2 text-xs text-slate-400">({fee.feeType || 'TERM'})</span>
+                      </div>
+                      <span className="text-sm font-bold text-slate-900">{formatCurrency(fee.amount)}</span>
+                    </div>
+                  ))}
+                <div className="flex items-center justify-between py-3 mt-2 border-t-2 border-slate-200">
+                  <span className="font-bold text-slate-900">Total</span>
+                  <span className="font-bold text-blue-600 text-lg">
+                    {formatCurrency(
+                      (feesData?.data || [])
+                        .filter((fee: any) => fee.classId === selectedClassForFees || (!fee.classId && fee.status === 'PUBLISHED'))
+                        .reduce((sum: number, f: any) => sum + (f.amount || 0), 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 mt-3">
+                This breakdown is what parents of students in this class will see in their portal.
+                Only PUBLISHED fee items are visible to parents.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -436,23 +564,41 @@ export default function FinancePage() {
         </div>
       </Modal>
 
-      {/* Fee Structure Modal */}
-      <Modal open={feeModal} onClose={() => setFeeModal(false)} title="Add Fee Structure" size="sm"
+      {/* Fee Structure Modal — Enhanced with class scoping and fee type */}
+      <Modal open={feeModal} onClose={() => setFeeModal(false)} title="Add Fee Item" size="md"
         footer={
           <>
             <Button variant="secondary" onClick={() => setFeeModal(false)}>Cancel</Button>
             <Button loading={createFeeMutation.isPending}
               onClick={feeForm.handleSubmit((d) => createFeeMutation.mutate(d))}>
-              Create Fee
+              Create Fee Item
             </Button>
           </>
         }>
         <div className="space-y-4">
-          <Input label="Fee Name" {...feeForm.register('name')} placeholder="e.g. School Fees, PTA Levy" />
-          <Input label="Amount (₦)" type="number" {...feeForm.register('amount', { valueAsNumber: true })} />
+          <Input label="Fee Name" {...feeForm.register('name')} placeholder="e.g. Tuition, Uniform, Books" />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Amount (₦)" type="number" {...feeForm.register('amount', { valueAsNumber: true })} />
+            <div className="form-group">
+              <label className="label">Fee Type</label>
+              <select {...feeForm.register('feeType')} className="input">
+                <option value="TERM">Per Term</option>
+                <option value="ONE_TIME">One-Time</option>
+                <option value="ANNUAL">Annual</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="label">Applicable Class</label>
+            <select {...feeForm.register('classId')} className="input">
+              <option value="">All Classes (applies to every class)</option>
+              {classes.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">If a specific class is selected, this fee only applies to students in that class.</p>
+          </div>
           <Input label="Description" {...feeForm.register('description')} placeholder="Optional description" />
-          <Select label="Billing Type" {...feeForm.register('termBased')}
-            options={[{ value: 'true', label: 'Per Term' }, { value: 'false', label: 'One-time' }]} />
         </div>
       </Modal>
 

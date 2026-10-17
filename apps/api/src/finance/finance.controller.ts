@@ -31,16 +31,32 @@ export class FinanceController {
 
   @Post('fee-structures')
   @Roles('Super Admin', 'Accountant')
-  @ApiOperation({ summary: 'Create fee structure' })
+  @ApiOperation({ summary: 'Create fee structure (supports classId, feeType, status)' })
   createFeeStructure(@Body() body: any, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.createFeeStructure(body, schoolId);
   }
 
   @Get('fee-structures')
   @Roles('Super Admin', 'Accountant')
-  @ApiOperation({ summary: 'Get all fee structures' })
-  getFeeStructures(@CurrentUser('schoolId') schoolId: string, @Query() query: PaginationDto) {
+  @ApiOperation({ summary: 'Get all fee structures (supports classId and status filters)' })
+  getFeeStructures(
+    @CurrentUser('schoolId') schoolId: string,
+    @Query() query: PaginationDto & { classId?: string; status?: string },
+  ) {
     return this.financeService.getFeeStructures(schoolId, query);
+  }
+
+  @Patch('fee-structures/:id/publish')
+  @Roles('Super Admin')
+  @ApiOperation({ summary: 'Publish a fee structure — makes it visible to parents' })
+  publishFeeStructure(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.financeService.publishFeeStructure(id, schoolId);
+  }
+
+  @Get('fee-structures/by-class/:classId')
+  @ApiOperation({ summary: 'Get published fee structures for a specific class (visible to parents)' })
+  getFeeStructuresByClass(@Param('classId') classId: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.financeService.getFeeStructuresByClass(classId, schoolId);
   }
 
   @Post('invoices')

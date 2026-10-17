@@ -15,24 +15,77 @@ export class FinanceService {
   // ─── FEE STRUCTURES ──────────────────────────────────────────────────────────
 
   async createFeeStructure(data: any, schoolId: string) {
+    // Validate classId if provided
+    if (data.classId) {
+      const cls = await this.prisma.class.findFirst({ where: { id: data.classId, schoolId } });
+      if (!cls) throw new BadRequestException('Selected class does not exist');
+    }
+
     const fee = await this.prisma.feeStructure.create({
-      data: { ...data, schoolId },
+      data: {
+        ...data,
+        schoolId,
+        // New fields with defaults
+        classId: data.classId || null,
+        sessionId: data.sessionId || null,
+        termId: data.termId || null,
+        feeType: data.feeType || 'TERM',
+        status: data.status || 'DRAFT',
+      },
+      include: { class: true },
     });
     return successResponse(fee, 'Fee structure created');
   }
 
-  async getFeeStructures(schoolId: string, query: PaginationDto) {
-    const { search } = query;
+  async getFeeStructures(schoolId: string, query: PaginationDto & { classId?: string; status?: string }) {
+    const { search, classId, status } = query;
     const where: Prisma.FeeStructureWhereInput = {
       schoolId,
       ...(search && { name: { contains: search } }),
+      ...(classId && { classId }),
+      ...(status && { status }),
     };
 
     const [data, total] = await Promise.all([
-      this.prisma.feeStructure.findMany({ where, skip: safeSkip(query), take: safeTake(query) }),
+      this.prisma.feeStructure.findMany({
+        where,
+        skip: safeSkip(query), take: safeTake(query),
+        include: { class: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
       this.prisma.feeStructure.count({ where }),
     ]);
     return paginate(data, total, query);
+  }
+
+  async publishFeeStructure(id: string, schoolId: string) {
+    const existing = await this.prisma.feeStructure.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Fee structure not found');
+    const updated = await this.prisma.feeStructure.update({
+      where: { id },
+      data: { status: 'PUBLISHED' },
+      include: { class: { select: { id: true, name: true } } },
+    });
+    return successResponse(updated, 'Fee structure published — now visible to parents');
+  }
+
+  async getFeeStructuresByClass(classId: string, schoolId: string) {
+    // Get published fee structures for a specific class (or class-agnostic ones)
+    const fees = await this.prisma.feeStructure.findMany({
+      where: {
+        schoolId,
+        status: 'PUBLISHED',
+        OR: [
+          { classId },
+          { classId: null }, // class-agnostic fees apply to all
+        ],
+      },
+      include: { class: { select: { id: true, name: true } } },
+      orderBy: { feeType: 'asc' },
+    });
+    // Calculate total
+    const total = fees.reduce((sum, f) => sum + (f.amount || 0), 0);
+    return successResponse({ fees, total });
   }
 
   // ─── INVOICES ────────────────────────────────────────────────────────────────
