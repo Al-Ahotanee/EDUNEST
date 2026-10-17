@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
   Plus, Users, UserCheck, Briefcase, Eye, Edit, Trash2, RefreshCw,
   Award, FileText, Printer, Download, ShieldAlert, DollarSign, CheckCircle2,
-  XCircle, Clock, TrendingUp, UserX, Folder, Calendar, BookOpen, Layers, Contact
+  XCircle, Clock, TrendingUp, UserX, Folder, Calendar, BookOpen, Layers, Contact, Camera
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, ConfirmDialog, Avatar,
@@ -32,6 +32,8 @@ export default function HRStaffPage() {
   const [editing, setEditing] = useState<any>(null);
   const [viewDossier, setViewDossier] = useState<any>(null);
   const [idCardStaff, setIdCardStaff] = useState<any>(null);
+  const [staffPhotoPreview, setStaffPhotoPreview] = useState<string>('');
+  const staffPhotoInputRef = useRef<HTMLInputElement>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<any>(null);
   const [deactivateReason, setDeactivateReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -96,8 +98,26 @@ export default function HRStaffPage() {
       specialization: '',
       bankName: 'First Bank of Nigeria',
       accountNumber: '',
+      photo: '',
     },
   });
+
+  // Staff photo upload handler
+  const handleStaffPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Photo must be under 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setStaffPhotoPreview(base64);
+      staffForm.setValue('photo', base64);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const leaveForm = useForm({
     defaultValues: {
@@ -942,12 +962,12 @@ export default function HRStaffPage() {
       {/* ─── MODAL 5: ENROLL / EDIT STAFF MODAL ───────────────────────────────── */}
       <Modal
         open={staffModal}
-        onClose={() => { setStaffModal(false); setEditing(null); staffForm.reset(); }}
+        onClose={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}
         title={editing ? 'Edit Staff Profile' : 'Enroll New Faculty / Staff'}
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setStaffModal(false); setEditing(null); staffForm.reset(); }}>Cancel</Button>
+            <Button variant="secondary" onClick={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}>Cancel</Button>
             <Button loading={createMutation.isPending} onClick={staffForm.handleSubmit(d => createMutation.mutate(d))}>
               {editing ? 'Update Record' : 'Save Staff Record'}
             </Button>
@@ -995,6 +1015,48 @@ export default function HRStaffPage() {
           <div className="grid grid-cols-2 gap-4">
             <Input label="Bank Name" {...staffForm.register('bankName')} placeholder="e.g. First Bank of Nigeria" />
             <Input label="Account Number" {...staffForm.register('accountNumber')} placeholder="10-digit NUBAN" />
+          </div>
+
+          {/* Staff Photo Upload */}
+          <div className="form-group">
+            <label className="label">Staff Photo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                {staffPhotoPreview || editing?.photo ? (
+                  <img src={staffPhotoPreview || editing?.photo} alt="Staff" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera size={24} className="text-slate-300" />
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  ref={staffPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleStaffPhotoUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={<Camera size={14} />}
+                  onClick={() => staffPhotoInputRef.current?.click()}
+                >
+                  {staffPhotoPreview || editing?.photo ? 'Change Photo' : 'Upload Photo'}
+                </Button>
+                {staffPhotoPreview && (
+                  <button
+                    type="button"
+                    onClick={() => { setStaffPhotoPreview(''); staffForm.setValue('photo', ''); }}
+                    className="ml-2 text-xs text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                )}
+                <p className="text-xs text-slate-400 mt-1">JPG/PNG, max 2MB. Used on ID card and staff directory.</p>
+              </div>
+            </div>
           </div>
         </div>
       </Modal>

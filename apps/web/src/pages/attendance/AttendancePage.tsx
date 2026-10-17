@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   ClipboardCheck, Save, Users, TrendingDown, ChevronLeft, ChevronRight,
   Calendar, Download, Printer, CheckCircle2, Clock, Check, X, QrCode,
   Camera, Wifi, WifiOff, AlertTriangle, History, BellRing, SlidersHorizontal,
-  UserCheck, Search, ShieldAlert, RefreshCw, FileText, XCircle
+  UserCheck, Search, ShieldAlert, RefreshCw, FileText, XCircle, Video, VideoOff
 } from 'lucide-react';
+import jsQR from 'jsqr';
 import { StatCard, Button, Select, PageLoader, Badge, Modal } from '../../components/ui';
 import { attendanceApi, academicApi, studentsApi, hrApi, api } from '../../services/api';
 import { formatDate, cn } from '../../lib/utils';
@@ -50,6 +51,14 @@ export default function AttendancePage() {
   const [auditReason, setAuditReason] = useState('');
   const [auditNewStatus, setAuditNewStatus] = useState<AttendanceStatus>('PRESENT');
   const [parentAlertModal, setParentAlertModal] = useState(false);
+
+  // Camera-based QR scanning state
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanLoopRef = useRef<number | null>(null);
+  const [cameraStatus, setCameraStatus] = useState<'idle' | 'starting' | 'active' | 'error' | 'unsupported'>('idle');
+  const [cameraError, setCameraError] = useState('');
 
   // QR Scanning & Duplicate-Prevention State
   const [manualQrInput, setManualQrInput] = useState('');
@@ -332,6 +341,97 @@ export default function AttendancePage() {
     toast.success(`Verified: ${attendeeName} marked PRESENT (${now})`);
     setManualQrInput('');
   };
+
+  // ─── CAMERA-BASED QR SCANNING ──────────────────────────────────────────────
+  const stopCamera = useCallback(() => {
+    if (scanLoopRef.current) {
+      cancelAnimationFrame(scanLoopRef.current);
+      scanLoopRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraStatus('idle');
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraStatus('unsupported');
+      setCameraError('Camera API not supported in this browser. Use the manual input field below.');
+      return;
+    }
+    setCameraStatus('starting');
+    setCameraError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        await videoRef.current.play();
+        setCameraStatus('active');
+        // Start QR detection loop
+        scanQRLoop();
+      }
+    } catch (err: any) {
+      setCameraStatus('error');
+      if (err.name === 'NotAllowedError') {
+        setCameraError('Camera access denied. Please allow camera permissions in your browser settings, or use the manual input field below.');
+      } else if (err.name === 'NotFoundError') {
+        setCameraError('No camera found. Use the manual input field below to enter the QR code.');
+      } else {
+        setCameraError(err.message || 'Failed to access camera.');
+      }
+    }
+  }, []);
+
+  const scanQRLoop = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) {
+      return;
+    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const code = jsQR(imageData.data, w, h, { inversionAttempts: 'dontInvert' });
+        if (code && code.data) {
+          // QR code found! Process it
+          processQrScan(code.data);
+          // Brief pause to prevent duplicate scans, then continue
+          setTimeout(() => {
+            scanLoopRef.current = requestAnimationFrame(scanQRLoop);
+          }, 2000);
+          return;
+        }
+      }
+    }
+    scanLoopRef.current = requestAnimationFrame(scanQRLoop);
+  }, []);
+
+  // Start/stop camera when QR modal opens/closes
+  useEffect(() => {
+    if (qrModal) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [qrModal, startCamera, stopCamera]);
 
   // Date Navigation Steppers
   const handlePrevDay = () => {
@@ -875,16 +975,95 @@ export default function AttendancePage() {
         }
       >
         <div className="space-y-5">
-          {/* Viewfinder Area */}
-          <div className="relative bg-slate-900 rounded-2xl p-8 text-center text-white overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[260px]">
-            <div className="w-48 h-48 border-2 border-emerald-400 rounded-2xl relative flex items-center justify-center overflow-hidden">
-              <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse" />
-              <QrCode size={96} className="text-slate-600" />
+          {/* Camera Viewfinder Area */}
+          <div className="relative bg-slate-900 rounded-2xl overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[280px]">
+            {/* Hidden canvas for QR detection */}
+            <canvas ref={canvasRef} className="hidden" />
+
+            {/* Real camera video feed */}
+            {(cameraStatus === 'active' || cameraStatus === 'starting') && (
+              <div className="relative w-full" style={{ maxHeight: '320px' }}>
+                <video
+                  ref={videoRef}
+                  className="w-full rounded-2xl"
+                  style={{ maxHeight: '320px', objectFit: 'cover' }}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                {/* Overlay scanning frame */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-48 border-2 border-emerald-400 rounded-2xl relative">
+                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse" style={{ top: '50%' }} />
+                    {/* Corner accents */}
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg" />
+                  </div>
+                </div>
+                {cameraStatus === 'active' && (
+                  <div className="absolute top-3 left-3">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-700">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Camera Live — Scanning...
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Starting state */}
+            {cameraStatus === 'starting' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                <div className="w-10 h-10 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-xs text-slate-300 font-mono">Starting camera...</p>
+              </div>
+            )}
+
+            {/* Error / unsupported state */}
+            {(cameraStatus === 'error' || cameraStatus === 'unsupported') && (
+              <div className="p-6 text-center text-white">
+                <VideoOff size={36} className="text-rose-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-rose-300 mb-1">Camera Unavailable</p>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">{cameraError}</p>
+                {cameraStatus === 'error' && (
+                  <button
+                    onClick={startCamera}
+                    className="mt-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors"
+                  >
+                    Retry Camera
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Idle state (before camera starts) */}
+            {cameraStatus === 'idle' && (
+              <div className="p-6 text-center text-white">
+                <Video size={36} className="text-slate-500 mx-auto mb-2" />
+                <p className="text-sm text-slate-300 font-mono">Camera initializing...</p>
+              </div>
+            )}
+
+            {/* Camera controls */}
+            <div className="flex items-center justify-center gap-2 pb-3 pt-2">
+              {cameraStatus === 'active' && (
+                <button
+                  onClick={stopCamera}
+                  className="text-xs text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1"
+                >
+                  <VideoOff size={12} /> Stop Camera
+                </button>
+              )}
+              {cameraStatus === 'idle' && (
+                <button
+                  onClick={startCamera}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1"
+                >
+                  <Video size={12} /> Start Camera
+                </button>
+              )}
             </div>
-            <p className="text-xs text-slate-300 mt-4 font-mono">Hold student or staff QR badge up to camera</p>
-            <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Optical Sensor Active
-            </span>
           </div>
 
           {/* Verification Feedback Banner */}
