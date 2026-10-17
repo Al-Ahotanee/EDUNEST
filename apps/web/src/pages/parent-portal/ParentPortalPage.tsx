@@ -6,13 +6,14 @@ import {
   GraduationCap, TrendingUp, CheckCircle, AlertCircle, ChevronRight,
   FileText, Clock, Printer, Download, CreditCard, Send, Calendar,
   ShieldCheck, CheckCircle2, HelpCircle, PenTool, Receipt, Sparkles,
-  Plus, Search, Check, AlertTriangle
+  Plus, Search, Check, AlertTriangle, Contact
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
 import { formatCurrency, formatDate, cn } from '../../lib/utils';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
+import { IDCardModal, StudentIDCardData } from '../../components/idcard';
 
 function useParentAuth() {
   const [token, setToken] = useState(() => localStorage.getItem('parent_token'));
@@ -152,6 +153,7 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const school = parent?.school || { name: 'EduNest International School' };
+  const [idCardChild, setIdCardChild] = useState<any>(null);
 
   // Financial Modals state
   const [viewInvoice, setViewInvoice] = useState<any>(null);
@@ -276,10 +278,17 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
                     <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-lg font-black">
                       {c.firstName?.[0]}{c.lastName?.[0]}
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="font-black text-base">{c.firstName} {c.lastName}</p>
                       <p className="text-slate-300 text-xs">{c.currentClass || 'JSS 2A'} • {c.admissionNumber}</p>
                     </div>
+                    <button
+                      onClick={() => setIdCardChild(c)}
+                      className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0"
+                      title="View / Print ID Card"
+                    >
+                      <Contact size={16} className="text-blue-300" />
+                    </button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="bg-white/10 rounded-xl p-2.5 text-center">
@@ -1096,6 +1105,38 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
           </div>
         </div>
       )}
+
+      {/* ─── Parent ID Card Modal ─── */}
+      <IDCardModal
+        open={!!idCardChild}
+        onClose={() => setIdCardChild(null)}
+        type="student"
+        canPrint={true}
+        viewerRoleLabel="Parent / Guardian"
+        studentData={idCardChild ? {
+          schoolName: school?.name || 'EduNest School',
+          schoolLogo: school?.logo,
+          schoolMotto: school?.motto,
+          schoolAddress: school?.address,
+          schoolPhone: school?.phone,
+          schoolEmail: school?.email,
+          primaryColor: school?.primaryColor || '#2563eb',
+          secondaryColor: school?.secondaryColor || '#7e3af2',
+          studentId: idCardChild.id || idCardChild.studentId || '',
+          admissionNumber: idCardChild.admissionNumber || '',
+          firstName: idCardChild.firstName || '',
+          lastName: idCardChild.lastName || '',
+          gender: idCardChild.gender,
+          dateOfBirth: idCardChild.dateOfBirth,
+          bloodGroup: idCardChild.bloodGroup,
+          className: idCardChild.currentClass || idCardChild.className,
+          status: idCardChild.status || 'ACTIVE',
+          photo: idCardChild.photo,
+          issueDate: new Date().toISOString(),
+          expiryDate: '2027-08-31',
+          signatureLine: 'Principal',
+        } : undefined}
+      />
     </div>
   );
 }

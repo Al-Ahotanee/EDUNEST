@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Plus, Eye, Edit, Trash2, Download, GraduationCap, Filter, RefreshCw } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, Download, GraduationCap, Filter, RefreshCw, Contact, Printer, Camera, CheckSquare, Square } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, Badge,
   ConfirmDialog, Avatar, StatCard, PageLoader, Card,
 } from '../../components/ui';
-import { studentsApi } from '../../services/api';
+import { studentsApi, schoolsApi } from '../../services/api';
 import { formatDate, getStatusBadge } from '../../lib/utils';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
+import { StudentIDCard, StudentIDCardData } from '../../components/idcard';
 
 const studentSchema = z.object({
   admissionNumber: z.string().min(1, 'Required'),
@@ -26,6 +28,7 @@ const studentSchema = z.object({
   religion: z.string().optional(),
   address: z.string().optional(),
   status: z.string().optional(),
+  photo: z.string().optional(),
 });
 
 type StudentForm = z.infer<typeof studentSchema>;
@@ -34,6 +37,7 @@ export default function StudentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -42,6 +46,19 @@ export default function StudentsPage() {
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [viewStudent, setViewStudent] = useState<any>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkPrintRef = useRef<HTMLDivElement>(null);
+
+  // Fetch school branding for ID cards
+  const { data: school } = useQuery({
+    queryKey: ['current-school'],
+    queryFn: async () => {
+      const res = await schoolsApi.current();
+      return res.data?.data || res.data;
+    },
+  });
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['students', page, search, statusFilter],
@@ -123,6 +140,7 @@ export default function StudentsPage() {
   const handleClose = () => {
     setModalOpen(false);
     setEditingStudent(null);
+    setPhotoPreview('');
     reset({});
     setSearchParams({});
   };
@@ -130,6 +148,165 @@ export default function StudentsPage() {
   const handleEdit = (student: any) => {
     setEditingStudent(student);
     setModalOpen(true);
+  };
+
+  // ─── BULK ID CARD PRINT ───────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const list = data?.data || [];
+    if (selectedIds.size === list.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(list.map((s: any) => s.id)));
+    }
+  };
+
+  const handlePrintIDCards = () => {
+    const list = (data?.data || []).filter((s: any) => selectedIds.has(s.id));
+    if (list.length === 0) {
+      toast.error('Select at least one student to print ID cards');
+      return;
+    }
+
+    const schoolName = school?.name || user?.school?.name || user?.tenant?.name || 'School';
+    const schoolLogo = school?.logo || user?.tenant?.logo;
+    const schoolMotto = school?.motto;
+    const schoolAddress = school?.address;
+    const schoolPhone = school?.phone;
+    const schoolEmail = school?.email;
+    const primaryColor = user?.tenant?.primaryColor || '#2563eb';
+    const secondaryColor = user?.tenant?.secondaryColor || '#7e3af2';
+
+    const cardsHtml = list.map((s: any) => {
+      const cardData: StudentIDCardData = {
+        schoolName, schoolLogo, schoolMotto, schoolAddress, schoolPhone, schoolEmail,
+        primaryColor, secondaryColor,
+        studentId: s.id,
+        admissionNumber: s.admissionNumber,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        otherName: s.otherName,
+        gender: s.gender,
+        dateOfBirth: s.dateOfBirth,
+        bloodGroup: s.bloodGroup,
+        className: s.classEnrollments?.[0]?.class?.name,
+        status: s.status,
+        photo: s.photo,
+        issueDate: s.admissionDate || new Date().toISOString(),
+        expiryDate: '2027-08-31',
+        signatureLine: 'Principal',
+      };
+      // Render the card to HTML string using ReactDOMServer-like approach
+      // Since we can't use ReactDOMServer in the browser easily, we'll build the HTML manually
+      return renderCardHTML(cardData);
+    }).join('<div style="page-break-after: always;"></div>');
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      toast.error('Please allow pop-ups to print ID cards');
+      return;
+    }
+    printWindow.document.write(`
+<!DOCTYPE html><html><head><title>Student ID Cards — Bulk Print</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+@page { size: 85.6mm 54mm; margin: 0; }
+body { margin: 0; padding: 8mm; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #f1f5f9; }
+.card-wrapper { page-break-after: always; margin-bottom: 8mm; }
+.card-wrapper:last-child { page-break-after: auto; margin-bottom: 0; }
+@media print { body { background: white; padding: 0; } .card-wrapper { margin-bottom: 0; } }
+.id-card { width: 85.6mm; height: 54mm; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; position: relative; background: white; }
+.id-card-header { height: 12mm; display: flex; align-items: center; gap: 6px; padding: 0 6px; color: white; }
+.id-card-body { position: absolute; top: 13mm; left: 0; right: 0; bottom: 5mm; display: flex; align-items: flex-start; gap: 4px; padding: 2px 6px; }
+.id-card-footer { position: absolute; bottom: 0; left: 0; right: 0; height: 5mm; display: flex; align-items: center; justify-content: space-between; padding: 0 6px; color: white; font-size: 5px; }
+.photo-placeholder { width: 14mm; height: 18mm; border-radius: 4px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); font-weight: bold; font-size: 11px; color: #475569; }
+.qr-placeholder { width: 48px; height: 48px; }
+</style></head><body>
+${cardsHtml}
+<script>
+// Generate QR codes for each card
+setTimeout(function() {
+  var qrContainers = document.querySelectorAll('[data-qr-payload]');
+  qrContainers.forEach(function(el) {
+    var payload = el.getAttribute('data-qr-payload');
+    QRCode.toCanvas(el, payload, { width: 48, margin: 0, color: { dark: '#000000', light: '#ffffff' } }, function(err) {
+      if (err) console.error('QR error:', err);
+    });
+  });
+  setTimeout(function() { window.print(); }, 500);
+}, 300);
+</script>
+</body></html>`);
+    printWindow.document.close();
+    toast.success(`Printing ${list.length} ID card(s)...`);
+  };
+
+  // Helper: render a single card's HTML for bulk print
+  const renderCardHTML = (d: StudentIDCardData): string => {
+    const primary = d.primaryColor || '#2563eb';
+    const secondary = d.secondaryColor || '#7e3af2';
+    const qrPayload = `STUDENT:${d.studentId}:${d.admissionNumber}:${d.firstName}:${d.lastName}`;
+    const initials = `${(d.firstName?.[0] || '?')}${(d.lastName?.[0] || '')}`;
+    const issueDate = d.issueDate ? new Date(d.issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    return `<div class="card-wrapper">
+  <div class="id-card">
+    <div class="id-card-header" style="background: linear-gradient(135deg, ${primary} 0%, ${secondary} 100%);">
+      ${d.schoolLogo ? `<img src="${d.schoolLogo}" style="width:18px;height:18px;border-radius:3px;background:white;padding:1px;object-fit:contain;"/>` : '<div style="width:18px;height:18px;border-radius:4px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;">🎓</div>'}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.schoolName}</div>
+        ${d.schoolMotto ? `<div style="font-size:6.5px;font-style:italic;color:rgba(255,255,255,0.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">"${d.schoolMotto}"</div>` : ''}
+      </div>
+      <div style="font-size:6px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(255,255,255,0.15);padding:1px 4px;border-radius:3px;">Student ID</div>
+    </div>
+    <div class="id-card-body">
+      <div class="photo-placeholder">${d.photo ? `<img src="${d.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;"/>` : initials}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:5px;text-transform:uppercase;color:#94a3b8;font-weight:600;">Name</div>
+        <div style="font-size:9px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.firstName} ${d.otherName ? d.otherName + ' ' : ''}${d.lastName}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 4px;margin-top:1px;">
+          <div><div style="font-size:5px;text-transform:uppercase;color:#94a3b8;font-weight:600;">Adm. No.</div><div style="font-size:7px;font-family:monospace;font-weight:700;color:#334155;">${d.admissionNumber}</div></div>
+          <div><div style="font-size:5px;text-transform:uppercase;color:#94a3b8;font-weight:600;">Class</div><div style="font-size:7px;font-weight:600;color:#334155;">${d.className || '—'}</div></div>
+          <div><div style="font-size:5px;text-transform:uppercase;color:#94a3b8;font-weight:600;">Gender</div><div style="font-size:7px;color:#334155;">${d.gender || '—'}</div></div>
+          <div><div style="font-size:5px;text-transform:uppercase;color:#94a3b8;font-weight:600;">Blood</div><div style="font-size:7px;font-weight:700;color:#dc2626;">${d.bloodGroup || '—'}</div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div data-qr-payload="${qrPayload}" class="qr-placeholder" style="border:1px solid #e2e8f0;border-radius:3px;padding:1px;background:white;"></div>
+        <div style="font-size:4.5px;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;font-weight:600;margin-top:1px;">Scan</div>
+      </div>
+    </div>
+    <div class="id-card-footer" style="background:${primary};">
+      <div style="font-size:5px;">Issued: <strong>${issueDate}</strong></div>
+      <div style="font-size:5px;">Valid: <strong>31 Aug 2027</strong></div>
+    </div>
+  </div>
+</div>`;
+  };
+
+  // ─── PHOTO UPLOAD ─────────────────────────────────────────────────
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Photo must be under 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setPhotoPreview(base64);
+      setValue('photo' as any, base64);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleExportStudents = () => {
@@ -208,6 +385,23 @@ export default function StudentsPage() {
       render: (row: any) => <Badge status={row.status} />,
     },
     {
+      key: 'select',
+      header: () => (
+        <button onClick={toggleSelectAll} className="p-1" title="Select all on this page">
+          {selectedIds.size === (data?.data || []).length && selectedIds.size > 0
+            ? <CheckSquare size={15} className="text-blue-600" />
+            : <Square size={15} className="text-slate-400" />}
+        </button>
+      ),
+      render: (row: any) => (
+        <button onClick={() => toggleSelect(row.id)} className="p-1">
+          {selectedIds.has(row.id)
+            ? <CheckSquare size={15} className="text-blue-600" />
+            : <Square size={15} className="text-slate-300" />}
+        </button>
+      ),
+    },
+    {
       key: 'actions',
       header: 'Actions',
       render: (row: any) => (
@@ -253,6 +447,15 @@ export default function StudentsPage() {
           <Button variant="secondary" icon={<Download size={15} />} onClick={handleExportStudents}>
             Export CSV
           </Button>
+          {selectedIds.size > 0 && (
+            <Button
+              variant="primary"
+              icon={<Printer size={15} />}
+              onClick={handlePrintIDCards}
+            >
+              Print {selectedIds.size} ID Card{selectedIds.size > 1 ? 's' : ''}
+            </Button>
+          )}
           <Button icon={<Plus size={15} />} onClick={() => setModalOpen(true)}>
             Register Student
           </Button>
@@ -368,6 +571,48 @@ export default function StudentsPage() {
             />
           </div>
           <Input label="Address" {...register('address')} placeholder="Home address" />
+
+          {/* Photo Upload */}
+          <div className="form-group">
+            <label className="label">Student Photo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                {photoPreview || editingStudent?.photo ? (
+                  <img src={photoPreview || editingStudent?.photo} alt="Student" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera size={24} className="text-slate-300" />
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={<Camera size={14} />}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {photoPreview || editingStudent?.photo ? 'Change Photo' : 'Upload Photo'}
+                </Button>
+                {photoPreview && (
+                  <button
+                    type="button"
+                    onClick={() => { setPhotoPreview(''); setValue('photo' as any, ''); }}
+                    className="ml-2 text-xs text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                )}
+                <p className="text-xs text-slate-400 mt-1">JPG/PNG, max 2MB. Used on ID card.</p>
+              </div>
+            </div>
+          </div>
         </form>
       </Modal>
 
