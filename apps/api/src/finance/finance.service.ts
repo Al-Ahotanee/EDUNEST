@@ -139,7 +139,8 @@ export class FinanceService {
         data: {
           studentId: enrollment.studentId,
           invoiceNo,
-          totalAmount,
+          subtotal: totalAmount,
+          total: totalAmount,
           balance: totalAmount,
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
           status: 'UNPAID',
@@ -152,7 +153,7 @@ export class FinanceService {
               feeStructureId: fee.id,
             })),
           },
-        },
+        } as any,
       });
       invoicesCreated++;
     }
