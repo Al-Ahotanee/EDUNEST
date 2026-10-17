@@ -148,6 +148,7 @@ export class FinanceService {
               description: fee.name,
               amount: fee.amount,
               quantity: 1,
+              subtotal: fee.amount,
               feeStructureId: fee.id,
             })),
           },
