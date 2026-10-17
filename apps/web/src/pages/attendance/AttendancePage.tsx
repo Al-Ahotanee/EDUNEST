@@ -5,7 +5,7 @@ import {
   ClipboardCheck, Save, Users, TrendingDown, ChevronLeft, ChevronRight,
   Calendar, Download, Printer, CheckCircle2, Clock, Check, X, QrCode,
   Camera, Wifi, WifiOff, AlertTriangle, History, BellRing, SlidersHorizontal,
-  UserCheck, Search, ShieldAlert, RefreshCw, FileText
+  UserCheck, Search, ShieldAlert, RefreshCw, FileText, XCircle
 } from 'lucide-react';
 import { StatCard, Button, Select, PageLoader, Badge, Modal } from '../../components/ui';
 import { attendanceApi, academicApi, studentsApi, hrApi, api } from '../../services/api';
@@ -891,21 +891,33 @@ export default function AttendancePage() {
           {lastScanResult && (
             <div className={cn(
               'p-4 rounded-xl border flex items-start gap-3 transition-all animate-slide-in',
-              lastScanResult.duplicate
-                ? 'bg-amber-50 border-amber-300 text-amber-900'
+              lastScanResult.success === false
+                ? lastScanResult.duplicate
+                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                  : 'bg-rose-50 border-rose-300 text-rose-900'
                 : 'bg-emerald-50 border-emerald-300 text-emerald-900'
             )}>
-              {lastScanResult.duplicate ? (
-                <AlertTriangle size={24} className="text-amber-600 flex-shrink-0" />
+              {lastScanResult.success === false ? (
+                lastScanResult.duplicate ? (
+                  <AlertTriangle size={24} className="text-amber-600 flex-shrink-0" />
+                ) : (
+                  <XCircle size={24} className="text-rose-600 flex-shrink-0" />
+                )
               ) : (
                 <CheckCircle2 size={24} className="text-emerald-600 flex-shrink-0" />
               )}
               <div className="flex-1 text-sm">
                 <p className="font-black text-base">{lastScanResult.name}</p>
-                {lastScanResult.duplicate ? (
-                  <p className="text-amber-700 mt-0.5">
-                    <strong>Duplicate Scan Prevented!</strong> This attendee was already recorded earlier today at <span className="font-mono font-bold">{lastScanResult.prevTime}</span>.
-                  </p>
+                {lastScanResult.success === false ? (
+                  lastScanResult.duplicate ? (
+                    <p className="text-amber-700 mt-0.5">
+                      <strong>Duplicate Scan Prevented!</strong> This attendee was already recorded earlier today at <span className="font-mono font-bold">{lastScanResult.prevTime}</span>.
+                    </p>
+                  ) : (
+                    <p className="text-rose-700 mt-0.5">
+                      <strong>REJECTED — Scan Ignored.</strong> The ID <span className="font-mono font-bold">{lastScanResult.id}</span> does not match any known student or staff record in the database. No attendance was recorded.
+                    </p>
+                  )
                 ) : (
                   <p className="text-emerald-700 mt-0.5">
                     <strong>Verified & Marked Present!</strong> Recorded at <span className="font-mono font-bold">{lastScanResult.time}</span>.
