@@ -42,6 +42,7 @@ import AttendancePage from './pages/attendance/AttendancePage';
 import ResultsPage from './pages/results/ResultsPage';
 import FinancePage from './pages/finance/FinancePage';
 import HRStaffPage from './pages/hr/HRStaffPage';
+import TeacherManagementPage from './pages/teacher-management/TeacherManagementPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import CbtPage from './pages/cbt/CbtPage';
@@ -154,6 +155,7 @@ export default function App() {
             <Route path="finance/invoices" element={<FinancePage />} />
             <Route path="finance/fees" element={<FinancePage />} />
             <Route path="hr/staff" element={<HRStaffPage />} />
+            <Route path="teacher-management" element={<TeacherManagementPage />} />
             <Route path="hr/departments" element={<HRStaffPage />} />
             <Route path="hr/leaves" element={<HRStaffPage />} />
             <Route path="hr/payroll" element={<HRStaffPage />} />

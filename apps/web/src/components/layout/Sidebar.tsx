@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   DollarSign, UserCog, Monitor, Library, Bed, Heart, Package,
   Calendar, Bell, BarChart3, Settings, ChevronDown, ChevronRight,
-  School, LogOut, ClipboardCheck, Award, FileText, Building2, X,
+  School, LogOut, ClipboardCheck, Award, FileText, Building2, X, Briefcase,
 } from 'lucide-react';
 import { EduNestIcon } from '../common/EduNestLogo';
 
@@ -46,6 +46,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: 'Attendance', path: '/app/attendance', icon: <ClipboardCheck size={18} />, requiredPermission: { module: 'attendance', action: 'read' } },
   { label: 'Results', path: '/app/results', icon: <Award size={18} />, requiredPermission: { module: 'results', action: 'read' } },
   { label: 'CBT Exams', path: '/app/cbt', icon: <Monitor size={18} />, requiredPermission: { module: 'academic', action: 'read' } },
+  { label: 'Teacher Management', path: '/app/teacher-management', icon: <Briefcase size={18} />, adminOnly: true },
   {
     label: 'Finance',
     icon: <DollarSign size={18} />,
