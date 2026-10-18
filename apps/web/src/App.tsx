@@ -44,6 +44,9 @@ import AcademicPage from './pages/academic/AcademicPage';
 import AttendancePage from './pages/attendance/AttendancePage';
 import ResultsPage from './pages/results/ResultsPage';
 import FinancePage from './pages/finance/FinancePage';
+import AccountantDashboardPage from './pages/finance/AccountantDashboardPage';
+import FinancialPolicyPage from './pages/finance/FinancialPolicyPage';
+import ClassMasterFinancePage from './pages/finance/ClassMasterFinancePage';
 import HRStaffPage from './pages/hr/HRStaffPage';
 import TeacherManagementPage from './pages/teacher-management/TeacherManagementPage';
 import StaffDocumentsPage from './pages/staff-documents/StaffDocumentsPage';
@@ -167,6 +170,9 @@ export default function App() {
             <Route path="finance" element={<FinancePage />} />
             <Route path="finance/invoices" element={<FinancePage />} />
             <Route path="finance/fees" element={<FinancePage />} />
+            <Route path="finance/accountant" element={<AccountantDashboardPage />} />
+            <Route path="finance/class-master" element={<ClassMasterFinancePage />} />
+            <Route path="finance/policy" element={<FinancialPolicyPage />} />
             <Route path="hr/staff" element={<HRStaffPage />} />
             <Route path="teacher-management" element={<TeacherManagementPage />} />
             <Route path="staff-documents" element={<StaffDocumentsPage />} />

@@ -74,6 +74,8 @@ const NAV_ITEMS: NavItemDef[] = [
       { label: 'Overview', path: '/app/finance', icon: <BarChart3 size={16} />, adminOnly: true },
       { label: 'Invoices', path: '/app/finance/invoices', icon: <FileText size={16} />, adminOnly: true },
       { label: 'Fee Structures', path: '/app/finance/fees', icon: <DollarSign size={16} />, adminOnly: true },
+      { label: 'Accountant Dashboard', path: '/app/finance/accountant', icon: <Briefcase size={16} />, adminOnly: true },
+      { label: 'Financial Policy', path: '/app/finance/policy', icon: <Settings size={16} />, adminOnly: true },
     ],
   },
   {

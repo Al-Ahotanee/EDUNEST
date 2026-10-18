@@ -141,6 +141,36 @@ export const financeApi = {
   getInvoice: (id: string) => api.get(`/finance/invoices/${id}`),
   createInvoice: (data: any) => api.post('/finance/invoices', data),
   recordPayment: (invoiceId: string, data: any) => api.post(`/finance/invoices/${invoiceId}/payments`, data),
+
+  // ─── Phase 4: Financial Workflow API ──────────────────────────────────────
+  // Payment submission + approval workflow
+  submitPayment: (data: any) => api.post('/finance/workflow/payments/submit', data),
+  approvePayment: (id: string) => api.patch(`/finance/workflow/payments/${id}/approve`),
+  rejectPayment: (id: string, reason: string) => api.patch(`/finance/workflow/payments/${id}/reject`, { reason }),
+  reversePayment: (id: string, reason: string) => api.patch(`/finance/workflow/payments/${id}/reverse`, { reason }),
+  getPendingPayments: (params?: any) => api.get('/finance/workflow/payments/pending', { params }),
+
+  // Receipts
+  getReceipt: (id: string) => api.get(`/finance/workflow/receipts/${id}`),
+  reprintReceipt: (id: string) => api.patch(`/finance/workflow/receipts/${id}/reprint`),
+
+  // Tenant financial policy
+  getPolicy: () => api.get('/finance/workflow/policy'),
+  updatePolicy: (data: any) => api.patch('/finance/workflow/policy', data),
+
+  // Parent-student links
+  createParentLink: (data: { userId: string; studentId: string; relationship?: string }) =>
+    api.post('/finance/workflow/parent-links', data),
+
+  // ─── Phase 4: Financial Reports API ────────────────────────────────────────
+  getAccountantDashboard: (params?: any) => api.get('/finance/reports/accountant-dashboard', { params }),
+  getClassMasterDashboard: () => api.get('/finance/reports/class-master-dashboard'),
+  getParentSummary: () => api.get('/finance/reports/parent-summary'),
+  getOutstandingFees: (params?: any) => api.get('/finance/reports/outstanding-fees', { params }),
+  getDailyCollection: (date: string) => api.get('/finance/reports/daily-collection', { params: { date } }),
+  getCollectionByUser: (startDate: string, endDate: string) =>
+    api.get('/finance/reports/collection-by-user', { params: { startDate, endDate } }),
+  getAuditLog: (params?: any) => api.get('/finance/reports/audit-log', { params }),
 };
 
 // ─── Results ──────────────────────────────────────────────────────────────────
