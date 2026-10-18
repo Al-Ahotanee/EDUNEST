@@ -87,8 +87,29 @@ export class StudentsService {
   }
 
   async findAll(schoolId: string, query: PaginationDto & { status?: string; classId?: string }) {
+    return this.findAllScoped(schoolId, null, query);
+  }
+
+  /**
+   * EDN-003 fix: Role-scoped student listing.
+   * - Super Admin: sees all students with full guardian info
+   * - Teacher/Class Master: sees only students in their assigned classes,
+   *   with minimal fields (no guardian phone/email PII unless they're admin)
+   */
+  async findAllScoped(
+    schoolId: string,
+    currentUser: any | null,
+    query: PaginationDto & { status?: string; classId?: string },
+  ) {
     const { search, sortBy, sortOrder, status, classId } = query;
 
+    // Determine if the user is a super admin or has admin-level access
+    const isSuperAdmin = currentUser?.isSuperAdmin === true;
+    const hasAdminRole = isSuperAdmin || currentUser?.roles?.some(
+      (r: any) => r.name === 'Super Admin' || r.name === 'Accountant'
+    );
+
+    // Build the where clause
     const where: Prisma.StudentWhereInput = {
       schoolId,
       deletedAt: null,
@@ -105,6 +126,29 @@ export class StudentsService {
       }),
     };
 
+    // EDN-003: For non-admin users (teachers), scope to assigned classes only
+    if (!hasAdminRole && currentUser?.id) {
+      // Get the user's assigned class IDs from TeacherAssignment
+      const assignments = await this.prisma.teacherAssignment.findMany({
+        where: { userId: currentUser.id, schoolId },
+        select: { classId: true },
+      });
+      const assignedClassIds = assignments.map(a => a.classId);
+
+      if (assignedClassIds.length > 0) {
+        // Scope to only students in the teacher's assigned classes
+        where.classEnrollments = {
+          some: { classId: { in: assignedClassIds } },
+        };
+      } else {
+        // Teacher with no assignments — return zero results (not all students)
+        return paginate([], 0, query);
+      }
+    }
+
+    // EDN-003: For non-admin users, exclude guardian PII (phone, email)
+    const includeGuardians = hasAdminRole;
+
     const [students, total] = await Promise.all([
       this.prisma.student.findMany({
         where,
@@ -114,7 +158,7 @@ export class StudentsService {
           ? { [sortBy]: sortOrder || 'asc' }
           : { createdAt: 'desc' },
         include: {
-          guardians: { take: 1 },
+          guardians: includeGuardians ? { take: 1 } : false,
           classEnrollments: {
             where: {},
             include: { class: true },
@@ -125,6 +169,11 @@ export class StudentsService {
       }),
       this.prisma.student.count({ where }),
     ]);
+
+    // EDN-003: For non-admin users, strip guardian PII from results
+    if (!includeGuardians) {
+      students.forEach(s => { delete (s as any).guardians; });
+    }
 
     return paginate(students, total, query);
   }

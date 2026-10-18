@@ -20,7 +20,7 @@ type TeacherTab = 'directory' | 'allocation' | 'idcards';
 export default function TeacherManagementPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const school = user?.tenant || user?.school || { name: 'EduNest School' };
+  const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
   const [activeTab, setActiveTab] = useState<TeacherTab>('directory');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -81,8 +81,8 @@ export default function TeacherManagementPage() {
     defaultValues: {
       staffId: '', firstName: '', lastName: '', gender: 'MALE',
       designation: '', departmentId: '', employmentType: 'FULL_TIME',
-      phone: '', email: '', salary: 0, qualification: 'B.Ed (Hons)',
-      bankName: 'First Bank of Nigeria', accountNumber: '', photo: '',
+      phone: '', email: '', salary: 0, qualification: '',
+      bankName: '', accountNumber: '', photo: '',
     },
   });
 

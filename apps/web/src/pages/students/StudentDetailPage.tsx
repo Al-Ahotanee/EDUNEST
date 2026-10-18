@@ -71,9 +71,10 @@ export default function StudentDetailPage() {
     );
   }
 
-  const currentEnrollment = student.enrollments?.[0];
+  // EDN-007 fix: Read class from classEnrollments (correct field name from API)
+  const currentEnrollment = student.classEnrollments?.[0] || student.enrollments?.[0];
   const className = currentEnrollment?.class?.name
-    ? `${currentEnrollment.class.name}${currentEnrollment.class.arm ? ` - ${currentEnrollment.class.arm}` : ''}`
+    ? `${currentEnrollment.class.name}${currentEnrollment.class.section ? ` - ${currentEnrollment.class.section}` : ''}`
     : 'Not Assigned';
 
   const totalInvoiced = (student.feeInvoices || []).reduce((acc: number, inv: any) => acc + (Number(inv.totalAmount) || 0), 0);

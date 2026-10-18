@@ -190,7 +190,18 @@ export default function App() {
           <Route path="/notifications" element={<Navigate to="/app/notifications" replace />} />
           <Route path="/reports" element={<Navigate to="/app/reports" replace />} />
           <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+              <div className="text-center space-y-4">
+                <h1 className="text-6xl font-black text-slate-300">404</h1>
+                <p className="text-lg font-semibold text-slate-600">Page Not Found</p>
+                <p className="text-sm text-slate-400">The page you're looking for doesn't exist or has been moved.</p>
+                <a href="/app/dashboard" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                  Back to Dashboard
+                </a>
+              </div>
+            </div>
+          } />
         </Routes>
       </BrowserRouter>
 

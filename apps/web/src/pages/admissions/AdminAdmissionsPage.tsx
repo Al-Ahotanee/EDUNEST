@@ -12,13 +12,14 @@ import {
 import { api } from '../../services/api';
 import { formatDate, cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
+import { schoolsApi } from '../../services/api';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 const admissionsApi = {
   list: (params?: any) => api.get('/admissions', { params }),
   getOne: (id: string) => api.get(`/admissions/${id}`),
   stats: () => api.get('/admissions/stats'),
-  approve: (id: string) => api.patch(`/admissions/${id}/approve`),
+  approve: (id: string, classId?: string) => api.patch(`/admissions/${id}/approve`, classId ? { classId } : {}),
   reject: (id: string, reason?: string) => api.patch(`/admissions/${id}/reject`, { reason }),
 };
 
@@ -37,7 +38,17 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdmissionsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const school = user?.tenant || user?.school || { name: 'EduNest International School' };
+
+  // EDN-006 fix: Fetch real school data to get the actual slug
+  const { data: schoolData } = useQuery({
+    queryKey: ['current-school-admissions'],
+    queryFn: async () => {
+      const res = await schoolsApi.current();
+      return res.data?.data || res.data;
+    },
+  });
+  const school = schoolData || user?.tenant || user?.school || { name: 'School', slug: 'demo-school' };
+  const schoolSlug = school?.slug || user?.tenant?.slug || 'demo-school';
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -191,7 +202,7 @@ export default function AdmissionsPage() {
     try { return JSON.parse(admission.notes); } catch { return {}; }
   };
 
-  const schoolSlug = user?.tenant?.slug || 'your-school';
+  // EDN-006 fix: schoolSlug is now resolved from the fetched school data above
 
   return (
     <div className="space-y-6 animate-fade-in">

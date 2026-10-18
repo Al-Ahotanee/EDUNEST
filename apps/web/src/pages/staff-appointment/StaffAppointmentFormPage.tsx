@@ -13,7 +13,7 @@ import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 export default function StaffAppointmentFormPage() {
   const { user } = useAuthStore();
-  const school = user?.tenant || user?.school || { name: 'EduNest School' };
+  const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState('');
@@ -23,8 +23,8 @@ export default function StaffAppointmentFormPage() {
     defaultValues: {
       staffId: '', firstName: '', lastName: '', gender: 'MALE',
       designation: '', departmentId: '', employmentType: 'FULL_TIME',
-      phone: '', email: '', salary: 0, qualification: 'B.Ed (Hons)',
-      specialization: '', trcnNumber: '', bankName: 'First Bank of Nigeria',
+      phone: '', email: '', salary: 0, qualification: '',
+      specialization: '', trcnNumber: '', bankName: '',
       accountNumber: '', stateOfOrigin: '', lga: '', address: '',
       emergencyContactName: '', emergencyContactPhone: '',
       employmentDate: new Date().toISOString().split('T')[0],

@@ -18,7 +18,7 @@ import { EduNestIcon } from '../../components/common/EduNestLogo';
 export default function FinancePage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const school = user?.tenant || user?.school || { name: 'EduNest Institutional College' };
+  const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
 
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState<any>(null);
@@ -698,7 +698,7 @@ export default function FinancePage() {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Information</p>
                 <div className="flex justify-between"><span className="text-slate-500">Student Name:</span><span className="font-bold text-slate-900">{selectedInvoice.student?.firstName} {selectedInvoice.student?.lastName}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Admission No:</span><span className="font-mono font-bold text-blue-600">{selectedInvoice.student?.admissionNumber}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Class:</span><span className="font-semibold text-slate-800">{selectedInvoice.student?.classEnrollments?.[0]?.class?.name || 'Assigned Class'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Class:</span><span className="font-semibold text-slate-800">{selectedInvoice.student?.classEnrollments?.[0]?.class?.name || selectedInvoice.student?.className || '—'}</span></div>
               </div>
 
               <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 border border-slate-100">

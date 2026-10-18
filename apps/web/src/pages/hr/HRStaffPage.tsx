@@ -21,7 +21,7 @@ type HRTab = 'staff' | 'workload' | 'leaves' | 'payroll' | 'documents' | 'apprai
 export default function HRStaffPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const school = user?.tenant || user?.school || { name: 'EduNest International School' };
+  const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
 
   const [activeTab, setActiveTab] = useState<HRTab>('staff');
   const [page, setPage] = useState(1);
@@ -359,7 +359,7 @@ export default function HRStaffPage() {
         <StatCard title="Total Staff" value={totalStaff} icon={<Users size={20} />} color="blue" />
         <StatCard title="Academic Faculty" value={Math.round(totalStaff * 0.75)} icon={<UserCheck size={20} />} color="green" />
         <StatCard title="Active Departments" value={(deptData || []).length || 6} icon={<Briefcase size={20} />} color="purple" />
-        <StatCard title="On Approved Leave" value="2" icon={<Clock size={20} />} color="amber" />
+        <StatCard title="On Approved Leave" value={(leavesData || []).filter((l: any) => l.status === 'APPROVED').length} icon={<Clock size={20} />} color="amber" />
       </div>
 
       {/* ─── NAVIGATION MODULE TABS ─────────────────────────────────────────── */}

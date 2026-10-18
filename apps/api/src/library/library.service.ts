@@ -8,6 +8,14 @@ export class LibraryService {
   constructor(private prisma: PrismaService) {}
 
   async createBook(data: any, schoolId: string) {
+    // EDN-026 fix: Validate ISBN format (basic check — 10 or 13 digits with optional hyphens)
+    if (data.isbn && data.isbn.trim()) {
+      const cleanIsbn = data.isbn.replace(/[-\s]/g, '');
+      if (!/^\d{10}$/.test(cleanIsbn) && !/^\d{13}$/.test(cleanIsbn)) {
+        throw new BadRequestException('ISBN must be a valid 10 or 13 digit number (hyphens allowed)');
+      }
+    }
+
     const book = await this.prisma.book.create({
       data: {
         schoolId,

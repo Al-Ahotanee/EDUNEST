@@ -25,12 +25,13 @@ export class StudentsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all students with pagination' })
+  @ApiOperation({ summary: 'Get all students with pagination — teachers see only assigned-class students with limited fields' })
   findAll(
     @CurrentUser('schoolId') schoolId: string,
+    @CurrentUser() currentUser: any,
     @Query() query: PaginationDto & { status?: string; classId?: string },
   ) {
-    return this.studentsService.findAll(schoolId, query);
+    return this.studentsService.findAllScoped(schoolId, currentUser, query);
   }
 
   @Get('statistics')

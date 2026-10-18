@@ -11,7 +11,13 @@ import { formatDate } from '../../lib/utils';
 
 export default function AcademicPage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'sessions' | 'classes' | 'subjects'>('sessions');
+  // EDN-016 fix: Deep-link to the correct tab based on the URL path
+  const [tab, setTab] = useState<'sessions' | 'classes' | 'subjects'>(() => {
+    const path = window.location.pathname;
+    if (path.includes('/classes')) return 'classes';
+    if (path.includes('/subjects')) return 'subjects';
+    return 'sessions';
+  });
   const [sessionModal, setSessionModal] = useState(false);
   const [termModal, setTermModal] = useState<any>(null);
   const [classModal, setClassModal] = useState(false);
