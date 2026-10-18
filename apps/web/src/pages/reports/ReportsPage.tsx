@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { BarChart3, Download, RefreshCw, TrendingUp, Users, DollarSign, ClipboardCheck } from 'lucide-react';
+import { BarChart3, Download, RefreshCw, TrendingUp, Users, DollarSign, ClipboardCheck, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { StatCard, Button, PageLoader, Select } from '../../components/ui';
 import { reportsApi, financeApi, studentsApi } from '../../services/api';
@@ -13,7 +13,7 @@ import { formatCurrency } from '../../lib/utils';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
-function downloadBlob(content: string, filename: string, mime: string) {
+function downloadBlob(content: BlobPart, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -40,6 +40,38 @@ function toCsv(rows: Record<string, any>[]): string {
   return lines.join('\n');
 }
 
+// ─── Excel export (single-sheet .xls via HTML table, opens natively in Excel) ──
+// Renders the report data as an HTML <table> with Excel-compatible styling
+// and Excel mime type. Excel and LibreOffice open this natively without needing
+// a third-party library (no jsPDF/SheetJS dependency, no bundle bloat).
+function toExcelHtml(sheets: { name: string; headers: string[]; rows: any[][] }[]): string {
+  const escape = (v: any) => {
+    if (v === null || v === undefined || v === '') return '';
+    const s = String(v);
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  };
+  const htmlSheets = sheets.map(sheet => `
+    <table border="1" style="border-collapse:collapse;font-family:Calibri;font-size:11pt;">
+      <thead>
+        <tr style="background:#1e3a8a;color:#fff;font-weight:bold;">
+          ${sheet.headers.map(h => `<th style="padding:6px 10px;border:1px solid #cbd5e1;">${escape(h)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${sheet.rows.map(row => `
+          <tr>
+            ${row.map(cell => `<td style="padding:6px 10px;border:1px solid #e2e8f0;">${escape(cell)}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`).join('<br/>');
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+${sheets.map(s => `<x:ExcelWorksheet><x:Name>${s.name}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>`).join('')}
+</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<body>${htmlSheets}</body></html>`;
+}
+
 export default function ReportsPage() {
   const [tab, setTab] = useState<'overview' | 'enrollment' | 'finance' | 'attendance'>('overview');
   const [year, setYear] = useState(new Date().getFullYear());
@@ -58,7 +90,7 @@ export default function ReportsPage() {
     return { value: String(y), label: String(y) };
   });
 
-  const handleExport = (format: 'csv' | 'json') => {
+  const handleExport = (format: 'csv' | 'json' | 'excel') => {
     const summary = {
       reportYear: year,
       generatedAt: new Date().toISOString(),
@@ -72,9 +104,11 @@ export default function ReportsPage() {
         collectionRate: finStats?.collectionRate || 0,
       },
       monthlyTrend: monthlyTrend || [],
+      byClass: studentStats?.byClass || [],
     };
 
     const stamp = new Date().toISOString().slice(0, 10);
+
     if (format === 'csv') {
       const rows = (monthlyTrend || []).map((m: any) => ({
         Month: m.month || m.label || '',
@@ -85,15 +119,111 @@ export default function ReportsPage() {
       const csv = toCsv(rows.length ? rows : [{ Note: 'No monthly data available' }]);
       downloadBlob(csv, `edunest-reports-${stamp}.csv`, 'text/csv;charset=utf-8');
       toast.success(`Exported CSV (${rows.length} rows)`);
+    } else if (format === 'excel') {
+      // P0 fix: real Excel .xls export with 2 sheets — Summary + Monthly Trend
+      const monthlyRows = (monthlyTrend || []).map((m: any) => [
+        m.month || m.label || '',
+        m.revenue || m.collected || 0,
+        m.outstanding || 0,
+        m.transactions || 0,
+      ]);
+      const summaryRows = [
+        ['Total Students', studentStats?.total || 0],
+        ['Active Students', studentStats?.active || 0],
+        ['Male', studentStats?.male || 0],
+        ['Female', studentStats?.female || 0],
+        ['Total Revenue', formatCurrency(finStats?.totalCollected || 0)],
+        ['Outstanding Balance', formatCurrency(finStats?.totalBalance || 0)],
+        ['Collection Rate', `${finStats?.collectionRate || 0}%`],
+        ['Report Year', year],
+        ['Generated At', new Date().toLocaleString()],
+      ];
+      const html = toExcelHtml([
+        { name: 'Summary', headers: ['Metric', 'Value'], rows: summaryRows },
+        { name: 'Monthly Trend', headers: ['Month', 'Revenue', 'Outstanding', 'Transactions'], rows: monthlyRows.length ? monthlyRows : [['—', '—', '—', '—']] },
+      ]);
+      downloadBlob(html, `edunest-reports-${stamp}.xls`, 'application/vnd.ms-excel');
+      toast.success(`Exported Excel workbook (2 sheets)`);
     } else {
       downloadBlob(JSON.stringify(summary, null, 2), `edunest-reports-${stamp}.json`, 'application/json');
       toast.success('Exported JSON report');
     }
   };
 
+  // P0 fix: PDF export — opens a print-optimized report view in a new window,
+  // then triggers the browser's native print-to-PDF dialog. Includes the
+  // summary KPIs + monthly trend table + class enrollment breakdown, so the
+  // printed document is a complete snapshot (not just the on-screen dashboard).
   const handlePrint = () => {
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) {
+      toast.error('Pop-up blocked. Please allow pop-ups for this site and try again.');
+      return;
+    }
+    const stamp = new Date().toLocaleString();
+    const monthlyRows = (monthlyTrend || []).map((m: any) => `
+      <tr>
+        <td>${m.month || m.label || '—'}</td>
+        <td style="text-align:right;">${formatCurrency(m.revenue || m.collected || 0)}</td>
+        <td style="text-align:right;">${formatCurrency(m.outstanding || 0)}</td>
+        <td style="text-align:right;">${m.transactions || 0}</td>
+      </tr>`).join('');
+    const classRows = (studentStats?.byClass || []).map((b: any) => `
+      <tr>
+        <td>${b.className || b.classId?.slice(0, 8) || '—'}</td>
+        <td style="text-align:right;">${b._count?.studentId || b._count || 0}</td>
+      </tr>`).join('');
+    win.document.write(`<!DOCTYPE html><html><head>
+<title>Reports — ${year}</title>
+<style>
+  @page { margin: 16mm; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; margin: 24px; }
+  h1 { font-size: 22pt; margin: 0 0 4px; }
+  h2 { font-size: 14pt; margin: 24px 0 8px; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; }
+  .meta { color: #64748b; font-size: 10pt; margin-bottom: 16px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .kpi { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; }
+  .kpi .label { font-size: 8pt; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
+  .kpi .value { font-size: 16pt; font-weight: 700; color: #1e3a8a; }
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 10px; }
+  th { background: #1e3a8a; color: white; text-align: left; }
+  tr:nth-child(even) { background: #f8fafc; }
+  .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #cbd5e1; color: #94a3b8; font-size: 9pt; text-align: center; }
+  @media print { body { margin: 0; } }
+</style>
+</head><body>
+  <h1>School Performance Report</h1>
+  <div class="meta">Academic Year: ${year} · Generated: ${stamp}</div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Total Students</div><div class="value">${(studentStats?.total || 0).toLocaleString()}</div></div>
+    <div class="kpi"><div class="label">Active</div><div class="value">${(studentStats?.active || 0).toLocaleString()}</div></div>
+    <div class="kpi"><div class="label">Total Revenue</div><div class="value">${formatCurrency(finStats?.totalCollected || 0)}</div></div>
+    <div class="kpi"><div class="label">Collection Rate</div><div class="value">${finStats?.collectionRate || 0}%</div></div>
+  </div>
+
+  <h2>Monthly Revenue Trend</h2>
+  <table>
+    <thead><tr><th>Month</th><th style="text-align:right;">Revenue</th><th style="text-align:right;">Outstanding</th><th style="text-align:right;">Transactions</th></tr></thead>
+    <tbody>${monthlyRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No monthly data available</td></tr>'}</tbody>
+  </table>
+
+  <h2>Enrollment by Class</h2>
+  <table>
+    <thead><tr><th>Class</th><th style="text-align:right;">Students</th></tr></thead>
+    <tbody>${classRows || '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No enrollment data available</td></tr>'}</tbody>
+  </table>
+
+  <div class="footer">Confidential — Generated by EduNest Reports module</div>
+</body></html>`);
+    win.document.close();
+    // Give the new window a moment to render before firing print.
+    setTimeout(() => {
+      win.focus();
+      win.print();
+    }, 400);
     toast.success('Opening print dialog for PDF export…');
-    setTimeout(() => window.print(), 300);
   };
 
   return (
@@ -103,9 +233,10 @@ export default function ReportsPage() {
           <h1 className="page-title">Reports & Analytics</h1>
           <p className="page-subtitle">School performance insights and data exports</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Select options={years} value={String(year)} onChange={e => setYear(Number(e.target.value))} className="w-28 py-2 text-sm" />
-          <Button variant="secondary" icon={<Download size={16} />} onClick={handlePrint}>Export PDF</Button>
+          <Button variant="secondary" icon={<FileText size={16} />} onClick={handlePrint}>Export PDF</Button>
+          <Button variant="secondary" icon={<Download size={16} />} onClick={() => handleExport('excel')}>Export Excel</Button>
           <Button variant="secondary" icon={<Download size={16} />} onClick={() => handleExport('csv')}>Export CSV</Button>
           <Button variant="secondary" icon={<Download size={16} />} onClick={() => handleExport('json')}>Export JSON</Button>
         </div>

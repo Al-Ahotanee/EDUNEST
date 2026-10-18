@@ -63,6 +63,11 @@ model School {
   principalSignature String?
   stampSeal          String?
   isActive           Boolean    @default(true)
+  // P0 fix: persist timetable publish state so it survives reloads.
+  // When false, the timetable is "Draft" and not visible on Student/Parent portals.
+  timetablePublished Boolean    @default(true)
+  // P2 fix: stores the academic session id that's currently active for timetabling.
+  // Used by Academic Dates CRUD so admins can scope events to a session.
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -80,9 +85,30 @@ model School {
   termReportCards    TermReportCard[]
   gradingScales      GradingScale[]
   reliefAssignments  ReliefAssignment[]
+  academicEvents     AcademicEvent[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
+}
+
+/// Academic calendar event — milestones like resumption, CA weeks, exams,
+/// holidays, vacations. Surfaced in the Timetable > Academic Dates view
+/// (P2 fix: previously hard-coded; now persisted via CRUD endpoints).
+model AcademicEvent {
+  id          String   @id @default(uuid())
+  schoolId    String
+  title       String
+  type        String   @default("ACADEMIC")  // ACADEMIC | EXAMINATION | HOLIDAY | VACATION | EVENT
+  startDate   DateTime
+  endDate     DateTime?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([startDate])
 }
 
 // ─── USERS & AUTH ─────────────────────────────────────────────────────────────

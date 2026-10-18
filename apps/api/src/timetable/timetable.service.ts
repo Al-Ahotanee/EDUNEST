@@ -204,4 +204,86 @@ export class TimetableService {
     await this.prisma.reliefAssignment.delete({ where: { id } });
     return successResponse(null, 'Relief assignment cancelled');
   }
+
+  // ─── PUBLISH / UNPUBLISH TIMETABLE ─────────────────────────────────────────
+  // Persists the timetable's published state on the School record so the
+  // student/parent portals can check it and only render published timetables.
+  async getPublishState(schoolId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { timetablePublished: true },
+    });
+    if (!school) throw new NotFoundException('School not found');
+    return successResponse({ published: school.timetablePublished });
+  }
+
+  async setPublishState(schoolId: string, published: boolean) {
+    const updated = await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { timetablePublished: published },
+      select: { id: true, name: true, timetablePublished: true },
+    });
+    return successResponse(
+      { published: updated.timetablePublished },
+      published
+        ? 'Timetable published to Student & Parent Portals'
+        : 'Timetable unpublished from portals (now Draft)',
+    );
+  }
+
+  // ─── ACADEMIC EVENTS (Academic Dates CRUD) ──────────────────────────────────
+  async listAcademicEvents(schoolId: string, from?: string, to?: string) {
+    const where: any = { schoolId };
+    if (from || to) {
+      where.startDate = {};
+      if (from) where.startDate.gte = new Date(from);
+      if (to) where.startDate.lte = new Date(to);
+    }
+    const events = await this.prisma.academicEvent.findMany({
+      where,
+      orderBy: { startDate: 'asc' },
+      take: 500,
+    });
+    return successResponse(events);
+  }
+
+  async createAcademicEvent(schoolId: string, data: any) {
+    if (!data?.title || !data?.startDate) {
+      throw new BadRequestException('title and startDate are required');
+    }
+    const ev = await this.prisma.academicEvent.create({
+      data: {
+        schoolId,
+        title: data.title,
+        type: data.type || 'ACADEMIC',
+        startDate: new Date(data.startDate),
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        description: data.description || null,
+      },
+    });
+    return successResponse(ev, 'Academic event created');
+  }
+
+  async updateAcademicEvent(id: string, schoolId: string, data: any) {
+    const existing = await this.prisma.academicEvent.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Academic event not found');
+    const updated = await this.prisma.academicEvent.update({
+      where: { id },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.startDate !== undefined && { startDate: new Date(data.startDate) }),
+        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
+        ...(data.description !== undefined && { description: data.description }),
+      },
+    });
+    return successResponse(updated, 'Academic event updated');
+  }
+
+  async deleteAcademicEvent(id: string, schoolId: string) {
+    const existing = await this.prisma.academicEvent.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Academic event not found');
+    await this.prisma.academicEvent.delete({ where: { id } });
+    return successResponse(null, 'Academic event deleted');
+  }
 }

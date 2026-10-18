@@ -28,6 +28,14 @@ const tapi = {
   listRelief: () => api.get('/timetable/relief'),
   createRelief: (d: any) => api.post('/timetable/relief', d),
   deleteRelief: (id: string) => api.delete(`/timetable/relief/${id}`),
+  // P0 fix: publish/unpublish persisted on School record
+  getPublishState: () => api.get('/timetable/publish-state'),
+  setPublishState: (published: boolean) => api.patch('/timetable/publish', { published }),
+  // P2 fix: academic events CRUD
+  listAcademicEvents: () => api.get('/timetable/academic-events'),
+  createAcademicEvent: (d: any) => api.post('/timetable/academic-events', d),
+  updateAcademicEvent: (id: string, d: any) => api.patch(`/timetable/academic-events/${id}`, d),
+  deleteAcademicEvent: (id: string) => api.delete(`/timetable/academic-events/${id}`),
 };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -250,7 +258,11 @@ export default function TimetablePage() {
 
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  // P0 fix: published state is persisted on the School record via
+  // /timetable/publish-state — initial value fetched on mount, then mirrored
+  // locally so the badge updates immediately on toggle.
   const [isPublished, setIsPublished] = useState<boolean>(true);
+  const [publishUpdating, setPublishUpdating] = useState<boolean>(false);
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(true);
 
   // Modals
@@ -643,6 +655,105 @@ export default function TimetablePage() {
     },
   });
 
+  // ─── PUBLISH STATE (P0 fix: persisted on School record) ─────────────────────
+  // Initial state fetched on mount so reloads reflect the persisted value.
+  const { data: publishStateData } = useQuery({
+    queryKey: ['timetable-publish-state'],
+    queryFn: () => tapi.getPublishState().then(r => r.data?.data || r.data || { published: true }),
+    retry: false,
+  });
+  useEffect(() => {
+    if (publishStateData && typeof publishStateData.published === 'boolean') {
+      setIsPublished(publishStateData.published);
+    }
+  }, [publishStateData]);
+
+  const togglePublishMutation = useMutation({
+    mutationFn: (published: boolean) => tapi.setPublishState(published),
+    onSuccess: (res) => {
+      const newPublished = res.data?.data?.published ?? res.data?.published;
+      if (typeof newPublished === 'boolean') setIsPublished(newPublished);
+      toast.success(res.data?.message || 'Publish state updated');
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.message || 'Failed to update publish state');
+    },
+    onSettled: () => setPublishUpdating(false),
+  });
+
+  // ─── ACADEMIC EVENTS (P2 fix: real CRUD, not hard-coded seed) ───────────────
+  const { data: academicEventsData, refetch: refetchAcademicEvents } = useQuery({
+    queryKey: ['timetable-academic-events'],
+    queryFn: () => tapi.listAcademicEvents().then(r => r.data?.data || r.data || []),
+    retry: false,
+  });
+  const academicEvents = Array.isArray(academicEventsData) ? academicEventsData : [];
+
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const eventForm = useForm({
+    defaultValues: {
+      title: '',
+      type: 'ACADEMIC',
+      startDate: '',
+      endDate: '',
+      description: '',
+    },
+  });
+
+  const saveEventMutation = useMutation({
+    mutationFn: (data: any) => {
+      const payload = {
+        ...data,
+        endDate: data.endDate || null,  // empty string → null
+      };
+      return editingEvent
+        ? tapi.updateAcademicEvent(editingEvent.id, payload)
+        : tapi.createAcademicEvent(payload);
+    },
+    onSuccess: (res) => {
+      toast.success(res.data?.message || (editingEvent ? 'Event updated' : 'Event created'));
+      setEventModalOpen(false);
+      setEditingEvent(null);
+      eventForm.reset();
+      refetchAcademicEvents();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to save event'),
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: (id: string) => tapi.deleteAcademicEvent(id),
+    onSuccess: () => {
+      toast.success('Event deleted');
+      refetchAcademicEvents();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to delete event'),
+  });
+
+  const openCreateEvent = () => {
+    setEditingEvent(null);
+    eventForm.reset({
+      title: '',
+      type: 'ACADEMIC',
+      startDate: '',
+      endDate: '',
+      description: '',
+    });
+    setEventModalOpen(true);
+  };
+
+  const openEditEvent = (ev: any) => {
+    setEditingEvent(ev);
+    eventForm.reset({
+      title: ev.title || '',
+      type: ev.type || 'ACADEMIC',
+      startDate: ev.startDate ? new Date(ev.startDate).toISOString().slice(0, 10) : '',
+      endDate: ev.endDate ? new Date(ev.endDate).toISOString().slice(0, 10) : '',
+      description: ev.description || '',
+    });
+    setEventModalOpen(true);
+  };
+
   // ─── FORM & MUTATIONS ──────────────────────────────────────────────────────
   const editForm = useForm({
     defaultValues: {
@@ -701,6 +812,24 @@ export default function TimetablePage() {
   const [generationScope, setGenerationScope] = useState<'current' | 'selected' | 'whole_school'>('current');
   const [selectedClassIdsForGen, setSelectedClassIdsForGen] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  // P1 fix: explicit overwrite confirmation modal. Auto-Generate is
+  // destructive — it deletes every existing slot for the targeted classes
+  // before re-creating them. We compute the affected slot count up-front so
+  // the user knows exactly how many slots will be destroyed.
+  const [overwriteConfirm, setOverwriteConfirm] = useState<{ classIds: string[]; slotCount: number } | null>(null);
+
+  // Compute the existing slot count for a list of class IDs (used in the warning)
+  const countExistingSlots = (classIds: string[]): number => {
+    if (!classIds.length || !schoolTimetableData) return 0;
+    const idSet = new Set(classIds);
+    let count = 0;
+    schoolTimetableData.forEach((c: any) => {
+      if (idSet.has(c.id)) {
+        count += (c.timetableSlots || []).length;
+      }
+    });
+    return count;
+  };
 
   const runAutoGenerator = async () => {
     let targetClassIds: string[] = [];
@@ -726,6 +855,21 @@ export default function TimetablePage() {
       return;
     }
 
+    // P1 fix: if any target class already has slots, show the overwrite
+    // confirmation modal BEFORE running the destructive batch.
+    const existingSlotCount = countExistingSlots(targetClassIds);
+    if (existingSlotCount > 0) {
+      setOverwriteConfirm({ classIds: targetClassIds, slotCount: existingSlotCount });
+      return;  // pause — actual generation runs after user confirms
+    }
+
+    // No existing slots — proceed directly
+    await doGenerate(targetClassIds);
+  };
+
+  // The actual generation work, factored out so the confirmation modal can
+  // invoke it after the user accepts the overwrite warning.
+  const doGenerate = async (targetClassIds: string[]) => {
     setIsGenerating(true);
     const loadingToast = toast.loading('Running class-specific constraint satisfaction engine...');
 
@@ -1224,14 +1368,18 @@ export default function TimetablePage() {
             <>
               <Button
                 variant={isPublished ? 'secondary' : 'primary'}
-                icon={<Share2 size={15} />}
+                icon={publishUpdating ? <RefreshCw size={15} className="animate-spin" /> : <Share2 size={15} />}
+                disabled={publishUpdating}
                 onClick={() => {
-                  setIsPublished(!isPublished);
-                  toast.success(isPublished ? 'Timetable unpublished from portals' : 'Timetable published to Student & Parent Portals!');
+                  // P0 fix: persist to backend via /timetable/publish
+                  setPublishUpdating(true);
+                  togglePublishMutation.mutate(!isPublished);
                 }}
                 className="whitespace-nowrap flex-shrink-0"
               >
-                {isPublished ? 'Unpublish' : 'Publish to Portals'}
+                {publishUpdating
+                  ? 'Updating…'
+                  : (isPublished ? 'Unpublish' : 'Publish to Portals')}
               </Button>
 
               <Button
@@ -1848,37 +1996,177 @@ export default function TimetablePage() {
       {/* ─── 6. ACADEMIC DATES VIEW ─────────────────────────────────────────── */}
       {activeView === 'calendar' && (
         <div className="card p-6 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">Academic Term Calendar & Key Examination Windows</h2>
-              <p className="text-xs text-slate-500">Curriculum progression milestones synchronized with school-wide teaching hours.</p>
+              <p className="text-xs text-slate-500">
+                Curriculum milestones synchronized with school-wide teaching hours. {academicEvents.length} event{academicEvents.length === 1 ? '' : 's'} on file.
+              </p>
             </div>
-            <span className="badge-blue text-xs font-bold">2026/2027 Academic Session</span>
+            <div className="flex items-center gap-2">
+              {isAdminOrPrincipal && (
+                <Button
+                  variant="primary"
+                  icon={<Plus size={15} />}
+                  onClick={openCreateEvent}
+                  className="whitespace-nowrap"
+                >
+                  Add Event
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                icon={<RefreshCw size={15} />}
+                onClick={() => refetchAcademicEvents()}
+                className="whitespace-nowrap"
+              >
+                Refresh
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { title: 'First Term Resumption & Assembly', date: 'Sept 14, 2026', type: 'ACADEMIC', badge: 'badge-blue' },
-              { title: 'Continuous Assessment Week 1 (CA1)', date: 'Oct 12 - 16, 2026', type: 'EXAMINATION', badge: 'badge-yellow' },
-              { title: 'Mid-Term Break & Staff In-Service Day', date: 'Oct 29 - 30, 2026', type: 'HOLIDAY', badge: 'badge-purple' },
-              { title: 'Continuous Assessment Week 2 (CA2)', date: 'Nov 16 - 20, 2026', type: 'EXAMINATION', badge: 'badge-yellow' },
-              { title: 'Revision Week & Practical Tests', date: 'Nov 30 - Dec 04, 2026', type: 'ACADEMIC', badge: 'badge-blue' },
-              { title: 'First Term Terminal Examinations', date: 'Dec 07 - 15, 2026', type: 'EXAMINATION', badge: 'badge-red' },
-              { title: 'End of Term Vacation & Report Day', date: 'Dec 18, 2026', type: 'VACATION', badge: 'badge-green' },
-            ].map((ev, i) => (
-              <div key={i} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
-                <div className="flex items-start justify-between">
-                  <h3 className="font-bold text-slate-800 text-sm">{ev.title}</h3>
-                  <span className={ev.badge}>{ev.type}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Calendar size={13} className="text-blue-600" />
-                  <span>{ev.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {academicEvents.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
+              <Calendar size={40} className="mx-auto text-slate-300 mb-3" />
+              <p className="text-sm font-semibold text-slate-700">No academic events yet</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Click "Add Event" to create resumption dates, CA weeks, examination windows, holidays, and vacation milestones.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {academicEvents.map((ev: any) => {
+                const typeBadge =
+                  ev.type === 'EXAMINATION' ? 'badge-red' :
+                  ev.type === 'HOLIDAY' ? 'badge-purple' :
+                  ev.type === 'VACATION' ? 'badge-green' :
+                  ev.type === 'EVENT' ? 'badge-yellow' :
+                  'badge-blue';
+                const fmt = (d: string) => d
+                  ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—';
+                const dateRange = ev.endDate
+                  ? `${fmt(ev.startDate)} → ${fmt(ev.endDate)}`
+                  : fmt(ev.startDate);
+                return (
+                  <div key={ev.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-slate-800 text-sm flex-1">{ev.title}</h3>
+                      <span className={typeBadge}>{ev.type}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <Calendar size={13} className="text-blue-600" />
+                      <span>{dateRange}</span>
+                    </div>
+                    {ev.description && (
+                      <p className="text-xs text-slate-600 italic mt-1 line-clamp-2">{ev.description}</p>
+                    )}
+                    {isAdminOrPrincipal && (
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditEvent(ev)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                        >
+                          <Edit size={11} /> Edit
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Delete event "${ev.title}"? This cannot be undone.`)) {
+                              deleteEventMutation.mutate(ev.id);
+                            }
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1"
+                        >
+                          <Trash2 size={11} /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* ─── MODAL: ACADEMIC EVENT CREATE/EDIT (P2 fix) ────────────────────── */}
+      {eventModalOpen && (
+        <Modal
+          open={eventModalOpen}
+          onClose={() => { setEventModalOpen(false); setEditingEvent(null); }}
+          title={editingEvent ? 'Edit Academic Event' : 'Add Academic Event'}
+          className="max-w-md"
+        >
+          <form
+            onSubmit={eventForm.handleSubmit(data => saveEventMutation.mutate(data))}
+            className="space-y-4 text-xs"
+          >
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Title</label>
+              <input
+                {...eventForm.register('title', { required: true })}
+                className="input w-full"
+                placeholder="e.g. First Term Resumption"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Type</label>
+              <select {...eventForm.register('type')} className="input w-full">
+                <option value="ACADEMIC">Academic</option>
+                <option value="EXAMINATION">Examination</option>
+                <option value="HOLIDAY">Holiday</option>
+                <option value="VACATION">Vacation</option>
+                <option value="EVENT">Event</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Start Date</label>
+                <input
+                  type="date"
+                  {...eventForm.register('startDate', { required: true })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">End Date <span className="font-normal text-slate-400">(optional)</span></label>
+                <input
+                  type="date"
+                  {...eventForm.register('endDate')}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Description <span className="font-normal text-slate-400">(optional)</span></label>
+              <textarea
+                {...eventForm.register('description')}
+                className="input w-full"
+                rows={3}
+                placeholder="Notes, venue, participating classes…"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+              <Button variant="secondary" onClick={() => { setEventModalOpen(false); setEditingEvent(null); }}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                icon={<Check size={14} />}
+                disabled={saveEventMutation.isPending}
+              >
+                {editingEvent ? 'Save Changes' : 'Create Event'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* ─── MODAL 1: CLASS-SPECIFIC CONSTRAINTS & TEACHER ALLOCATIONS ──────── */}
@@ -2436,6 +2724,61 @@ export default function TimetablePage() {
                 className="bg-purple-600 hover:bg-purple-700 text-white"
               >
                 {isGenerating ? 'Scheduling Classes...' : 'Generate Conflict-Free Schedule'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── P1 fix: AUTO-GENERATE OVERWRITE CONFIRMATION ──────────────────────── */}
+      {overwriteConfirm && (
+        <Modal
+          open={!!overwriteConfirm}
+          onClose={() => setOverwriteConfirm(null)}
+          title="⚠️ Overwrite Existing Timetable?"
+          className="max-w-md"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-3">
+              <AlertTriangle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-amber-900">
+                <p className="font-bold text-sm">Existing slots will be deleted</p>
+                <p className="text-[11px] mt-1">
+                  The selected scope already contains <strong>{overwriteConfirm.slotCount}</strong> timetable
+                  slot{overwriteConfirm.slotCount === 1 ? '' : 's'} across{' '}
+                  <strong>{overwriteConfirm.classIds.length}</strong> class
+                  {overwriteConfirm.classIds.length === 1 ? '' : 'es'}.
+                  Auto-Generate will <strong>permanently delete</strong> these slots and replace them with a freshly
+                  generated schedule.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-slate-600">
+              Any manual edits made to these classes (per-slot teacher swaps, room assignments, double-period
+              toggles) will be lost. This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+              <Button
+                variant="secondary"
+                onClick={() => setOverwriteConfirm(null)}
+                disabled={isGenerating}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                icon={<Sparkles size={14} />}
+                disabled={isGenerating}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={async () => {
+                  const ids = overwriteConfirm.classIds;
+                  setOverwriteConfirm(null);
+                  await doGenerate(ids);
+                }}
+              >
+                {isGenerating ? 'Scheduling…' : `Overwrite & Generate`}
               </Button>
             </div>
           </div>
