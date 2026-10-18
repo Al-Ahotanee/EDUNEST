@@ -255,7 +255,9 @@ export default function TimetablePage() {
   // 'workload': Admin / Principal Teaching Staff Workload Report
   // 'substitutions': Relief Desk
   // 'calendar': Academic Dates
-  const [activeView, setActiveView] = useState<'class' | 'my-schedule' | 'master' | 'workload' | 'substitutions' | 'calendar'>(
+  // 'constraints': P1 fix — full-page Constraints & Quotas editor (was a modal,
+  //   but it has too much data for a modal per the user's UX guidance)
+  const [activeView, setActiveView] = useState<'class' | 'my-schedule' | 'master' | 'workload' | 'substitutions' | 'calendar' | 'constraints' | 'auto-generate' | 'print-center'>(
     isTeacher ? 'my-schedule' : 'class'
   );
 
@@ -1467,24 +1469,23 @@ export default function TimetablePage() {
                 variant="secondary"
                 icon={<Sliders size={15} className="text-blue-600" />}
                 onClick={() => {
-                  // P1-TT1 fix: when the Constraints modal opens with an empty
-                  // subjectQuotas list (i.e. no preset has been applied yet),
-                  // auto-populate from the real /academic/subjects list. This
-                  // avoids the misleading "0 subjects / 41 over quota" state
-                  // previously caused by relying on a hard-coded seed list.
+                  // P1 fix: Constraints is now a full-page view (not a modal).
+                  // It has too much data (subject quotas table, teacher allocations,
+                  // timing config, break config) for a modal per the user's UX guidance.
+                  // Auto-populate from /academic/subjects when the quotas list is empty.
                   if (selectedClass && activeClassProfile.subjectQuotas.length === 0 && subjects.length > 0) {
                     updateActiveClassProfile({
                       subjectQuotas: subjects.map((s: any, i: number) => ({
                         subjectId: s.id,
                         subjectName: s.name,
                         subjectCode: s.code || s.name.slice(0, 3).toUpperCase(),
-                        quota: 3,  // sensible default
+                        quota: 3,
                         allowDouble: false,
                         assignedTeacherId: staff[i % staff.length]?.id || '',
                       })),
                     });
                   }
-                  setConstraintsModal(true);
+                  setActiveView('constraints');
                 }}
                 className="whitespace-nowrap flex-shrink-0"
               >
@@ -1494,7 +1495,7 @@ export default function TimetablePage() {
               <Button
                 variant="secondary"
                 icon={<Sparkles size={15} className="text-purple-600" />}
-                onClick={() => setAutoGenModal(true)}
+                onClick={() => setActiveView('auto-generate')}
                 className="whitespace-nowrap flex-shrink-0 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
               >
                 Auto-Generate
@@ -1514,7 +1515,7 @@ export default function TimetablePage() {
           <Button
             variant="secondary"
             icon={<Printer size={15} />}
-            onClick={() => setPrintCenterModal(true)}
+            onClick={() => setActiveView('print-center')}
             className="whitespace-nowrap flex-shrink-0"
           >
             Formal Print Center
@@ -2325,15 +2326,28 @@ export default function TimetablePage() {
         </Modal>
       )}
 
-      {/* ─── MODAL 1: CLASS-SPECIFIC CONSTRAINTS & TEACHER ALLOCATIONS ──────── */}
-      {constraintsModal && (
-        <Modal
-          title={`⚙️ Timetable Constraints & Teacher Allocations — ${selectedClassName}`}
-          open={constraintsModal}
-          onClose={() => setConstraintsModal(false)}
-          className="max-w-4xl"
-        >
-          <div className="space-y-6 text-xs max-h-[80vh] overflow-y-auto pr-1">
+      {/* ─── FULL-PAGE VIEW: CLASS CONSTRAINTS & QUOTAS ──────────────────────── */}
+      {/* P1 fix: converted from modal to full-page view — too much data for a modal. */}
+      {activeView === 'constraints' && (
+        <div className="card p-6 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                ⚙️ Timetable Constraints & Teacher Allocations — {selectedClassName}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Configure class timing, break intervals, and subject period quotas.
+                Teacher assignments are managed in{' '}
+                <button onClick={() => window.location.href = '/app/teacher-management'} className="text-blue-600 hover:underline font-semibold">
+                  Teacher Management → Class & Subject Allocation
+                </button>.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={() => setActiveView('class')}>
+              ← Back to Timetable
+            </Button>
+          </div>
+          <div className="space-y-6 text-xs">
             {/* Quick Level Presets */}
             <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-center justify-between flex-wrap gap-2">
               <div>
@@ -2853,23 +2867,34 @@ export default function TimetablePage() {
                 onClick={() => {
                   toast.success(`Constraints & allocations saved for ${selectedClassName}!`);
                   setConstraintsModal(false);
+                  setActiveView('class');
                 }}
               >
                 Save Constraints for {selectedClassName}
               </Button>
             </div>
           </div>
-        </Modal>
+        </div>
       )}
 
-      {/* ─── MODAL 2: CLASS-AWARE AUTO-GENERATION ENGINE ─────────────────────── */}
-      {autoGenModal && (
-        <Modal
-          title="✨ Class-Aware Algorithmic Timetable Generator"
-          open={autoGenModal}
-          onClose={() => setAutoGenModal(false)}
-          className="max-w-xl"
-        >
+      {/* ─── FULL-PAGE VIEW: AUTO-GENERATE TIMETABLE ──────────────────────── */}
+      {/* P1 fix: converted from modal to full-page view for better UX. */}
+      {activeView === 'auto-generate' && (
+        <div className="card p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                ✨ Class-Aware Algorithmic Timetable Generator
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Generates an optimal schedule respecting each class's distinct school hours,
+                distinct subject quotas, and prevents cross-class teacher double-booking.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={() => setActiveView('class')}>
+              ← Back to Timetable
+            </Button>
+          </div>
           <div className="space-y-4 text-xs">
             <div className="p-3 bg-purple-50 rounded-2xl border border-purple-200 flex items-start gap-3">
               <Sparkles size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
@@ -2933,7 +2958,7 @@ export default function TimetablePage() {
             )}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
-              <Button variant="secondary" onClick={() => setAutoGenModal(false)} disabled={isGenerating}>
+              <Button variant="secondary" onClick={() => setActiveView('class')} disabled={isGenerating}>
                 Cancel
               </Button>
               <Button
@@ -2947,7 +2972,7 @@ export default function TimetablePage() {
               </Button>
             </div>
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* ─── P1 fix: AUTO-GENERATE OVERWRITE CONFIRMATION ──────────────────────── */}
@@ -3361,14 +3386,23 @@ export default function TimetablePage() {
         </Modal>
       )}
 
-      {/* ─── MODAL 6: FORMAL PRINT & EXPORT CENTER ───────────────────────────── */}
-      {printCenterModal && (
-        <Modal
-          title="🖨️ Formal Institutional Print & Export Center"
-          open={printCenterModal}
-          onClose={() => setPrintCenterModal(false)}
-          className="max-w-lg"
-        >
+      {/* ─── FULL-PAGE VIEW: FORMAL PRINT & EXPORT CENTER ──────────────── */}
+      {/* P1 fix: converted from modal to full-page view. */}
+      {activeView === 'print-center' && (
+        <div className="card p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                🖨️ Formal Institutional Print & Export Center
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Select timetable printout scope for institutional dissemination, staff room notice boards, or student record files.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={() => setActiveView('class')}>
+              ← Back to Timetable
+            </Button>
+          </div>
           <div className="space-y-4 text-xs">
             <p className="text-slate-600">
               Select timetable printout scope for institutional dissemination, staff room notice boards, or student record files:
@@ -3537,13 +3571,13 @@ export default function TimetablePage() {
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-              <Button variant="secondary" onClick={() => setPrintCenterModal(false)}>
+              <Button variant="secondary" onClick={() => setActiveView('class')}>
                 Cancel
               </Button>
               <Button
                 icon={<Printer size={15} />}
                 onClick={() => {
-                  setPrintCenterModal(false);
+                  setActiveView('class');
                   setTimeout(() => window.print(), 200);
                 }}
               >
@@ -3551,7 +3585,7 @@ export default function TimetablePage() {
               </Button>
             </div>
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* ─── MODAL 7: CLEAR TIMETABLE CONFIRMATION ──────────────────────────── */}
