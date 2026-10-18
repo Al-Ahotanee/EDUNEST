@@ -252,6 +252,23 @@ export default function TeacherManagementPage() {
       {/* ─── TAB 2: CLASS & SUBJECT ALLOCATION ─── */}
       {activeTab === 'allocation' && (
         <div className="space-y-4">
+          {/* Many-to-many model explainer */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+            <h4 className="text-sm font-bold text-blue-950 flex items-center gap-2 mb-1">
+              <Layers size={14} /> How Teacher ↔ Subject Allocation Works
+            </h4>
+            <p className="text-xs text-blue-800 leading-relaxed">
+              <strong>One teacher can teach multiple subjects across multiple classes.</strong> For example, Mr Ali can be the
+              Mathematics teacher in JSS 1, Physics teacher in SS 1, and Chemistry teacher in SS 3.
+              <br />
+              <strong>Multiple teachers can teach the same subject</strong> in different classes — e.g. Mr Ali teaches
+              Mathematics in JSS 1 while Mr Musa teaches Mathematics in JSS 2.
+              <br />
+              Use the form below to assign a teacher to a class + subject combination. Each row in the table represents one
+              (teacher, class, subject) assignment. A teacher with no subject is treated as the Class Master / Form Teacher.
+            </p>
+          </div>
+
           {/* Assignment form */}
           <div className="card p-5">
             <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">

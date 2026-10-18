@@ -6,7 +6,8 @@ import toast from 'react-hot-toast';
 import {
   Plus, Users, UserCheck, Briefcase, Eye, Edit, Trash2, RefreshCw,
   Award, FileText, Printer, Download, ShieldAlert, DollarSign, CheckCircle2,
-  XCircle, Clock, TrendingUp, UserX, Folder, Calendar, BookOpen, Layers, Contact, Camera
+  XCircle, Clock, TrendingUp, UserX, Folder, Calendar, BookOpen, Layers, Contact, Camera,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, ConfirmDialog, Avatar,
@@ -358,6 +359,157 @@ export default function HRStaffPage() {
       ),
     },
   ];
+
+  // P1 fix: when staffModal is true, render ONLY the full-page staff form.
+  // This replaces the entire page content (header, tabs, table, etc.) with
+  // the staff enrollment/edit form. The form has too many fields for a modal.
+  if (staffModal) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">{editing ? 'Edit Staff Profile' : 'Enroll New Staff'}</h1>
+            <p className="page-subtitle">
+              {editing
+                ? `Editing ${editing.firstName} ${editing.lastName} (${editing.staffId})`
+                : 'Capture biographical, employment, salary, and banking details. A User account will be auto-created if an email is provided.'}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            icon={<ArrowLeft size={15} />}
+            onClick={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}
+          >
+            Back to Staff List
+          </Button>
+        </div>
+        {/* Reuse the original modal's body content as full-page form */}
+        <div className="card p-6 border border-slate-200 shadow-xs">
+          <form onSubmit={staffForm.handleSubmit(d => createMutation.mutate(d))} className="space-y-6">
+            {/* Section: Personal Data */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Users size={16} className="text-blue-600" /> Personal Data
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Input label="First Name *" {...staffForm.register('firstName', { required: true })} placeholder="First name" />
+                <Input label="Last Name *" {...staffForm.register('lastName', { required: true })} placeholder="Last name" />
+                <Select label="Gender" {...staffForm.register('gender')} options={[{ value: 'MALE', label: 'Male' }, { value: 'FEMALE', label: 'Female' }]} />
+              </div>
+            </div>
+
+            {/* Section: Employment Details */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Briefcase size={16} className="text-emerald-600" /> Employment Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Input label="Staff ID *" {...staffForm.register('staffId', { required: true })} placeholder="e.g. STF001" />
+                <Input label="Designation *" {...staffForm.register('designation')} placeholder="e.g. Senior Class Teacher" />
+                <Select
+                  label="Department"
+                  {...staffForm.register('departmentId')}
+                  options={(deptData || []).map((d: any) => ({ value: d.id, label: d.name }))}
+                  placeholder="Select department"
+                />
+                <Select
+                  label="Employment Type"
+                  {...staffForm.register('employmentType')}
+                  options={[
+                    { value: 'FULL_TIME', label: 'Full Time' },
+                    { value: 'PART_TIME', label: 'Part Time' },
+                    { value: 'CONTRACT', label: 'Contract' },
+                  ]}
+                />
+                <Input label="Academic Qualification" {...staffForm.register('qualification')} placeholder="e.g. B.Sc, B.Ed (Hons)" />
+                <Input label="TRCN License Number" {...staffForm.register('trcnNumber')} placeholder="e.g. TRCN/2026/..." />
+              </div>
+            </div>
+
+            {/* Section: Contact Information */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Contact size={16} className="text-purple-600" /> Contact Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Phone Number" {...staffForm.register('phone')} placeholder="+234..." />
+                <Input label="Email Address" type="email" {...staffForm.register('email')} placeholder="staff@school.edu" />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                💡 If an email is provided, a User account will be auto-created with the default password <strong>password123</strong>.
+                The staff member can reset it via the "Forgot Password" link on the login page.
+              </p>
+            </div>
+
+            {/* Section: Salary & Banking */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <DollarSign size={16} className="text-amber-600" /> Salary & Banking
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input label="Monthly Salary (₦)" type="number" {...staffForm.register('salary', { valueAsNumber: true })} />
+                <Input label="Bank Name" {...staffForm.register('bankName')} placeholder="e.g. First Bank of Nigeria" />
+                <Input label="Account Number" {...staffForm.register('accountNumber')} placeholder="10-digit NUBAN" />
+              </div>
+            </div>
+
+            {/* Section: Staff Photo */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Camera size={16} className="text-rose-600" /> Staff Photograph
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className="w-24 h-24 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                  {staffPhotoPreview || editing?.photo ? (
+                    <img src={staffPhotoPreview || editing?.photo} alt="Staff" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera size={28} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    ref={staffPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleStaffPhotoUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Camera size={14} />}
+                    onClick={() => staffPhotoInputRef.current?.click()}
+                  >
+                    {staffPhotoPreview || editing?.photo ? 'Change Photo' : 'Upload Photo'}
+                  </Button>
+                  {staffPhotoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => { setStaffPhotoPreview(''); staffForm.setValue('photo', ''); }}
+                      className="ml-2 text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1">JPG/PNG, max 2MB. Used on ID card and staff directory.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+              <Button variant="secondary" onClick={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={createMutation.isPending}>
+                {editing ? 'Update Record' : 'Save Staff Record'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -994,107 +1146,12 @@ export default function HRStaffPage() {
         </div>
       </Modal>
 
-      {/* ─── MODAL 5: ENROLL / EDIT STAFF MODAL ───────────────────────────────── */}
-      <Modal
-        open={staffModal}
-        onClose={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}
-        title={editing ? 'Edit Staff Profile' : 'Enroll New Staff'}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}>Cancel</Button>
-            <Button loading={createMutation.isPending} onClick={staffForm.handleSubmit(d => createMutation.mutate(d))}>
-              {editing ? 'Update Record' : 'Save Staff Record'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name *" {...staffForm.register('firstName', { required: true })} placeholder="First name" />
-            <Input label="Last Name *" {...staffForm.register('lastName', { required: true })} placeholder="Last name" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Staff ID *" {...staffForm.register('staffId', { required: true })} placeholder="e.g. STF001" />
-            <Select label="Gender" {...staffForm.register('gender')} options={[{ value: 'MALE', label: 'Male' }, { value: 'FEMALE', label: 'Female' }]} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Designation *" {...staffForm.register('designation')} placeholder="e.g. Senior Class Teacher" />
-            <Select
-              label="Department"
-              {...staffForm.register('departmentId')}
-              options={(deptData || []).map((d: any) => ({ value: d.id, label: d.name }))}
-              placeholder="Select department"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Academic Qualification" {...staffForm.register('qualification')} placeholder="e.g. B.Sc, B.Ed (Hons)" />
-            <Input label="TRCN License Number" {...staffForm.register('trcnNumber')} placeholder="e.g. TRCN/2026/..." />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Employment Type"
-              {...staffForm.register('employmentType')}
-              options={[
-                { value: 'FULL_TIME', label: 'Full Time' },
-                { value: 'PART_TIME', label: 'Part Time' },
-                { value: 'CONTRACT', label: 'Contract' },
-              ]}
-            />
-            <Input label="Monthly Salary (₦)" type="number" {...staffForm.register('salary', { valueAsNumber: true })} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Phone Number" {...staffForm.register('phone')} placeholder="+234..." />
-            <Input label="Email Address" type="email" {...staffForm.register('email')} placeholder="staff@school.edu" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Bank Name" {...staffForm.register('bankName')} placeholder="e.g. First Bank of Nigeria" />
-            <Input label="Account Number" {...staffForm.register('accountNumber')} placeholder="10-digit NUBAN" />
-          </div>
-
-          {/* Staff Photo Upload */}
-          <div className="form-group">
-            <label className="label">Staff Photo</label>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
-                {staffPhotoPreview || editing?.photo ? (
-                  <img src={staffPhotoPreview || editing?.photo} alt="Staff" className="w-full h-full object-cover" />
-                ) : (
-                  <Camera size={24} className="text-slate-300" />
-                )}
-              </div>
-              <div className="flex-1">
-                <input
-                  ref={staffPhotoInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleStaffPhotoUpload}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  icon={<Camera size={14} />}
-                  onClick={() => staffPhotoInputRef.current?.click()}
-                >
-                  {staffPhotoPreview || editing?.photo ? 'Change Photo' : 'Upload Photo'}
-                </Button>
-                {staffPhotoPreview && (
-                  <button
-                    type="button"
-                    onClick={() => { setStaffPhotoPreview(''); staffForm.setValue('photo', ''); }}
-                    className="ml-2 text-xs text-red-500 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                )}
-                <p className="text-xs text-slate-400 mt-1">JPG/PNG, max 2MB. Used on ID card and staff directory.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
+      {/* MODAL 5 (Staff Enroll/Edit) was converted to a full-page view at the
+          top of this component — see the `if (staffModal)` early return.
+          The cramped size="lg" modal was replaced with a dedicated full-page
+          form because it has too many fields (personal data, contact,
+          employment, salary, bank details, photo upload) for a modal per
+          the user's UX guidance. */}
 
       {/* ─── MODAL 6: CONDUCT PERFORMANCE APPRAISAL ──────────────────────────── */}
       <Modal
