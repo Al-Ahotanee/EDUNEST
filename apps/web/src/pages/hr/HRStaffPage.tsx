@@ -511,6 +511,91 @@ export default function HRStaffPage() {
     );
   }
 
+  // P1 fix: when viewDossier is set, render the Staff Dossier as a full-page
+  // view instead of a cramped modal. The dossier contains photo, personal
+  // data, employment details, salary, leave history, and appraisal scores —
+  // too much data for a modal.
+  if (viewDossier) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Staff Dossier</h1>
+            <p className="page-subtitle">
+              Complete profile, employment history, and academic credentials for{' '}
+              {viewDossier.firstName} {viewDossier.lastName}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            icon={<ArrowLeft size={15} />}
+            onClick={() => setViewDossier(null)}
+          >
+            Back to Staff List
+          </Button>
+        </div>
+
+        <div className="card p-6 border border-slate-200 shadow-xs">
+          {/* Header: Photo + Name + Designation */}
+          <div className="flex items-center gap-6 pb-6 border-b border-slate-200">
+            <Avatar name={`${viewDossier.firstName} ${viewDossier.lastName}`} photo={viewDossier.photo} size="lg" />
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {viewDossier.firstName} {viewDossier.lastName}
+              </h2>
+              <p className="text-sm text-slate-500 font-mono mt-1">
+                Staff ID: {viewDossier.staffId} • {viewDossier.designation || 'Academic Staff'}
+              </p>
+              <div className="flex gap-2 mt-2">
+                {viewDossier.employmentType && (
+                  <span className="badge-blue text-xs px-2 py-0.5 rounded-full">
+                    {viewDossier.employmentType.replace('_', ' ')}
+                  </span>
+                )}
+                {viewDossier.department?.name && (
+                  <span className="badge-purple text-xs px-2 py-0.5 rounded-full">
+                    {viewDossier.department.name}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Dossier Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Personal Data</h4>
+              <dl className="text-sm space-y-1.5">
+                <div><dt className="text-slate-400 inline">Gender: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.gender || '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Date of Birth: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.dateOfBirth ? new Date(viewDossier.dateOfBirth).toLocaleDateString('en-GB') : '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Phone: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.phone || '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Email: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.email || '—'}</dd></div>
+              </dl>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Employment</h4>
+              <dl className="text-sm space-y-1.5">
+                <div><dt className="text-slate-400 inline">Designation: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.designation || '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Department: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.department?.name || '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Employment Date: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.employmentDate ? new Date(viewDossier.employmentDate).toLocaleDateString('en-GB') : '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Status: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.isActive ? 'Active' : 'Inactive'}</dd></div>
+              </dl>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Qualifications & Banking</h4>
+              <dl className="text-sm space-y-1.5">
+                <div><dt className="text-slate-400 inline">Qualification: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.qualification || '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Salary: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.salary ? formatCurrency(viewDossier.salary) : '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Bank: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.bankName || '—'}</dd></div>
+                <div><dt className="text-slate-400 inline">Account No: </dt><dd className="text-slate-700 inline font-medium">{viewDossier.accountNumber || '—'}</dd></div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* ─── PAGE HEADER ────────────────────────────────────────────────────── */}
@@ -898,58 +983,8 @@ export default function HRStaffPage() {
         </div>
       )}
 
-      {/* ─── MODAL 1: VIEW FULL DOSSIER ───────────────────────────────────────── */}
-      <Modal
-        open={!!viewDossier}
-        onClose={() => setViewDossier(null)}
-        title="Staff Dossier & Academic Credentials"
-        size="lg"
-        footer={<Button variant="secondary" onClick={() => setViewDossier(null)}>Close</Button>}
-      >
-        {viewDossier && (
-          <div className="space-y-6 text-sm">
-            {/* Header bio */}
-            <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-              <Avatar name={`${viewDossier.firstName} ${viewDossier.lastName}`} photo={viewDossier.photo} size="lg" />
-              <div>
-                <h3 className="font-black text-slate-900 text-lg">{viewDossier.firstName} {viewDossier.lastName}</h3>
-                <p className="text-xs text-slate-500 font-mono">Staff ID: {viewDossier.staffId} • {viewDossier.designation || 'Academic Staff'}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="badge-green text-xs font-bold">{viewDossier.employmentType || 'FULL TIME'}</span>
-                  <span className="badge-blue text-xs font-bold">{viewDossier.department?.name || 'Academic Dept'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dossier Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3.5 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Qualifications</span>
-                <p className="font-bold text-slate-900">{viewDossier.qualification || 'B.Ed Mathematics (First Class)'}</p>
-                <p className="text-xs text-slate-600">TRCN License: <span className="font-mono font-bold">{viewDossier.trcnNumber || 'TRCN/2024/9981'}</span></p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Remuneration</span>
-                <p className="font-bold text-slate-900">{viewDossier.salary ? formatCurrency(viewDossier.salary) : '₦280,000 / month'}</p>
-                <p className="text-xs text-slate-600">Bank: {viewDossier.bankName || 'First Bank'} • {viewDossier.accountNumber || '0123456789'}</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Contact Information</span>
-                <p className="font-semibold text-slate-800">{viewDossier.phone || '+234 800 000 0000'}</p>
-                <p className="text-xs text-slate-600">{viewDossier.email || 'staff@edunest.edu'}</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Emergency Contact</span>
-                <p className="font-semibold text-slate-800">Mrs. {viewDossier.lastName} (Spouse)</p>
-                <p className="text-xs text-slate-600">+234 802 333 4444</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* MODAL 1 (View Dossier) was converted to a full-page view — see the
+          `if (viewDossier)` early return at the top of this component. */}
 
       {/* ─── MODAL 2: OFFICIAL PRINTABLE PAYSLIP ──────────────────────────────── */}
       <Modal
