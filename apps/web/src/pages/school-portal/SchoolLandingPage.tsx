@@ -226,7 +226,7 @@ export default function SchoolLandingPage() {
             <a href="#about" className="hover:opacity-75 transition-opacity">About</a>
             <a href="#admissions" className="hover:opacity-75 transition-opacity">Admissions</a>
           </div>
-          <p className="opacity-60">Powered by <span className="font-semibold">SchoolERP</span></p>
+          <p className="opacity-60">© {new Date().getFullYear()} {school.name}. All rights reserved.</p>
         </div>
       </footer>
     </div>

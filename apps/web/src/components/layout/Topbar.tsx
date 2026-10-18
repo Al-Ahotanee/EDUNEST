@@ -71,7 +71,7 @@ export function Topbar({
     toast.success('Logged out successfully');
   };
 
-  const schoolName = user?.tenant?.name || user?.school?.name || 'EduNest';
+  const schoolName = user?.tenant?.name || user?.school?.name || user?.school?.name || 'School Portal';
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`;
 
   return (

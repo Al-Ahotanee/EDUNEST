@@ -10,6 +10,21 @@ import {
 } from 'lucide-react';
 import { EduNestIcon } from '../common/EduNestLogo';
 
+// School-branded logo component — uses school name first letter when no logo
+function SchoolLogo({ school, size = 22 }: { school: any; size?: number }) {
+  if (school?.logo) {
+    return <img src={school.logo} alt={school.name} className="rounded-xl object-contain bg-white p-0.5" style={{ width: size + 14, height: size + 14 }} />;
+  }
+  // Use first letter of school name as the logo
+  const initial = school?.name?.[0] || 'S';
+  return (
+    <div className="rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center shadow-xs"
+      style={{ width: size + 14, height: size + 14 }}>
+      <span className="text-white font-bold" style={{ fontSize: size - 4 }}>{initial}</span>
+    </div>
+  );
+}
+
 // Each item declares the permission(s) needed to see it.
 // Items without `requiredPermission` are visible to all authenticated users.
 // Items with `adminOnly: true` are only visible to users with role 'Super Admin' (or isSuperAdmin flag).
@@ -220,9 +235,7 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
             {user?.tenant?.logo ? (
               <img src={user.tenant.logo} alt={user.tenant.name} className="w-9 h-9 rounded-xl object-contain bg-white p-0.5" />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center shadow-xs">
-                <EduNestIcon size={22} className="text-white" />
-              </div>
+              <SchoolLogo school={user?.school || user?.tenant || { name: user?.school?.name || 'S' }} size={22} />
             )}
           </div>
           {!isCollapsed && (
