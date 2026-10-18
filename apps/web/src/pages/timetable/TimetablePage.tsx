@@ -8,7 +8,10 @@ import {
   BookOpen, School, Layers, Check, X, Settings2, Sliders, ArrowRightLeft,
   Eye, Users, Building, FileSpreadsheet, Lock, Unlock, HelpCircle, CheckSquare,
   Search, AlertCircle, ChevronDown, ChevronRight, Bell, Volume2, VolumeX,
-  FileText, Award, BarChart3, User, CheckCheck, Briefcase
+  FileText, Award, BarChart3, User, CheckCheck, Briefcase,
+  Edit,  // P0 fix: was missing — used by Academic Dates "Edit" button (line 2171).
+         // Same root cause as TeacherManagementPage blank-screen crash: missing
+         // lucide-react import → ReferenceError at render time.
 } from 'lucide-react';
 import { Button, Modal, Input, Select, StatCard, Badge } from '../../components/ui';
 import { api, academicApi } from '../../services/api';

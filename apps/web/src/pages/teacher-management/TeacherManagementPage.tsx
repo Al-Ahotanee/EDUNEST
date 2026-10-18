@@ -5,6 +5,9 @@ import toast from 'react-hot-toast';
 import {
   Plus, Eye, Edit, Trash2, Users, Briefcase, BookOpen, Contact,
   Camera, GraduationCap, ShieldCheck, X, ChevronRight, Award, Layers,
+  FileText,  // P0 fix: was missing — caused runtime ReferenceError when the
+             // "Appointment Form" button rendered, crashing the entire page
+             // to a blank screen with no error message.
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, ConfirmDialog, Avatar, PageLoader,
@@ -13,7 +16,6 @@ import { hrApi, academicApi, resultsApi, api } from '../../services/api';
 import { formatDate, formatCurrency, cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { IDCardModal } from '../../components/idcard';
-import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 type TeacherTab = 'directory' | 'allocation' | 'idcards';
 
