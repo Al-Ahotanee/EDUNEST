@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { cn } from '../../lib/utils';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { OfflineBanner } from '../shared/OfflineBanner';
@@ -9,6 +10,7 @@ import { OfflineBanner } from '../shared/OfflineBanner';
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
   useTenantTheme(); // Apply school colors, logo, name globally
 
   return (
@@ -39,7 +41,17 @@ export function AppLayout() {
         )}
       >
         <div className="p-6 sm:p-8 lg:p-10 w-full max-w-7xl 2xl:max-w-[1700px] mx-auto">
-          <Outlet />
+          {/* P0 prevention: section-level ErrorBoundary keyed to the current
+              route so navigating to a different page automatically resets
+              the boundary state. If a page (e.g. TeacherManagementPage)
+              throws during render, only the page content is replaced with
+              the fallback UI — the sidebar and topbar remain functional. */}
+          <ErrorBoundary
+            key={location.pathname}
+            sectionName={location.pathname.split('/').pop() || 'page'}
+          >
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
       <OfflineBanner />

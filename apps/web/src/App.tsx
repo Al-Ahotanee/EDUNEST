@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AppLayout } from './components/layout/AppLayout';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { useAuthStore } from './store/authStore';
 import { Users } from 'lucide-react';
 
@@ -97,18 +98,24 @@ function MarketerOnly({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          {/* ── Public / Marketing ── */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/saas/register" element={<SaasRegisterPage />} />
-          <Route path="/register" element={<Navigate to="/saas/register" replace />} />
-          <Route path="/parent-portal" element={<ParentPortalPage />} />
-          <Route path="/parent-portal/login" element={<ParentPortalPage />} />
-          <Route path="/login" element={<Public><LoginPage /></Public>} />
-          <Route path="/login/:tenantSlug" element={<Public><LoginPage /></Public>} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/* P0 prevention: wrap the entire app in an ErrorBoundary so any
+          uncaught render error (e.g. a missing import like the Round 6
+          FileText crash) shows a friendly fallback UI instead of a
+          blank white screen. The boundary catches errors during render,
+          in lifecycle methods, and in constructors of the whole tree below. */}
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            {/* ── Public / Marketing ── */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/saas/register" element={<SaasRegisterPage />} />
+            <Route path="/register" element={<Navigate to="/saas/register" replace />} />
+            <Route path="/parent-portal" element={<ParentPortalPage />} />
+            <Route path="/parent-portal/login" element={<ParentPortalPage />} />
+            <Route path="/login" element={<Public><LoginPage /></Public>} />
+            <Route path="/login/:tenantSlug" element={<Public><LoginPage /></Public>} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* ── School Public Portals ── */}
           <Route path="/school/:slug" element={<SchoolLandingPage />} />
@@ -207,7 +214,8 @@ export default function App() {
             </div>
           } />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </ErrorBoundary>
 
       <Toaster
         position="top-right"
