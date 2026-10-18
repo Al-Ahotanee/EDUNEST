@@ -258,6 +258,37 @@ export default function FinancePage() {
               <FileText size={15} />
             </button>
           )}
+          {/* P6: Pay Online via Paystack — only show for unpaid invoices with balance > 0 */}
+          {r.balance > 0 && (
+            <button
+              onClick={async () => {
+                try {
+                  toast.loading('Initializing online payment...', { id: 'pay-online' });
+                  const res = await financeApi.initiateOnlinePayment({
+                    invoiceId: r.id,
+                    callbackUrl: `${window.location.origin}/app/finance/invoices?verify=success`,
+                  });
+                  toast.dismiss('pay-online');
+                  const data = res.data?.data || res.data;
+                  if (data?.authorizationUrl) {
+                    toast.success('Redirecting to Paystack...');
+                    setTimeout(() => {
+                      window.location.href = data.authorizationUrl;
+                    }, 800);
+                  } else {
+                    toast.error('Failed to initialize payment. Please try again.');
+                  }
+                } catch (e: any) {
+                  toast.dismiss('pay-online');
+                  toast.error(e.response?.data?.message || 'Online payments not available. Please pay at the bursary.');
+                }
+              }}
+              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-all"
+              title="Pay Online via Paystack"
+            >
+              <CreditCard size={15} />
+            </button>
+          )}
           <button
             onClick={() => setSelectedInvoice(r)}
             className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-all"

@@ -201,6 +201,36 @@ export class FinancialWorkflowController {
       userRole: currentUser.roles?.[0]?.name || '',
     });
   }
+
+  // ─── PAYSTACK ONLINE PAYMENTS ──────────────────────────────────────────────
+
+  @Post('payments/initiate-online')
+  @ApiOperation({ summary: 'Initiate a Paystack online payment session for an invoice' })
+  initiateOnlinePayment(
+    @Body() body: { invoiceId: string; callbackUrl?: string },
+    @CurrentUser() currentUser: any,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.workflowService.initiatePaystackPayment(body, {
+      schoolId,
+      userId: currentUser.id,
+      userRole: currentUser.roles?.[0]?.name || '',
+    });
+  }
+
+  @Get('payments/verify-online/:reference')
+  @ApiOperation({ summary: 'Verify a Paystack payment after redirect (server-side verification)' })
+  verifyOnlinePayment(
+    @Param('reference') reference: string,
+    @CurrentUser() currentUser: any,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.workflowService.verifyPaystackPayment(reference, {
+      schoolId,
+      userId: currentUser.id,
+      userRole: currentUser.roles?.[0]?.name || '',
+    });
+  }
 }
 
 /**

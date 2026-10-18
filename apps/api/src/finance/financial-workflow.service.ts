@@ -744,4 +744,250 @@ export class FinancialWorkflowService {
     if (kobo > 0) result += ', ' + convert(kobo) + ' Kobo';
     return result + ' Only';
   }
+
+  // ─── PAYSTACK ONLINE PAYMENT INTEGRATION ────────────────────────────────────
+
+  /**
+   * Initiate a Paystack payment session for an invoice.
+   *
+   * Per the master prompt §14:
+   *   - Server-side transaction initialization (never trust client-calculated amounts)
+   *   - Unique payment references
+   *   - Server-side transaction verification
+   *   - Idempotent processing
+   *
+   * This method calls the Paystack Initialize Transaction API to create a
+   * checkout session. The parent is redirected to Paystack's hosted checkout
+   * page. After payment, Paystack redirects back to the callback URL and
+   * fires the webhook.
+   */
+  async initiatePaystackPayment(
+    data: { invoiceId: string; callbackUrl?: string },
+    context: { schoolId: string; userId: string; userRole: string },
+  ) {
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
+    if (!secretKey) {
+      throw new BadRequestException(
+        'Online payments are not configured. The school administrator must set the PAYSTACK_SECRET_KEY environment variable.'
+      );
+    }
+
+    // 1. Validate invoice exists and belongs to this school
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: data.invoiceId, student: { schoolId: context.schoolId } },
+      include: { student: true },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.balance <= 0) {
+      throw new BadRequestException('This invoice is already fully paid');
+    }
+
+    // 2. Check tenant policy — online payments must be enabled
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { schools: { some: { id: context.schoolId } } },
+      include: { financialPolicy: true },
+    });
+    if (tenant?.financialPolicy && !tenant.financialPolicy.onlinePaymentsEnabled) {
+      throw new BadRequestException(
+        'Online payments are not enabled for this school. Please contact the school administrator.'
+      );
+    }
+
+    // 3. Generate unique reference
+    const reference = `EDN-${invoice.invoiceNo}-${Date.now()}-${uuidv4().slice(0, 8)}`;
+
+    // 4. Call Paystack Initialize Transaction API
+    const callbackUrl = data.callbackUrl || `${process.env.FRONTEND_URL || 'https://edunest.onrender.com'}/parent-portal?payment=success`;
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: (invoice.student as any)?.email || `${invoice.studentId}@edunest.test`,
+        amount: Math.round(invoice.balance * 100), // Paystack expects kobo (amount in minor units)
+        currency: 'NGN',
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          invoiceId: invoice.id,
+          schoolId: context.schoolId,
+          userId: context.userId,
+          studentId: invoice.studentId,
+          invoiceNo: invoice.invoiceNo,
+          amount: invoice.balance,
+          custom_fields: [
+            { display_name: 'Invoice Number', variable_name: 'invoice_no', value: invoice.invoiceNo },
+            { display_name: 'Student', variable_name: 'student_name', value: `${invoice.student.firstName} ${invoice.student.lastName}` },
+          ],
+        },
+      }),
+    });
+
+    if (!paystackResponse.ok) {
+      const errorBody = await paystackResponse.text();
+      console.error('[Paystack] Initialize failed:', paystackResponse.status, errorBody);
+      throw new BadRequestException(
+        `Failed to initialize payment with Paystack. Please try again or contact support. (HTTP ${paystackResponse.status})`
+      );
+    }
+
+    const paystackData = await paystackResponse.json() as any;
+    if (!paystackData?.status || !paystackData?.data?.authorization_url) {
+      throw new BadRequestException(
+        'Paystack returned an unexpected response. Please try again or contact support.'
+      );
+    }
+
+    // 5. Create a payment record in INITIATED state (not yet posted)
+    const receiptNo = await this.generateReceiptNumber(context.schoolId);
+    const payment = await this.prisma.payment.create({
+      data: {
+        invoiceId: invoice.id,
+        amount: invoice.balance,
+        method: 'ONLINE',
+        reference,
+        receiptNo,
+        status: 'INITIATED',
+        recordedById: context.userId,
+        idempotencyKey: reference, // use the Paystack reference as idempotency key
+        notes: `Paystack online payment — ${invoice.invoiceNo}`,
+      },
+    });
+
+    // 6. Write audit log
+    await this.writeAuditLog({
+      schoolId: context.schoolId,
+      action: 'PAYMENT_SUBMITTED',
+      entityType: 'Payment',
+      entityId: payment.id,
+      userId: context.userId,
+      userRole: context.userRole,
+      description: `Online payment of ₦${invoice.balance.toLocaleString()} initiated via Paystack for invoice ${invoice.invoiceNo}. Reference: ${reference}`,
+      metadata: JSON.stringify({ reference, invoiceNo: invoice.invoiceNo, amount: invoice.balance }),
+    });
+
+    return successResponse({
+      authorizationUrl: paystackData.data.authorization_url,
+      accessCode: paystackData.data.access_code,
+      reference,
+      paymentId: payment.id,
+      amount: invoice.balance,
+    }, 'Payment session initialized. Redirecting to Paystack...');
+  }
+
+  /**
+   * Verify a Paystack transaction after the parent returns from the
+   * Paystack checkout page.
+   *
+   * Per the master prompt §14: "A browser redirect to a success URL is not
+   * sufficient evidence of payment." This method calls the Paystack Verify
+   * Transaction API to confirm the payment was actually successful.
+   *
+   * If verified, the payment is posted through the normal workflow.
+   */
+  async verifyPaystackPayment(
+    reference: string,
+    context: { schoolId: string; userId: string; userRole: string },
+  ) {
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
+    if (!secretKey) {
+      throw new BadRequestException('Online payments are not configured on this server.');
+    }
+
+    // 1. Find the payment record by reference
+    const payment = await this.prisma.payment.findFirst({
+      where: { reference, invoice: { student: { schoolId: context.schoolId } } },
+      include: { invoice: { include: { student: true, items: true } } },
+    });
+    if (!payment) throw new NotFoundException('Payment record not found for this reference');
+
+    // Idempotency — if already posted, return success without re-processing
+    if (payment.status === 'POSTED') {
+      return successResponse({ payment, alreadyVerified: true }, 'Payment was already verified and posted.');
+    }
+
+    // 2. Call Paystack Verify Transaction API
+    const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${secretKey}`,
+      },
+    });
+
+    if (!verifyResponse.ok) {
+      throw new BadRequestException(`Failed to verify payment with Paystack (HTTP ${verifyResponse.status})`);
+    }
+
+    const verifyData = await verifyResponse.json() as any;
+
+    // 3. Check transaction status
+    if (!verifyData?.status || verifyData?.data?.status !== 'success') {
+      // Update payment to FAILED
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'FAILED' },
+      });
+
+      await this.writeAuditLog({
+        schoolId: context.schoolId,
+        action: 'PAYMENT_REJECTED',
+        entityType: 'Payment',
+        entityId: payment.id,
+        userId: context.userId,
+        userRole: context.userRole,
+        description: `Paystack payment verification failed for reference ${reference}. Status: ${verifyData?.data?.status || 'unknown'}`,
+        metadata: JSON.stringify({ reference, paystackStatus: verifyData?.data?.status }),
+      });
+
+      throw new BadRequestException(
+        `Payment verification failed. Paystack status: ${verifyData?.data?.status || 'unknown'}. ` +
+        `If you believe this is an error, please contact the school with reference: ${reference}`
+      );
+    }
+
+    // 4. Verify amount matches (protect against amount manipulation)
+    const paidAmountKobo = verifyData.data.amount;
+    const expectedAmountKobo = Math.round(payment.amount * 100);
+    if (paidAmountKobo !== expectedAmountKobo) {
+      console.error(`[Paystack] Amount mismatch: expected ${expectedAmountKobo} kobo, got ${paidAmountKobo} kobo`);
+      throw new BadRequestException(
+        `Amount mismatch detected. Expected ₦${payment.amount.toLocaleString()} but received ₦${(paidAmountKobo / 100).toLocaleString()}. ` +
+        `Please contact the school administrator.`
+      );
+    }
+
+    // 5. Post the payment through the normal workflow
+    await this.postPaymentInternal(payment, []);
+
+    // 6. Update payment status to POSTED
+    const updated = await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'POSTED',
+        verifiedById: context.userId || null,
+        verifiedAt: new Date(),
+        approvedById: context.userId || null,
+        approvedAt: new Date(),
+        postedAt: new Date(),
+      },
+      include: { receipt: true },
+    });
+
+    // 7. Write audit log
+    await this.writeAuditLog({
+      schoolId: context.schoolId,
+      action: 'PAYMENT_POSTED',
+      entityType: 'Payment',
+      entityId: payment.id,
+      userId: context.userId,
+      userRole: context.userRole,
+      description: `Paystack payment of ₦${payment.amount.toLocaleString()} verified and posted for invoice ${payment.invoice.invoiceNo}. Reference: ${reference}`,
+      metadata: JSON.stringify({ reference, amount: payment.amount, invoiceNo: payment.invoice.invoiceNo }),
+    });
+
+    return successResponse(updated, 'Payment verified and posted successfully. Official receipt generated.');
+  }
 }

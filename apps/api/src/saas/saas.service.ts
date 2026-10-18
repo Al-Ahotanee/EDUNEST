@@ -257,6 +257,7 @@ export class SaasService {
     if (event === 'charge.success' && data) {
       const metadata = data.metadata || {};
 
+      // SaaS subscription payment (tenant activation)
       if (metadata.tenantId) {
         await this.prisma.tenant.update({
           where: { id: metadata.tenantId },
@@ -268,37 +269,176 @@ export class SaasService {
         });
       }
 
+      // School fee invoice payment — P6 fix: use the new payment workflow
+      // instead of the old direct invoice update. This ensures the payment
+      // goes through the proper state machine + receipt generation + audit log.
       if (metadata.invoiceId) {
-        const invoice = await this.prisma.invoice.findUnique({ where: { id: metadata.invoiceId } });
-        if (invoice) {
-          const paidAmount = Number(data.amount) / 100;
-          const newAmountPaid = invoice.amountPaid + paidAmount;
-          const newBalance = Math.max(0, invoice.total - newAmountPaid);
-          const newStatus = newBalance <= 0 ? 'PAID' : 'PARTIAL';
+        const reference = data.reference;
+        // Check if a payment with this reference already exists (idempotency)
+        const existing = await this.prisma.payment.findFirst({
+          where: { reference },
+        });
 
-          await this.prisma.$transaction([
-            this.prisma.payment.create({
+        if (existing) {
+          // Already processed — don't duplicate (webhook replay protection)
+          if (existing.status === 'POSTED') {
+            return { received: true, message: 'Payment already processed (idempotent)' };
+          }
+          // If it exists but isn't POSTED yet, post it through the workflow
+          if (existing.status === 'INITIATED') {
+            const paidAmount = Number(data.amount) / 100;
+
+            // Verify amount matches
+            if (Math.abs(paidAmount - existing.amount) > 0.01) {
+              console.error(`[Paystack Webhook] Amount mismatch for ${reference}: expected ${existing.amount}, got ${paidAmount}`);
+              return { received: true, message: 'Amount mismatch — payment flagged for review' };
+            }
+
+            // Post the payment
+            const invoice = await this.prisma.invoice.findUnique({
+              where: { id: existing.invoiceId },
+              include: { items: true, student: { include: { classEnrollments: { take: 1, orderBy: { createdAt: 'desc' } } } } },
+            });
+            if (invoice) {
+              // Update invoice balance
+              const newAmountPaid = invoice.amountPaid + paidAmount;
+              const newBalance = Math.max(0, invoice.total - newAmountPaid);
+              const newStatus = newBalance <= 0.01 ? 'PAID' : 'PARTIAL';
+              await this.prisma.invoice.update({
+                where: { id: invoice.id },
+                data: { amountPaid: newAmountPaid, balance: newBalance, status: newStatus as any },
+              });
+
+              // Create allocations (FIFO)
+              let remaining = paidAmount;
+              for (const item of invoice.items) {
+                if (remaining <= 0) break;
+                const allocAmount = Math.min(remaining, item.subtotal);
+                await this.prisma.paymentAllocation.create({
+                  data: { paymentId: existing.id, invoiceId: invoice.id, invoiceItemId: item.id, amount: allocAmount },
+                });
+                remaining -= allocAmount;
+              }
+
+              // Generate receipt
+              const existingReceipt = await this.prisma.receipt.findUnique({ where: { paymentId: existing.id } });
+              if (!existingReceipt) {
+                const schoolId = invoice.student.schoolId;
+                await this.prisma.receipt.create({
+                  data: {
+                    receiptNo: existing.receiptNo,
+                    paymentId: existing.id,
+                    schoolId,
+                    studentName: `${invoice.student.firstName} ${invoice.student.lastName}`,
+                    studentAdmissionNo: invoice.student.admissionNumber,
+                    className: invoice.student.classEnrollments?.[0] ? (await this.prisma.class.findUnique({ where: { id: invoice.student.classEnrollments[0].classId } }))?.name : null,
+                    amountInFigures: paidAmount,
+                    amountInWords: this.numberToWords(paidAmount),
+                    paymentDate: new Date(),
+                    paymentMethod: 'ONLINE',
+                    transactionRef: reference,
+                    invoiceAllocations: JSON.stringify([{ invoiceNo: invoice.invoiceNo, amount: paidAmount }]),
+                    issuedById: existing.recordedById || '',
+                  },
+                });
+              }
+
+              // Update payment to POSTED
+              await this.prisma.payment.update({
+                where: { id: existing.id },
+                data: {
+                  status: 'POSTED',
+                  postedAt: new Date(),
+                  verifiedAt: new Date(),
+                  approvedAt: new Date(),
+                },
+              });
+
+              // Write audit log
+              await this.prisma.financialAuditLog.create({
+                data: {
+                  schoolId: invoice.student.schoolId,
+                  action: 'PAYMENT_POSTED' as any,
+                  entityType: 'Payment',
+                  entityId: existing.id,
+                  description: `Paystack webhook: payment of ₦${paidAmount.toLocaleString()} verified and posted for invoice ${invoice.invoiceNo}. Reference: ${reference}`,
+                  metadata: JSON.stringify({ reference, amount: paidAmount, invoiceNo: invoice.invoiceNo }),
+                },
+              });
+            }
+          }
+        } else {
+          // Legacy path: create payment record directly (for payments initiated
+          // before the new workflow was deployed). Still generates receipt + audit log.
+          const invoice = await this.prisma.invoice.findUnique({
+            where: { id: metadata.invoiceId },
+            include: { student: true },
+          });
+          if (invoice) {
+            const paidAmount = Number(data.amount) / 100;
+            const newAmountPaid = invoice.amountPaid + paidAmount;
+            const newBalance = Math.max(0, invoice.total - newAmountPaid);
+            const newStatus = newBalance <= 0 ? 'PAID' : 'PARTIAL';
+
+            const receiptNo = `RCP-${Date.now()}-${uuidv4().slice(0, 6).toUpperCase()}`;
+            const [payment] = await this.prisma.$transaction([
+              this.prisma.payment.create({
+                data: {
+                  invoiceId: invoice.id,
+                  amount: paidAmount,
+                  method: 'ONLINE',
+                  reference: data.reference || uuidv4(),
+                  receiptNo,
+                  status: 'POSTED',
+                  postedAt: new Date(),
+                  verifiedAt: new Date(),
+                  approvedAt: new Date(),
+                  idempotencyKey: data.reference,
+                },
+              }),
+              this.prisma.invoice.update({
+                where: { id: invoice.id },
+                data: { amountPaid: newAmountPaid, balance: newBalance, status: newStatus as any },
+              }),
+            ]);
+
+            // Write audit log
+            await this.prisma.financialAuditLog.create({
               data: {
-                invoice: { connect: { id: invoice.id } },
-                amount: paidAmount,
-                method: 'ONLINE',
-                receiptNo: `RCP-${Date.now()}-${uuidv4().slice(0, 6).toUpperCase()}`,
-                reference: data.reference || uuidv4(),
+                schoolId: invoice.student?.schoolId || '',
+                action: 'PAYMENT_POSTED' as any,
+                entityType: 'Payment',
+                entityId: payment.id,
+                description: `Paystack webhook (legacy path): payment of ₦${paidAmount.toLocaleString()} posted for invoice ${invoice.invoiceNo}. Reference: ${reference}`,
+                metadata: JSON.stringify({ reference, amount: paidAmount, invoiceNo: invoice.invoiceNo }),
               },
-            }),
-            this.prisma.invoice.update({
-              where: { id: invoice.id },
-              data: {
-                amountPaid: newAmountPaid,
-                balance: newBalance,
-                status: newStatus,
-              },
-            }),
-          ]);
+            });
+          }
         }
       }
     }
 
     return { received: true };
+  }
+
+  // Helper: convert number to words for receipt generation
+  private numberToWords(amount: number): string {
+    const naira = Math.floor(amount);
+    const kobo = Math.round((amount - naira) * 100);
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const convert = (num: number): string => {
+      if (num === 0) return 'Zero';
+      if (num < 20) return ones[num];
+      if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? '-' + ones[num % 10] : '');
+      if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + convert(num % 100) : '');
+      if (num < 1000000) return convert(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + convert(num % 1000) : '');
+      if (num < 1000000000) return convert(Math.floor(num / 1000000)) + ' Million' + (num % 1000000 ? ' ' + convert(num % 1000000) : '');
+      return convert(Math.floor(num / 1000000000)) + ' Billion' + (num % 1000000000 ? ' ' + convert(num % 1000000000) : '');
+    };
+    let result = convert(naira) + ' Naira';
+    if (kobo > 0) result += ', ' + convert(kobo) + ' Kobo';
+    return result + ' Only';
   }
 }

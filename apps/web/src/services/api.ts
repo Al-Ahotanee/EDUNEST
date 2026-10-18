@@ -162,6 +162,12 @@ export const financeApi = {
   createParentLink: (data: { userId: string; studentId: string; relationship?: string }) =>
     api.post('/finance/workflow/parent-links', data),
 
+  // Paystack online payments
+  initiateOnlinePayment: (data: { invoiceId: string; callbackUrl?: string }) =>
+    api.post('/finance/workflow/payments/initiate-online', data),
+  verifyOnlinePayment: (reference: string) =>
+    api.get(`/finance/workflow/payments/verify-online/${reference}`),
+
   // ─── Phase 4: Financial Reports API ────────────────────────────────────────
   getAccountantDashboard: (params?: any) => api.get('/finance/reports/accountant-dashboard', { params }),
   getClassMasterDashboard: () => api.get('/finance/reports/class-master-dashboard'),
