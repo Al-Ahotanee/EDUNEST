@@ -46,6 +46,8 @@ model Tenant {
   roles     Role[]
   auditLogs AuditLog[]
   marketer  Marketer?  @relation(fields: [marketerId], references: [id])
+  // ─── Phase 2: Financial module relation ──────────────────────────────────
+  financialPolicy TenantFinancialPolicy?
 }
 
 model School {
@@ -86,6 +88,10 @@ model School {
   gradingScales      GradingScale[]
   reliefAssignments  ReliefAssignment[]
   academicEvents     AcademicEvent[]
+  // ─── Phase 2: Financial module relations ──────────────────────────────────
+  receipts           Receipt[]
+  creditNotes        CreditNote[]
+  financialAuditLogs FinancialAuditLog[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -149,6 +155,8 @@ model User {
   receivedMessages   Message[]           @relation("ReceivedMessages")
   loginHistory       LoginHistory[]
   teacherAssignments TeacherAssignment[]
+  // ─── Phase 2: Financial module relations ──────────────────────────────────
+  parentStudentLinks  ParentStudentLink[]
 
   @@unique([email, tenantId])
   @@index([tenantId])
@@ -304,6 +312,9 @@ model Student {
   documents           Document[]
   examAttempts        ExamAttempt[]
   termReportCards     TermReportCard[]
+  // ─── Phase 2: Financial module relations ──────────────────────────────────
+  creditNotes         CreditNote[]
+  parentLinks         ParentStudentLink[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
@@ -701,6 +712,14 @@ model FeeStructure {
   termId      String?  // if set, applies only to this term
   feeType     String   @default("TERM") // ONE_TIME | ANNUAL | TERM
   status      String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+
+  // ─── Phase 2: Approval workflow tracking ──────────────────────────────────
+  createdById   String?   // User who created the fee structure
+  publishedById String?   // User who published it
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  version       Int       @default(1)  // increments on each publish
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -728,11 +747,29 @@ model Invoice {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
+  // ─── Phase 2: Academic scoping for proper invoice filtering ────────────────
+  schoolId   String?       // tenant school that issued the invoice
+  sessionId  String?       // academic session
+  termId     String?      // academic term
+  classId    String?       // student's class at time of issuance
+
+  // ─── Phase 2: Workflow tracking ───────────────────────────────────────────
+  generatedById String?    // User who generated the invoice
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancellationReason String?
+
   student  Student       @relation(fields: [studentId], references: [id])
   items    InvoiceItem[]
   payments Payment[]
+  allocations PaymentAllocation[]
+  creditNotes CreditNote[]
 
   @@index([studentId])
+  @@index([schoolId])
+  @@index([sessionId])
+  @@index([termId])
+  @@index([classId])
 }
 
 model InvoiceItem {
@@ -746,6 +783,7 @@ model InvoiceItem {
 
   invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   feeStructure FeeStructure? @relation(fields: [feeStructureId], references: [id])
+  allocations  PaymentAllocation[]
 
   @@index([invoiceId])
 }
@@ -762,9 +800,290 @@ model Payment {
   createdAt   DateTime      @default(now())
   isSynced    Boolean       @default(true)
 
-  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  // ─── Phase 2: Financial module enhancements ──────────────────────────────
+  // Payment status state machine — tracks lifecycle from submission to posting
+  status      PaymentStatus @default(POSTED)  // default POSTED for backward compat
+
+  // Workflow tracking — who recorded, verified, approved, posted
+  recordedById    String?   // User who recorded/submitted the payment
+  verifiedById    String?   // School Accountant who verified
+  approvedById    String?   // School Accountant who approved (for Class Master submissions)
+  verifiedAt      DateTime?
+  approvedAt      DateTime?
+  postedAt        DateTime?  // when the payment was officially posted
+  rejectionReason String?   // required if status = REJECTED
+
+  // Class Master cash submission context
+  isClassMasterSubmission Boolean @default(false)
+  submissionNotes String?
+
+  // Reversal tracking
+  reversedAt      DateTime?
+  reversedById    String?
+  reversalReason  String?
+  reversedByPaymentId String?  // links to the compensating payment if reversed
+
+  // Idempotency — prevent duplicate submissions from retries
+  idempotencyKey  String?  @unique
+
+  invoice      Invoice             @relation(fields: [invoiceId], references: [id])
+  allocations  PaymentAllocation[]
+  receipt      Receipt?
+  creditNotes  CreditNote[]
 
   @@index([invoiceId])
+  @@index([status])
+  @@index([recordedById])
+  @@index([verifiedById])
+}
+
+/// Payment status state machine. Tracks the lifecycle of a payment from
+/// initiation through verification, approval, posting, and potential reversal.
+/// This is separate from InvoiceStatus so a payment can be "PENDING_APPROVAL"
+/// while the invoice remains "UNPAID" — the invoice balance only decreases
+/// when the payment reaches POSTED status.
+enum PaymentStatus {
+  INITIATED                       // Payment initiated but not yet submitted
+  PENDING_VERIFICATION            // Awaiting verification (e.g. bank transfer screenshot)
+  PENDING_ACCOUNTANT_APPROVAL    // Class Master cash submission awaiting Accountant approval
+  VERIFIED                        // Verified by School Accountant, awaiting posting
+  POSTED                          // Officially posted — reduces invoice balance
+  FAILED                          // Failed (e.g. gateway declined)
+  REJECTED                        // Rejected by School Accountant
+  REVERSED                        // Reversed after posting (compensating entry)
+  REFUNDED                        // Refunded to payer
+}
+
+/// Tenant-level financial policy. Controls school-wide financial behavior
+/// including Class Master collection permissions and approval thresholds.
+/// One record per tenant (school). Created on first access if missing.
+model TenantFinancialPolicy {
+  id                 String   @id @default(uuid())
+  tenantId           String   @unique
+
+  // Class Master collection mode:
+  //   VIEW_ONLY        — Class Masters can only view, cannot record payments
+  //   RECORD_PENDING   — Class Masters can record cash payments, Accountant must approve
+  classMasterCollectionMode String @default("VIEW_ONLY")
+
+  // Whether Class Masters can issue provisional acknowledgements (not official receipts)
+  allowProvisionalAcknowledgement Boolean @default(false)
+
+  // Whether online payments (Paystack) are enabled for this tenant
+  onlinePaymentsEnabled Boolean @default(false)
+
+  // Whether parents can submit bank transfer references for manual verification
+  allowTransferReferenceSubmission Boolean @default(true)
+
+  // Default payment due date offset (days from invoice issue)
+  defaultDueDateDays Int @default(30)
+
+  // Overdue threshold (days past due date before marking OVERDUE)
+  overdueThresholdDays Int @default(7)
+
+  // Whether refunds require Principal approval
+  refundsRequirePrincipalApproval Boolean @default(true)
+
+  // Maximum cash payment a Class Master can record without escalation (0 = no limit)
+  classMasterCashLimit Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+/// Payment allocation — links a payment to specific invoice items.
+/// Supports partial payments, multi-invoice allocation, and overpayment tracking.
+/// A single Payment can have multiple PaymentAllocation records (one per invoice item paid).
+model PaymentAllocation {
+  id           String  @id @default(uuid())
+  paymentId    String
+  invoiceId    String
+  invoiceItemId String?  // optional — if null, allocation is to the invoice generally
+  amount       Float       // amount allocated to this invoice/item
+  createdAt    DateTime @default(now())
+
+  payment      Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice      Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceItem  InvoiceItem? @relation(fields: [invoiceItemId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@index([invoiceId])
+  @@index([invoiceItemId])
+}
+
+/// Official receipt record. Generated when a payment reaches POSTED status.
+/// One receipt per posted payment. Reprints tracked via reprintCount.
+model Receipt {
+  id              String   @id @default(uuid())
+  receiptNo       String   @unique
+  paymentId       String   @unique  // one receipt per payment
+  schoolId        String
+
+  // Receipt content (snapshot at time of issuance)
+  studentName     String
+  studentAdmissionNo String
+  className        String?
+  payerName       String?
+  amountInFigures Float
+  amountInWords   String
+  paymentDate     DateTime
+  paymentMethod   String
+  transactionRef  String?
+  sessionId       String?
+  termId          String?
+  invoiceAllocations String?  // JSON summary of which invoices were paid
+
+  issuedById      String   // User who issued/authorized the receipt
+  issuedAt        DateTime @default(now())
+  reprintCount    Int      @default(0)
+  lastReprintedAt DateTime?
+  lastReprintedById String?
+
+  // Cancellation support
+  isCancelled     Boolean  @default(false)
+  cancelledAt     DateTime?
+  cancelledById   String?
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([paymentId])
+}
+
+/// Credit note — for refunds, waivers, discounts, and adjustments.
+/// Each credit note has an approval workflow and links to the original
+/// invoice/payment being adjusted.
+enum CreditNoteType {
+  DISCOUNT         // Approved discount on an invoice
+  WAIVER           // Fee waiver (full or partial)
+  REFUND           // Refund to payer
+  ADJUSTMENT       // Manual adjustment (debit or credit)
+  REVERSAL         // Reversal of a posted payment
+}
+
+enum CreditNoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  POSTED
+  CANCELLED
+}
+
+model CreditNote {
+  id              String           @id @default(uuid())
+  schoolId        String
+  creditNoteNo    String           @unique
+  type            CreditNoteType
+  status          CreditNoteStatus @default(DRAFT)
+
+  // What is being credited
+  invoiceId       String?          // invoice being adjusted
+  paymentId       String?          // payment being reversed/refunded
+  studentId       String
+
+  // Financial details
+  amount          Float            // positive = credit to student, negative = debit
+  reason          String
+  description     String?
+
+  // Approval workflow
+  requestedById   String           // User who requested
+  approvedById    String?          // User who approved (null if pending)
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  // Posting
+  postedAt        DateTime?
+  postedById      String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  invoice  Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([invoiceId])
+}
+
+/// Append-only audit log for all financial actions. Every sensitive
+/// financial operation writes a record here. Never updated or deleted.
+enum FinancialAction {
+  FEE_STRUCTURE_CREATED
+  FEE_STRUCTURE_PUBLISHED
+  FEE_STRUCTURE_ARCHIVED
+  INVOICE_GENERATED
+  INVOICE_CANCELLED
+  PAYMENT_SUBMITTED
+  PAYMENT_VERIFIED
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  PAYMENT_POSTED
+  PAYMENT_REVERSED
+  PAYMENT_REFUNDED
+  RECEIPT_ISSUED
+  RECEIPT_REPRINTED
+  RECEIPT_CANCELLED
+  CREDIT_NOTE_CREATED
+  CREDIT_NOTE_APPROVED
+  CREDIT_NOTE_POSTED
+  ALLOCATION_ADJUSTED
+  POLICY_UPDATED
+}
+
+model FinancialAuditLog {
+  id           String           @id @default(uuid())
+  schoolId     String
+  action       FinancialAction
+  entityType   String           // 'Invoice' | 'Payment' | 'FeeStructure' | 'Receipt' | 'CreditNote'
+  entityId     String           // ID of the affected entity
+  userId       String?          // User who performed the action
+  userRole     String?          // Role at time of action
+  ipAddress    String?
+  userAgent    String?
+  description  String           // human-readable summary
+  metadata     String?          // JSON string with before/after values
+  createdAt    DateTime         @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+/// Explicit link between a User account (parent/guardian) and Student records.
+/// This is the source of truth for parent→child access — never trust URL params.
+/// A parent can be linked to multiple students; a student can have multiple
+/// linked parent users.
+model ParentStudentLink {
+  id          String   @id @default(uuid())
+  userId      String   // User account (parent/guardian)
+  studentId   String   // Student record
+  relationship String? // 'father' | 'mother' | 'guardian' | etc.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, studentId])  // prevent duplicate links
+  @@index([userId])
+  @@index([studentId])
 }
 
 // ─── HR & STAFF ───────────────────────────────────────────────────────────────
