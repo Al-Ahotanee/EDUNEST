@@ -7,6 +7,7 @@ import {
   DollarSign, UserCog, Monitor, Library, Bed, Heart, Package,
   Calendar, Bell, BarChart3, Settings, ChevronDown, ChevronRight,
   School, LogOut, ClipboardCheck, Award, FileText, Building2, X, Briefcase,
+  AlertTriangle,
 } from 'lucide-react';
 
 // School-branded logo component — uses school name first letter when no logo.
@@ -75,6 +76,8 @@ const NAV_ITEMS: NavItemDef[] = [
       { label: 'Invoices', path: '/app/finance/invoices', icon: <FileText size={16} />, adminOnly: true },
       { label: 'Fee Structures', path: '/app/finance/fees', icon: <DollarSign size={16} />, adminOnly: true },
       { label: 'Accountant Dashboard', path: '/app/finance/accountant', icon: <Briefcase size={16} />, adminOnly: true },
+      { label: 'Outstanding Fees', path: '/app/finance/outstanding-fees', icon: <AlertTriangle size={16} />, adminOnly: true },
+      { label: 'Daily Collection', path: '/app/finance/daily-collection', icon: <Calendar size={16} />, adminOnly: true },
       { label: 'Financial Policy', path: '/app/finance/policy', icon: <Settings size={16} />, adminOnly: true },
     ],
   },
