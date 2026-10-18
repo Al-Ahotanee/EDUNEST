@@ -8,12 +8,12 @@ import {
   Download, Trash2, Printer, ShieldCheck, CheckCircle2, FileText
 } from 'lucide-react';
 import {
-  StatCard, DataTable, Button, Modal, Input, Select, Badge, PageLoader,
+  DataTable, Button, Modal, Input, Select, StatCard, Badge, Avatar, PageLoader, Card,
 } from '../../components/ui';
+import { ReceiptViewer } from '../../components/finance/ReceiptViewer';
 import { financeApi, studentsApi, academicApi } from '../../services/api';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
-import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 export default function FinancePage() {
   const queryClient = useQueryClient();
@@ -27,6 +27,8 @@ export default function FinancePage() {
   const [selectedClassForFees, setSelectedClassForFees] = useState('');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  // P5: receipt viewer state — when set, shows the ReceiptViewer modal
+  const [receiptData, setReceiptData] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [tab, setTab] = useState<'overview' | 'invoices' | 'fees'>('overview');
 
@@ -105,16 +107,32 @@ export default function FinancePage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
+  // P5 fix: use the new submitPayment workflow instead of the legacy recordPayment.
+  // This routes through FinancialWorkflowService which:
+  //   - Auto-posts cash/POS payments (Accountant recording directly)
+  //   - Sets bank transfers to PENDING_VERIFICATION
+  //   - Generates official receipts for posted payments
+  //   - Writes to the financial audit log
+  //   - Supports idempotency keys to prevent duplicate submissions
   const recordPaymentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => financeApi.recordPayment(id, data),
-    onSuccess: () => {
-      toast.success('Payment recorded!');
+    mutationFn: ({ id, data }: { id: string; data: any }) => financeApi.submitPayment({
+      invoiceId: id,
+      amount: data.amount,
+      method: data.method,
+      reference: data.reference,
+      notes: data.notes,
+      idempotencyKey: `fin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    }),
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'Payment recorded and posted!');
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accountant-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-payments'] });
       setPaymentModal(null);
       paymentForm.reset();
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to record payment'),
   });
 
   const createFeeMutation = useMutation({
@@ -201,10 +219,49 @@ export default function FinancePage() {
               <CreditCard size={15} />
             </button>
           )}
+          {/* P5: View Receipt for invoices with payments */}
+          {r.amountPaid > 0 && (
+            <button
+              onClick={async () => {
+                try {
+                  const invoice = await financeApi.getInvoice(r.id);
+                  const payments = invoice.data?.data?.payments || invoice.data?.payments || [];
+                  if (payments.length === 0) {
+                    toast.info('No payments recorded for this invoice yet');
+                    return;
+                  }
+                  const postedPayment = payments.find((p: any) => p.status === 'POSTED') || payments[0];
+                  if (postedPayment?.receiptNo) {
+                    setReceiptData({
+                      receiptNo: postedPayment.receiptNo,
+                      studentName: `${r.student?.firstName || ''} ${r.student?.lastName || ''}`.trim() || 'Student',
+                      studentAdmissionNo: r.student?.admissionNumber || '—',
+                      amountInFigures: postedPayment.amount,
+                      amountInWords: '',
+                      paymentDate: postedPayment.paymentDate,
+                      paymentMethod: postedPayment.method || 'CASH',
+                      transactionRef: postedPayment.reference,
+                      invoiceAllocations: JSON.stringify([{ invoiceNo: r.invoiceNo, amount: postedPayment.amount }]),
+                      issuedAt: postedPayment.postedAt || postedPayment.createdAt,
+                      reprintCount: 0,
+                    });
+                  } else {
+                    toast.info('Payment is pending approval. Receipt will be available once approved.');
+                  }
+                } catch {
+                  toast.error('Failed to load receipt');
+                }
+              }}
+              className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-all"
+              title="View Receipt"
+            >
+              <FileText size={15} />
+            </button>
+          )}
           <button
             onClick={() => setSelectedInvoice(r)}
             className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-all"
-            title="View Official Receipt"
+            title="View Invoice"
           >
             <Eye size={15} />
           </button>
@@ -809,6 +866,13 @@ export default function FinancePage() {
           </div>
         )}
       </Modal>
+
+      {/* P5: Receipt Viewer — shows official receipt for posted payments */}
+      <ReceiptViewer
+        receipt={receiptData}
+        open={!!receiptData}
+        onClose={() => setReceiptData(null)}
+      />
     </div>
   );
 }
