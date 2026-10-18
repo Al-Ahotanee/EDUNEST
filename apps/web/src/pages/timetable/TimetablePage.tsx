@@ -1005,26 +1005,51 @@ export default function TimetablePage() {
             poolPtr++;
             subjectsTaughtToday[chosen.subjectId] = (subjectsTaughtToday[chosen.subjectId] || 0) + 1;
 
-            // Pick teacher ensuring 0 time overlaps across all classes
+            // Pick teacher ensuring 0 time overlaps across all classes.
+            // P1-TT8 fix: previously the algorithm used staff.find() which
+            // always returned the FIRST free teacher in the array, causing
+            // massive load skew (teacher #1 overloaded, teachers at the end
+            // of the array completely idle). Now we pick the teacher with
+            // the LOWEST current weekly load who is also free at this time.
             let teacherId = chosen.assignedTeacherId;
 
-            // Verify teacher isn't double-booked in this exact time range
-            if (teacherId && teacherBusyRegistry[teacherId]) {
-              const hasConflict = teacherBusyRegistry[teacherId].some(
+            // Helper: check if a teacher is free at this day/time
+            const isTeacherFree = (tid: string): boolean => {
+              const busySlots = teacherBusyRegistry[tid] || [];
+              return !busySlots.some(
                 reg => reg.day === dayOfWeek &&
                        checkTimeOverlap(period.start, period.end, formatMinutes(reg.start), formatMinutes(reg.end))
               );
+            };
 
-              if (hasConflict && !profile.isSingleClassMaster) {
-                // Find substitute teacher who is free at this time
-                const freeStaff = staff.find(st => {
-                  const busySlots = teacherBusyRegistry[st.id] || [];
-                  return !busySlots.some(
-                    reg => reg.day === dayOfWeek &&
-                           checkTimeOverlap(period.start, period.end, formatMinutes(reg.start), formatMinutes(reg.end))
-                  );
-                });
-                if (freeStaff) teacherId = freeStaff.id;
+            // Helper: get current weekly load for a teacher
+            const teacherLoad = (tid: string): number => (teacherBusyRegistry[tid] || []).length;
+
+            // Verify the chosen teacher isn't double-booked in this exact time range.
+            // If they are, find a substitute — prioritizing LEAST-LOADED teachers.
+            if (teacherId && !isTeacherFree(teacherId) && !profile.isSingleClassMaster) {
+              // P1-TT8 fix: pick the LEAST-loaded teacher who is free at this time.
+              // Sort by load ascending so the most-idle teachers get used first.
+              const freeStaff = staff
+                .filter(st => isTeacherFree(st.id))
+                .sort((a, b) => teacherLoad(a.id) - teacherLoad(b.id));
+              if (freeStaff.length > 0) {
+                teacherId = freeStaff[0].id;
+              }
+            }
+
+            // P1-TT8 fix: load-balance even when the assigned teacher IS free.
+            // If the chosen teacher already has a heavy load (>= 22 periods/wk)
+            // AND a less-loaded teacher is available, swap to the less-loaded
+            // one. This prevents the "5 overloaded + 24 idle" pattern reported
+            // in the Round 2 UAT (P1-TT8).
+            const MAX_LOAD = 22;
+            if (teacherId && teacherLoad(teacherId) >= MAX_LOAD && !profile.isSingleClassMaster) {
+              const lighterStaff = staff
+                .filter(st => st.id !== teacherId && isTeacherFree(st.id) && teacherLoad(st.id) < MAX_LOAD)
+                .sort((a, b) => teacherLoad(a.id) - teacherLoad(b.id));
+              if (lighterStaff.length > 0) {
+                teacherId = lighterStaff[0].id;
               }
             }
 
@@ -1060,12 +1085,40 @@ export default function TimetablePage() {
       toast.dismiss(loadingToast);
       toast.success(`🎉 Timetable generated for ${targetClassIds.length} classes with 0 collisions!`);
 
+      // P1-TT8 fix: compute REAL utilization stats from the
+      // teacherBusyRegistry instead of the hard-coded '89.6%' placeholder.
+      const teachersUsed = new Set<string>();
+      let totalAssignedSlots = 0;
+      const loads: number[] = [];
+      for (const slot of generatedSlots) {
+        if (slot.staffId) {
+          teachersUsed.add(slot.staffId);
+          totalAssignedSlots++;
+        }
+      }
+      // Count load per teacher from the registry (post-generation)
+      for (const tid of teachersUsed) {
+        loads.push((teacherBusyRegistry[tid] || []).length);
+      }
+      const assignedTeachers = teachersUsed.size;
+      const idleTeachers = (staff?.length || 0) - assignedTeachers;
+      const avgLoad = loads.length ? (loads.reduce((a, b) => a + b, 0) / loads.length).toFixed(1) : '0';
+      const maxLoad = loads.length ? Math.max(...loads) : 0;
+      const utilizationPct = staff?.length
+        ? Math.round((assignedTeachers / staff.length) * 100)
+        : 0;
+
       setSolverResultModal({
         classesCount: targetClassIds.length,
         totalSlots: generatedSlots.length,
         quotasFulfilled: '100% Guaranteed',
         teacherConflicts: 0,
-        facultyUtilization: '89.6%',  // P2-TT2 note: this is the algorithm's projected utilization, not the live Teaching Staff utilization.
+        // P1-TT8 fix: real numbers, not a fake 89.6%
+        facultyUtilization: `${utilizationPct}% (${assignedTeachers}/${staff?.length || 0} teachers)`,
+        assignedTeachers,
+        idleTeachers,
+        avgLoad: `${avgLoad} periods/wk`,
+        maxLoad: `${maxLoad} periods/wk (max 22)`,
       });
 
       setAutoGenModal(false);
@@ -2990,6 +3043,27 @@ export default function TimetablePage() {
                 <span className="text-slate-500">Teaching Staff Utilization Rate:</span>
                 <span className="font-bold text-purple-600">{solverResultModal.facultyUtilization}</span>
               </div>
+              {/* P1-TT8 fix: real load-distribution metrics */}
+              {solverResultModal.assignedTeachers !== undefined && (
+                <>
+                  <div className="flex items-center justify-between p-2.5">
+                    <span className="text-slate-500">Teachers Assigned:</span>
+                    <span className="font-bold text-emerald-600">{solverResultModal.assignedTeachers}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5">
+                    <span className="text-slate-500">Teachers Idle:</span>
+                    <span className="font-bold text-amber-600">{solverResultModal.idleTeachers}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5">
+                    <span className="text-slate-500">Average Weekly Load:</span>
+                    <span className="font-bold text-slate-800">{solverResultModal.avgLoad}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5">
+                    <span className="text-slate-500">Peak Teacher Load:</span>
+                    <span className="font-bold text-slate-800">{solverResultModal.maxLoad}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex items-center justify-end">

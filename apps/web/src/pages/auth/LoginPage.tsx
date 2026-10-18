@@ -37,7 +37,7 @@ export default function LoginPage() {
     retry: false,
   });
 
-  const schoolName = school?.name || 'School Portal';
+  const schoolName = school?.name || 'EduNest';
   const schoolLogo = school?.logo;
   const schoolMotto = school?.motto;
   const primaryColor = school?.primaryColor || '#1a56db';

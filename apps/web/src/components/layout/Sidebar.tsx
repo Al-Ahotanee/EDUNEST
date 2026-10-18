@@ -218,9 +218,22 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
       .filter((item): item is NavItemDef => item !== null);
   }, [user]);
 
-  const displayRole = user?.isSuperAdmin
-    ? 'School Administrator'
-    : user?.roles?.[0]?.name || 'Staff Member';
+  // P3-15 fix: previously `user.isSuperAdmin` (the platform-level flag) was
+  // checked first and labeled 'School Administrator' — but for actual school
+  // admins (admin@demo.com), isSuperAdmin is false and their role.name is
+  // 'Super Admin' (the tenant-level role). The label fell through to
+  // 'Staff Member', which is misleading. Now we resolve the role label
+  // properly using the role name + a few special-case overrides.
+  const displayRole = (() => {
+    if (user?.isSuperAdmin) return 'Platform Administrator';
+    const roleName = user?.roles?.[0]?.name || '';
+    if (roleName === 'Super Admin') return 'School Administrator';
+    if (roleName === 'Accountant') return 'Bursar';
+    if (roleName === 'Parent') return 'Parent / Guardian';
+    if (roleName === 'Teacher') return 'Subject Teacher';
+    if (roleName === 'Class Master') return 'Class Teacher';
+    return roleName || 'Staff Member';
+  })();
 
   return (
     <aside
@@ -243,7 +256,9 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <p className="font-bold text-white text-sm truncate">{user?.school?.name || user?.tenant?.name || 'School Portal'}</p>
+              <p className="font-bold text-white text-sm truncate">
+                {user?.school?.name || user?.tenant?.name || user?.school?.name || 'EduNest Portal'}
+              </p>
               <p className="text-xs text-slate-400 truncate">{displayRole}</p>
             </div>
           )}

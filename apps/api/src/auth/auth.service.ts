@@ -33,6 +33,23 @@ export class AuthService {
       await this.prisma.$executeRaw`
         UPDATE User SET lastLoginAt = NOW(), lastLoginIp = ${ip || ''} WHERE id = ${rawUser.id}
       `;
+      // P0 fix: previously the super-admin branch returned a bare user
+      // object without school/tenant info. This caused the sidebar to show
+      // "School Portal" for any user with isSuperAdmin=true even if they
+      // had a real schoolId. Now we fetch the school/tenant relations for
+      // the response so the frontend can display the proper branding.
+      const saUser = await this.prisma.user.findUnique({
+        where: { id: rawUser.id },
+        include: {
+          school: { select: { id: true, name: true, logo: true } },
+          tenant: {
+            select: {
+              id: true, name: true, slug: true, logo: true,
+              primaryColor: true, secondaryColor: true, motto: true, isActive: true,
+            },
+          },
+        },
+      });
       const tokens = await this.generateTokens(rawUser, true);
       return {
         user: {
@@ -40,8 +57,15 @@ export class AuthService {
           email: rawUser.email,
           firstName: rawUser.firstName,
           lastName: rawUser.lastName,
+          avatar: rawUser.avatar,
           isSuperAdmin: true,
           roles: [],
+          // Include school/tenant if the super admin has them — this lets
+          // the frontend show real branding instead of generic "School Portal".
+          ...(saUser?.schoolId && { schoolId: saUser.schoolId }),
+          ...(saUser?.tenantId && { tenantId: saUser.tenantId }),
+          ...(saUser?.school && { school: saUser.school }),
+          ...(saUser?.tenant && { tenant: saUser.tenant }),
         },
         ...tokens,
       };

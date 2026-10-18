@@ -71,7 +71,7 @@ export function Topbar({
     toast.success('Logged out successfully');
   };
 
-  const schoolName = user?.tenant?.name || user?.school?.name || user?.school?.name || 'School Portal';
+  const schoolName = user?.tenant?.name || user?.school?.name || user?.school?.name || 'EduNest Portal';
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`;
 
   return (
@@ -159,7 +159,21 @@ export function Topbar({
           </div>
           <div className="hidden md:block text-left min-w-0">
             <p className="text-sm font-semibold text-slate-900 leading-tight truncate max-w-32">{user?.firstName} {user?.lastName}</p>
-            <p className="text-xs text-slate-400 truncate">{user?.roles?.[0]?.name || (user?.isSuperAdmin ? 'Administrator' : 'User')}</p>
+            <p className="text-xs text-slate-400 truncate">
+              {/* P3-15 fix: resolve role label the same way as Sidebar.tsx
+                  so 'Super Admin' (tenant-level) shows as 'School Administrator'
+                  instead of falling through to the generic 'User' label. */}
+              {(() => {
+                if (user?.isSuperAdmin) return 'Platform Administrator';
+                const roleName = user?.roles?.[0]?.name || '';
+                if (roleName === 'Super Admin') return 'School Administrator';
+                if (roleName === 'Accountant') return 'Bursar';
+                if (roleName === 'Parent') return 'Parent / Guardian';
+                if (roleName === 'Teacher') return 'Subject Teacher';
+                if (roleName === 'Class Master') return 'Class Teacher';
+                return roleName || 'User';
+              })()}
+            </p>
           </div>
         </button>
 

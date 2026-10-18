@@ -4,13 +4,82 @@ import { successResponse } from '../common/dto/pagination.dto';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 
+// ─── P1-TT6 fix: UUID format validation ──────────────────────────────────────
+// Reject malformed UUIDs with a 400 Bad Request + actionable message instead
+// of letting Prisma throw an opaque 500 Internal Server Error. Prisma's FK
+// violation errors return no actionable context (just "Internal server error")
+// which is unhelpful for API consumers.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;  // HH:MM or HH:MM:SS
+
 @Injectable()
 export class TimetableService {
   constructor(private prisma: PrismaService) {}
 
+  // Validates a single timetable slot payload BEFORE the Prisma create call.
+  // Throws BadRequestException with a specific message for each failure mode.
+  private async validateSlotPayload(data: any, schoolId: string) {
+    const errors: string[] = [];
+
+    // Required fields
+    if (!data?.classId) errors.push('classId is required');
+    if (!data?.subjectId) errors.push('subjectId is required');
+    if (data?.dayOfWeek === undefined || data?.dayOfWeek === null) errors.push('dayOfWeek is required');
+    if (!data?.startTime) errors.push('startTime is required');
+    if (!data?.endTime) errors.push('endTime is required');
+
+    // Format validation (only if value is present)
+    if (data?.classId && !UUID_RE.test(data.classId)) errors.push('classId must be a valid UUID');
+    if (data?.subjectId && !UUID_RE.test(data.subjectId)) errors.push('subjectId must be a valid UUID');
+    if (data?.staffId && !UUID_RE.test(data.staffId)) errors.push('staffId must be a valid UUID (or null)');
+    if (data?.startTime && !TIME_RE.test(data.startTime)) errors.push('startTime must be in HH:MM format');
+    if (data?.endTime && !TIME_RE.test(data.endTime)) errors.push('endTime must be in HH:MM format');
+
+    // dayOfWeek range check (1 = Monday … 5 = Friday, 6/7 = Sat/Sun)
+    const dow = Number(data?.dayOfWeek);
+    if (data?.dayOfWeek !== undefined && data?.dayOfWeek !== null && (isNaN(dow) || dow < 1 || dow > 7)) {
+      errors.push('dayOfWeek must be an integer 1-7 (1=Monday … 7=Sunday)');
+    }
+
+    // Logical: startTime must be before endTime
+    if (data?.startTime && data?.endTime && data.startTime >= data.endTime) {
+      errors.push('startTime must be earlier than endTime');
+    }
+
+    if (errors.length) {
+      throw new BadRequestException(`Invalid timetable slot: ${errors.join('; ')}`);
+    }
+
+    // FK existence checks — verify classId, subjectId, staffId belong to this school
+    // Run in parallel for performance.
+    const [cls, subj] = await Promise.all([
+      this.prisma.class.findFirst({ where: { id: data.classId, schoolId }, select: { id: true, name: true } }),
+      this.prisma.subject.findFirst({ where: { id: data.subjectId, schoolId }, select: { id: true, name: true } }),
+    ]);
+    if (!cls) throw new BadRequestException(`Class with id ${data.classId} not found in this school`);
+    if (!subj) throw new BadRequestException(`Subject with id ${data.subjectId} not found in this school`);
+
+    if (data.staffId) {
+      const staff = await this.prisma.staff.findFirst({ where: { id: data.staffId, schoolId }, select: { id: true, firstName: true, lastName: true } });
+      if (!staff) throw new BadRequestException(`Staff with id ${data.staffId} not found in this school`);
+    }
+  }
+
   async createSlot(data: any, schoolId: string) {
+    // P1-TT6 fix: validate BEFORE Prisma create so malformed input returns
+    // 400 Bad Request with an actionable message, not 500 Internal Server Error.
+    await this.validateSlotPayload(data, schoolId);
+
     const slot = await this.prisma.timetableSlot.create({
-      data: { ...data, dayOfWeek: Number(data.dayOfWeek) },
+      data: {
+        classId: data.classId,
+        subjectId: data.subjectId,
+        staffId: data.staffId || null,
+        dayOfWeek: Number(data.dayOfWeek),
+        startTime: data.startTime,
+        endTime: data.endTime,
+        room: data.room || null,
+      },
       include: { class: true, subject: true, staff: { select: { firstName: true, lastName: true } } },
     });
     return successResponse(slot, 'Slot created');
@@ -50,6 +119,23 @@ export class TimetableService {
 
   async createBatch(body: { slots: any[]; classIds?: string[] }, schoolId: string) {
     const { slots, classIds } = body;
+
+    // P1-TT6 fix: validate EVERY slot before persisting. If any one is
+    // malformed or references an unknown FK, reject the whole batch with a
+    // 400 + actionable message. The frontend already confirms before the
+    // batch fires (overwrite warning modal from Round 4), so a 400 here
+    // means the user has to cancel and fix the inputs — no partial writes.
+    if (slots && slots.length > 0) {
+      for (let i = 0; i < slots.length; i++) {
+        try {
+          await this.validateSlotPayload(slots[i], schoolId);
+        } catch (e: any) {
+          // Re-throw with the slot index appended for easier debugging.
+          throw new BadRequestException(`Slot #${i + 1}: ${e.response?.message || e.message}`);
+        }
+      }
+    }
+
     if (classIds && classIds.length > 0) {
       await this.prisma.timetableSlot.deleteMany({
         where: { classId: { in: classIds } },

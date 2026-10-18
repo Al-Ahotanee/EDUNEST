@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Plus, Users, UserCheck, Briefcase, Eye, Edit, Trash2, RefreshCw,
@@ -22,8 +23,42 @@ export default function HRStaffPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<HRTab>('staff');
+  // P1-25 fix: sync the active tab with the URL path so /app/hr/departments,
+  // /app/hr/leaves, and /app/hr/payroll show their respective content instead
+  // of always defaulting to the Staff Directory tab. Previously all 4 routes
+  // rendered HRStaffPage but the page never read the URL — every visit showed
+  // the staff directory regardless of which nav item was clicked.
+  const tabFromPath = (() => {
+    const segment = location.pathname.split('/').pop() || '';
+    if (segment === 'departments' || segment === 'leaves' || segment === 'payroll') {
+      return segment as HRTab;
+    }
+    return 'staff' as HRTab;
+  })();
+  const [activeTab, setActiveTab] = useState<HRTab>(tabFromPath);
+
+  // When the URL changes (user clicks a different HR nav item), update the tab.
+  useEffect(() => {
+    setActiveTab(tabFromPath);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // When the user clicks an in-page tab pill, navigate to the matching URL
+  // so the browser back button + bookmarks work correctly.
+  const handleTabChange = (tab: HRTab) => {
+    setActiveTab(tab);
+    if (tab === 'staff') {
+      navigate('/app/hr/staff', { replace: true });
+    } else if (tab === 'departments' || tab === 'leaves' || tab === 'payroll') {
+      navigate(`/app/hr/${tab}`, { replace: true });
+    }
+    // Other tabs (workload, documents, appraisals) don't have dedicated URLs —
+    // they stay on the current path.
+  };
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
 
@@ -376,7 +411,7 @@ export default function HRStaffPage() {
           return (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id as HRTab)}
+              onClick={() => handleTabChange(t.id as HRTab)}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
                 activeTab === t.id

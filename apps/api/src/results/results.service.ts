@@ -138,6 +138,57 @@ export class ResultsService {
   ) {
     const { userId, classId, subjectId = null, roleType } = data;
 
+    // ─── P0 fix: validate FK existence BEFORE the create call ──────────────
+    // Previously, passing a Staff ID (not a User ID) as `userId` would cause
+    // Prisma to throw an opaque P2003 foreign-key violation with no actionable
+    // context. Now we validate up-front and return a 400 Bad Request with a
+    // clear message that tells the admin exactly what's wrong.
+    const [user, cls, subj] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: { id: userId },
+        select: { id: true, firstName: true, lastName: true, schoolId: true },
+      }),
+      this.prisma.class.findFirst({
+        where: { id: classId, schoolId },
+        select: { id: true, name: true },
+      }),
+      subjectId ? this.prisma.subject.findFirst({
+        where: { id: subjectId, schoolId },
+        select: { id: true, name: true },
+      }) : Promise.resolve(null),
+    ]);
+
+    if (!user) {
+      // Helpful hint: if the caller passed a Staff ID by mistake (which is
+      // the most common cause of this error), point them at the right field.
+      const staffMatch = await this.prisma.staff.findFirst({
+        where: { id: userId },
+        select: { id: true, userId: true, firstName: true, lastName: true, email: true },
+      });
+      if (staffMatch) {
+        if (staffMatch.userId) {
+          throw new BadRequestException(
+            `You passed a Staff ID (${staffMatch.firstName} ${staffMatch.lastName}) instead of their User ID. ` +
+            `Use userId=${staffMatch.userId} instead.`
+          );
+        }
+        throw new BadRequestException(
+          `Staff "${staffMatch.firstName} ${staffMatch.lastName}" has no linked User account. ` +
+          `Assign a User account to this staff member first (via Staff edit form) so they can log in and be allocated to classes.`
+        );
+      }
+      throw new BadRequestException(`User with id ${userId} not found`);
+    }
+    if (user.schoolId && user.schoolId !== schoolId) {
+      throw new BadRequestException('This user does not belong to your school');
+    }
+    if (!cls) {
+      throw new BadRequestException(`Class with id ${classId} not found in this school`);
+    }
+    if (subjectId && !subj) {
+      throw new BadRequestException(`Subject with id ${subjectId} not found in this school`);
+    }
+
     const existing = await this.prisma.teacherAssignment.findFirst({
       where: {
         userId,

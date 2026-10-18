@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse, PaginationDto, paginate, safeSkip, safeTake } from '../common/dto/pagination.dto';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 
 // Allowlist of writable fields (prevents accidental mass-assignment of relations / read-only fields)
 const STAFF_WRITABLE_FIELDS = new Set([
@@ -55,18 +57,77 @@ export class HrService {
     });
     if (existing) throw new ConflictException('Staff ID already exists');
 
+    // P0 fix: auto-link Staff to a User account so they can be assigned to
+    // classes/subjects (TeacherAssignment.userId references User, not Staff).
+    // Strategy:
+    //  1. If staff.email matches an existing User in this school, link to it.
+    //  2. If no match but email is provided, create a new User with a default
+    //     password (the staff member can reset it later via Forgot Password).
+    //  3. If no email, leave userId null — admin can link later via edit.
+    let linkedUserId: string | null = null;
+    if (data.email) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: { email: data.email.toLowerCase().trim() },
+      });
+      if (existingUser) {
+        linkedUserId = existingUser.id;
+      } else {
+        // Look up the school to get tenantId for the new User
+        const school = await this.prisma.school.findUnique({
+          where: { id: schoolId },
+          select: { id: true, tenantId: true, code: true },
+        });
+        if (school?.tenantId) {
+          // Find or create a "Teacher" role for this tenant
+          let teacherRole = await this.prisma.role.findFirst({
+            where: { tenantId: school.tenantId, name: 'Teacher' },
+          });
+          if (!teacherRole) {
+            const readPerms = await this.prisma.permission.findMany({
+              where: { action: 'read' },
+            });
+            teacherRole = await this.prisma.role.create({
+              data: {
+                tenantId: school.tenantId,
+                name: 'Teacher',
+                description: 'Subject teacher / class master',
+                rolePermissions: { create: readPerms.map(p => ({ permissionId: p.id })) },
+              },
+            });
+          }
+          // Default password — staff must reset on first login via Forgot Password
+          const defaultPassword = await bcrypt.hash('password123', 12);
+          const newUser = await this.prisma.user.create({
+            data: {
+              tenantId: school.tenantId,
+              schoolId: school.id,
+              email: data.email.toLowerCase().trim(),
+              password: defaultPassword,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              phone: data.phone || null,
+              isEmailVerified: false,
+              userRoles: { create: { roleId: teacherRole.id } },
+            },
+          });
+          linkedUserId = newUser.id;
+        }
+      }
+    }
+
     const cleanData = pickAllowed(data, STAFF_WRITABLE_FIELDS);
     const staff = await this.prisma.staff.create({
       data: {
         ...cleanData,
         schoolId,
+        userId: linkedUserId,
         salary: cleanData.salary ? Number(cleanData.salary) : null,
         dateOfBirth: cleanData.dateOfBirth ? new Date(cleanData.dateOfBirth) : null,
         employmentDate: cleanData.employmentDate ? new Date(cleanData.employmentDate) : null,
       } as any,
       include: { department: true },
     });
-    return successResponse(staff, 'Staff created');
+    return successResponse(staff, 'Staff created' + (linkedUserId ? ' (linked User account auto-created with default password "password123")' : ''));
   }
 
   async getStaff(schoolId: string, query: PaginationDto & { departmentId?: string }) {
