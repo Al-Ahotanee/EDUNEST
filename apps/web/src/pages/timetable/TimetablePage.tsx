@@ -280,6 +280,17 @@ export default function TimetablePage() {
   const [printSelectedClassIds, setPrintSelectedClassIds] = useState<string[]>([]);
   const [printSelectedTeacherIds, setPrintSelectedTeacherIds] = useState<string[]>([]);
 
+  // P2-TT7 fix: signature block state — populated in the Print Center modal
+  // and rendered in the print layout so the printed timetable carries
+  // verifiable sign-off metadata (signatory name + date + stamp image).
+  const [signatureBlock, setSignatureBlock] = useState({
+    classTeacherName: '',
+    classTeacherDate: new Date().toISOString().slice(0, 10),
+    principalName: '',
+    principalDate: new Date().toISOString().slice(0, 10),
+    stampImage: '',  // base64 data URL — optional uploaded school seal
+  });
+
   // ─── QUERIES ───────────────────────────────────────────────────────────────
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
@@ -759,6 +770,11 @@ export default function TimetablePage() {
     defaultValues: {
       subjectId: '',
       staffId: '',
+      // P2-TT6 fix: expose Day + Period in the Assign modal so users can
+      // change which slot they're editing without closing the modal and
+      // clicking another cell. These default to the cell the user clicked.
+      dayOfWeek: 1,           // 1 = Monday, … 5 = Friday
+      periodKey: '',          // 'startTime-endTime' composite key
     }
   });
 
@@ -776,6 +792,26 @@ export default function TimetablePage() {
 
   const saveSlotMutation = useMutation({
     mutationFn: async (payload: any) => {
+      // P2-TT6 fix: support moving a slot to a different day/period via
+      // the modal's Day + Period dropdowns. The form's dayOfWeek + periodKey
+      // override the originally-clicked cell values when the user changes them.
+      // Resolve start/end times from the periodKey (format: "HH:MM-HH:MM").
+      let targetDay = activeSlotTarget?.dayOfWeek;
+      let targetStart = activeSlotTarget?.startTime;
+      let targetEnd = activeSlotTarget?.endTime;
+
+      if (payload.dayOfWeek && payload.dayOfWeek !== activeSlotTarget?.dayOfWeek) {
+        targetDay = Number(payload.dayOfWeek);
+      }
+      if (payload.periodKey && typeof payload.periodKey === 'string' && payload.periodKey.includes('-')) {
+        const [s, e] = payload.periodKey.split('-');
+        // Only override if user actually changed the period
+        if (s !== activeSlotTarget?.startTime || e !== activeSlotTarget?.endTime) {
+          targetStart = s;
+          targetEnd = e;
+        }
+      }
+
       if (activeSlotTarget?.existingSlotId) {
         await tapi.delete(activeSlotTarget.existingSlotId);
       }
@@ -783,9 +819,9 @@ export default function TimetablePage() {
         classId: selectedClass,
         subjectId: payload.subjectId,
         staffId: payload.staffId || null,
-        dayOfWeek: activeSlotTarget.dayOfWeek,
-        startTime: activeSlotTarget.startTime,
-        endTime: activeSlotTarget.endTime,
+        dayOfWeek: targetDay,
+        startTime: targetStart,
+        endTime: targetEnd,
       });
     },
     onSuccess: () => {
@@ -1076,6 +1112,9 @@ export default function TimetablePage() {
     editForm.reset({
       subjectId: existingSlot?.subjectId || (subjects[0]?.id || ''),
       staffId: existingSlot?.staffId || (staff[0]?.id || ''),
+      // P2-TT6: seed Day + Period fields with the clicked cell's values
+      dayOfWeek: dayOfWeek,
+      periodKey: `${period.start}-${period.end}`,
     });
 
     setSlotEditModal(true);
@@ -1174,7 +1213,19 @@ export default function TimetablePage() {
   return (
     <div className="space-y-6 animate-fade-in pb-16">
       {/* ─── PRINT FORMAL LAYOUT (PRINT ONLY) ─────────────────────────────────── */}
-      <div className="hidden print:block text-slate-900 p-4">
+      {/* P2-TT5 fix: hard-coded display:none on screen + print:block via Tailwind.
+          Belt-and-suspenders: inline style guarantees zero flicker even if
+          Tailwind's print: variant fails to apply on first paint. */}
+      <div
+        className="hidden print:block text-slate-900 p-4 edunest-print-layout"
+        style={{ display: 'none' }}
+        ref={(el) => {
+          // On mount + whenever printScope changes, ensure the element is
+          // hidden on screen. The browser's print engine will override via
+          // @media print CSS in index.css.
+          if (el) el.style.display = 'none';
+        }}
+      >
         {/* Print Sheet Logic based on printScope */}
         {printScope === 'current_class' && (
           <div className="space-y-4">
@@ -1232,18 +1283,46 @@ export default function TimetablePage() {
               </tbody>
             </table>
 
-            {/* Validation Sign-off Box */}
+            {/* Validation Sign-off Box — P2-TT7 fix: functional signature blocks
+                populated from the Print Center modal inputs */}
             <div className="grid grid-cols-3 gap-4 pt-8 text-xs text-center border-t border-slate-400 mt-8">
               <div>
-                <div className="border-t border-slate-800 w-44 mx-auto pt-1 font-bold">Class Teacher Signature</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{activeClassProfile.isSingleClassMaster ? 'Sole Homeroom Master' : 'Form Teacher'}</div>
+                {signatureBlock.stampImage ? (
+                  <img
+                    src={signatureBlock.stampImage}
+                    alt="School Seal"
+                    className="w-20 h-20 object-contain mx-auto mb-1 opacity-90"
+                  />
+                ) : null}
+                <div className="border-t border-slate-800 w-44 mx-auto pt-1 font-bold">
+                  {signatureBlock.classTeacherName || (
+                    <span className="text-slate-400 italic">Class Teacher Signature</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  {activeClassProfile.isSingleClassMaster ? 'Sole Homeroom Master' : 'Form Teacher'}
+                  {signatureBlock.classTeacherDate && (
+                    <span> · {new Date(signatureBlock.classTeacherDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  )}
+                </div>
               </div>
               <div>
-                <div className="border-t border-slate-800 w-44 mx-auto pt-1 font-bold">Principal / Headmaster</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Approved & Certified</div>
+                <div className="border-t border-slate-800 w-44 mx-auto pt-1 font-bold">
+                  {signatureBlock.principalName || (
+                    <span className="text-slate-400 italic">Principal / Headmaster</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  Approved &amp; Certified
+                  {signatureBlock.principalDate && (
+                    <span> · {new Date(signatureBlock.principalDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  )}
+                </div>
               </div>
-              <div className="border border-slate-400 rounded-lg p-3 text-[10px] text-slate-500">
-                Official Institutional Seal & Date Stamp
+              <div className="border border-slate-400 rounded-lg p-3 text-[10px] text-slate-500 flex items-center justify-center">
+                {signatureBlock.stampImage
+                  ? <span className="font-semibold text-slate-700">Official Seal Applied</span>
+                  : 'Official Institutional Seal & Date Stamp'}
               </div>
             </div>
           </div>
@@ -2938,6 +3017,62 @@ export default function TimetablePage() {
               </div>
             </div>
 
+            {/* P2-TT6 fix: Day + Period dropdowns so admins can move a slot
+                without closing the modal and clicking another cell. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Day</label>
+                <select
+                  {...editForm.register('dayOfWeek', { valueAsNumber: true, required: true })}
+                  className="input w-full"
+                >
+                  {DAYS.map((d, i) => (
+                    <option key={d} value={i + 1}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Period</label>
+                <select
+                  {...editForm.register('periodKey', { required: true })}
+                  className="input w-full"
+                >
+                  {periodSlots.filter(p => !p.isBreak).map(p => (
+                    <option key={p.id} value={`${p.start}-${p.end}`}>
+                      {p.label} ({p.start} - {p.end})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Show "moving" hint when user changes day or period */}
+            {(() => {
+              const watchedDay = editForm.watch('dayOfWeek');
+              const watchedPeriod = editForm.watch('periodKey');
+              const dayChanged = Number(watchedDay) !== activeSlotTarget?.dayOfWeek;
+              const periodChanged = watchedPeriod && watchedPeriod !== `${activeSlotTarget?.startTime}-${activeSlotTarget?.endTime}`;
+              if (!dayChanged && !periodChanged) return null;
+              const newDayName = DAYS[(Number(watchedDay) || 1) - 1];
+              const newPeriodLabel = periodSlots.find(p => `${p.start}-${p.end}` === watchedPeriod)?.label || '';
+              return (
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-xs flex items-start gap-2">
+                  <ArrowRightLeft size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-blue-950">Moving slot</p>
+                    <p className="text-blue-800 mt-0.5">
+                      From <strong>{activeSlotTarget?.dayName} {activeSlotTarget?.periodLabel}</strong>
+                      {' → '}
+                      <strong>{newDayName} {newPeriodLabel}</strong>
+                    </p>
+                    <p className="text-blue-600 text-[10px] mt-1">
+                      The original slot will be cleared and a new one created at the target day/period.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Subject Select */}
             <div>
               <label className="block text-slate-700 font-bold mb-1">Subject</label>
@@ -3234,6 +3369,95 @@ export default function TimetablePage() {
                 ))}
               </div>
             )}
+
+            {/* P2-TT7 fix: signature block inputs — appear on the printed sheet.
+                Signatory names + dates are typed in here and rendered as
+                "Approved by" lines on the printout. The school seal is an
+                optional image upload (PNG/JPG of the school stamp). */}
+            <div className="border border-slate-200 rounded-xl p-3 space-y-3 bg-slate-50/60">
+              <div>
+                <p className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                  <CheckSquare size={12} className="text-blue-600" /> Sign-off Block
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  These values will be rendered at the bottom of the printed timetable sheet. Leave blank to print empty signature lines.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Class Teacher Name</label>
+                  <input
+                    type="text"
+                    value={signatureBlock.classTeacherName}
+                    onChange={e => setSignatureBlock(s => ({ ...s, classTeacherName: e.target.value }))}
+                    placeholder="e.g. Mr. Bello Adekunle"
+                    className="input w-full py-1.5 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Class Teacher Date</label>
+                  <input
+                    type="date"
+                    value={signatureBlock.classTeacherDate}
+                    onChange={e => setSignatureBlock(s => ({ ...s, classTeacherDate: e.target.value }))}
+                    className="input w-full py-1.5 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Principal / Headmaster</label>
+                  <input
+                    type="text"
+                    value={signatureBlock.principalName}
+                    onChange={e => setSignatureBlock(s => ({ ...s, principalName: e.target.value }))}
+                    placeholder="e.g. Dr. Hauwa Mohammed"
+                    className="input w-full py-1.5 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Principal Date</label>
+                  <input
+                    type="date"
+                    value={signatureBlock.principalDate}
+                    onChange={e => setSignatureBlock(s => ({ ...s, principalDate: e.target.value }))}
+                    className="input w-full py-1.5 text-xs"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">School Seal / Stamp Image (optional)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 500 * 1024) {
+                        toast.error('Stamp image must be under 500KB');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setSignatureBlock(s => ({ ...s, stampImage: reader.result as string }));
+                        toast.success('School seal attached');
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 file:font-semibold file:text-[10px] hover:file:bg-blue-100"
+                  />
+                  {signatureBlock.stampImage && (
+                    <button
+                      type="button"
+                      onClick={() => { setSignatureBlock(s => ({ ...s, stampImage: '' })); toast.success('Seal removed'); }}
+                      className="text-[10px] text-red-600 hover:text-red-800 font-semibold"
+                    >Remove</button>
+                  )}
+                </div>
+                {signatureBlock.stampImage && (
+                  <img src={signatureBlock.stampImage} alt="Seal preview" className="mt-2 w-16 h-16 object-contain border border-slate-200 rounded-lg p-1" />
+                )}
+              </div>
+            </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
               <Button variant="secondary" onClick={() => setPrintCenterModal(false)}>

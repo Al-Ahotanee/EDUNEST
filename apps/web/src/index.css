@@ -388,4 +388,10 @@
   body {
     background: white !important;
   }
+  /* P2-TT5 fix: explicitly show the print-only layout during printing.
+     The inline style="display:none" is overridden here with !important
+     so the timetable printable sheet appears in the print output. */
+  .edunest-print-layout {
+    display: block !important;
+  }
 }
