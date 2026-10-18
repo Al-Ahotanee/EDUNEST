@@ -142,6 +142,7 @@ model User {
   school             School?             @relation(fields: [schoolId], references: [id])
   userRoles          UserRole[]
   refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   auditLogs          AuditLog[]
   notifications      Notification[]
   sentMessages       Message[]           @relation("SentMessages")
@@ -162,6 +163,20 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Password reset token issued by /auth/forgot-password and consumed by
+/// /auth/reset-password. Single-use, expires after 30 minutes.
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model LoginHistory {
@@ -1210,10 +1225,11 @@ enum SubscriptionStatus {
 }
 
 enum SchoolType {
-  NURSERY
-  PRIMARY
-  SECONDARY
-  COMBINED
+  NURSERY          // Pre-Nursery / Early Years (Crèche, Playgroup)
+  PRIMARY          // Primary School (Nursery & Basic 1-6)
+  SECONDARY        // Secondary School (JSS & SSS)
+  COMBINED         // K-12 Comprehensive (Pre-Nursery → SSS)
+  TERTIARY         // Tertiary College / Polytechnic
 }
 
 enum Gender {

@@ -243,7 +243,7 @@ export default function HRStaffPage() {
     { key: 'designation', header: 'Designation & Dept', render: (r: any) => (
       <div>
         <p className="text-sm font-medium text-slate-800">{r.designation || 'Class Teacher'}</p>
-        <p className="text-xs text-slate-400">{r.department?.name || 'Academic Faculty'}</p>
+        <p className="text-xs text-slate-400">{r.department?.name || 'Acadademic Staff'}</p>
       </div>
     )},
     {
@@ -357,7 +357,7 @@ export default function HRStaffPage() {
       {/* ─── KPI STATS ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Staff" value={totalStaff} icon={<Users size={20} />} color="blue" />
-        <StatCard title="Academic Faculty" value={Math.round(totalStaff * 0.75)} icon={<UserCheck size={20} />} color="green" />
+        <StatCard title="Acadademic Staff" value={Math.round(totalStaff * 0.75)} icon={<UserCheck size={20} />} color="green" />
         <StatCard title="Active Departments" value={(deptData || []).length || 6} icon={<Briefcase size={20} />} color="purple" />
         <StatCard title="On Approved Leave" value={(leavesData || []).filter((l: any) => l.status === 'APPROVED').length} icon={<Clock size={20} />} color="amber" />
       </div>
@@ -480,7 +480,7 @@ export default function HRStaffPage() {
       {activeTab === 'leaves' && (
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between flex-wrap gap-2">
-            <h3 className="font-bold text-slate-800 text-sm">Faculty Leave Applications Pipeline</h3>
+            <h3 className="font-bold text-slate-800 text-sm">Staff Leave Applications Pipeline</h3>
             <span className="text-xs text-slate-500 font-mono">Workflow: Applicant ➔ Relief Assigned ➔ Principal Approval</span>
           </div>
 
@@ -660,7 +660,7 @@ export default function HRStaffPage() {
         <div className="space-y-4">
           <div className="card p-5 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-100 flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">Faculty Performance Appraisals</h3>
+              <h3 className="font-bold text-slate-900 text-base">Staff Performance Appraisals</h3>
               <p className="text-xs text-slate-600">Termly KPI evaluation covering pedagogical delivery, student exam pass rates, punctuality, and peer reviews.</p>
             </div>
             <button
@@ -676,7 +676,7 @@ export default function HRStaffPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>Faculty Member</th>
+                    <th>Staff Member</th>
                     <th>Evaluation Cycle</th>
                     <th>Teaching Score</th>
                     <th>Student Pass Rate</th>
@@ -715,7 +715,7 @@ export default function HRStaffPage() {
       <Modal
         open={!!viewDossier}
         onClose={() => setViewDossier(null)}
-        title="Faculty Staff Dossier & Academic Credentials"
+        title="Staff Dossier & Academic Credentials"
         size="lg"
         footer={<Button variant="secondary" onClick={() => setViewDossier(null)}>Close</Button>}
       >
@@ -807,10 +807,10 @@ export default function HRStaffPage() {
                 <div>
                   <p><span className="text-slate-400">Employee Name: </span><strong className="text-slate-900">{payslipModal.firstName} {payslipModal.lastName}</strong></p>
                   <p className="mt-1"><span className="text-slate-400">Staff ID: </span><strong className="font-mono">{payslipModal.staffId}</strong></p>
-                  <p className="mt-1"><span className="text-slate-400">Designation: </span>{payslipModal.designation || 'Senior Faculty'}</p>
+                  <p className="mt-1"><span className="text-slate-400">Designation: </span>{payslipModal.designation || 'Senior Staff'}</p>
                 </div>
                 <div>
-                  <p><span className="text-slate-400">Department: </span>{payslipModal.department?.name || 'Academic Faculty'}</p>
+                  <p><span className="text-slate-400">Department: </span>{payslipModal.department?.name || 'Acadademic Staff'}</p>
                   <p className="mt-1"><span className="text-slate-400">Bank Name: </span>{payslipModal.bankName || 'First Bank of Nigeria'}</p>
                   <p className="mt-1"><span className="text-slate-400">Account No: </span><strong className="font-mono">{payslipModal.accountNumber || '0123456789'}</strong></p>
                 </div>
@@ -963,7 +963,7 @@ export default function HRStaffPage() {
       <Modal
         open={staffModal}
         onClose={() => { setStaffModal(false); setEditing(null); staffForm.reset(); setStaffPhotoPreview(''); }}
-        title={editing ? 'Edit Staff Profile' : 'Enroll New Faculty / Staff'}
+        title={editing ? 'Edit Staff Profile' : 'Enroll New Staff'}
         size="lg"
         footer={
           <>
@@ -1065,14 +1065,14 @@ export default function HRStaffPage() {
       <Modal
         open={appraisalModal}
         onClose={() => setAppraisalModal(false)}
-        title="Conduct Faculty Performance Appraisal"
+        title="Conduct Staff Performance Appraisal"
         size="md"
         footer={
           <>
             <Button variant="secondary" onClick={() => setAppraisalModal(false)}>Cancel</Button>
             <Button
               onClick={() => {
-                toast.success('Appraisal score recorded and filed to faculty dossier');
+                toast.success('Appraisal score recorded and filed to staff dossier');
                 setAppraisalModal(false);
               }}
             >
@@ -1084,7 +1084,7 @@ export default function HRStaffPage() {
         <div className="space-y-3">
           <Select
             label="Staff Member Under Review"
-            options={staffList.map((s: any) => ({ value: s.id, label: `${s.firstName} ${s.lastName} (${s.designation || 'Faculty'})` }))}
+            options={staffList.map((s: any) => ({ value: s.id, label: `${s.firstName} ${s.lastName} (${s.designation || 'Staff'})` }))}
             placeholder="Select staff member"
           />
           <Input label="Review Cycle" defaultValue="2026/2027 Academic Session — Term 1" />

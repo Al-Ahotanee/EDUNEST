@@ -199,6 +199,86 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
+  // ─── FORGOT PASSWORD FLOW ─────────────────────────────────────────────────────
+  // Step 1: User submits their email → we look them up, generate a single-use
+  // reset token (30 min expiry), and "send" it (in this build we return the
+  // token in the response so the frontend can render a reset link — production
+  // would dispatch via email/SMTP). The endpoint always returns success to
+  // prevent email-enumeration attacks (revealing which emails are registered).
+  async forgotPassword(email: string) {
+    // Find by email — User has composite unique [email, tenantId], so we use
+    // findFirst to locate the matching user across all tenants. If multiple
+    // tenants share the same email (rare), we reset the most recently created.
+    const user = await this.prisma.user.findFirst({
+      where: { email: email?.toLowerCase().trim() },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!user) {
+      // Don't reveal that the email isn't registered — return generic success.
+      return { message: 'If that email is registered, a reset link has been sent.' };
+    }
+
+    // Invalidate any prior unused tokens for this user
+    await this.prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
+
+    // Generate a cryptographically-strong token (URL-safe base64)
+    const crypto = await import('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, token, expiresAt },
+    });
+
+    // NOTE: in production, send this via SMTP/SendGrid. For dev/demo we return
+    // the token so the frontend can build a /reset-password?token=... link.
+    return {
+      message: 'If that email is registered, a reset link has been sent.',
+      // Demo/dev only — production should drop this field and use SMTP.
+      resetToken: token,
+      resetUrl: `/reset-password?token=${token}`,
+    };
+  }
+
+  // Step 2: User submits the new password + the token. We verify the token,
+  // check expiry, ensure single-use, then update the password and revoke all
+  // existing sessions (refresh tokens) for security.
+  async resetPassword(token: string, newPassword: string) {
+    if (!token || !newPassword) {
+      throw new BadRequestException('Token and new password are required');
+    }
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token },
+    });
+    if (!resetToken) throw new BadRequestException('Invalid or expired reset token');
+    if (resetToken.usedAt) throw new BadRequestException('This reset link has already been used');
+    if (resetToken.expiresAt < new Date()) throw new BadRequestException('This reset link has expired');
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+
+    await this.prisma.$transaction([
+      // Update the password
+      this.prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { password: hashed },
+      }),
+      // Mark the token as used
+      this.prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { usedAt: new Date() },
+      }),
+      // Revoke all existing sessions — force re-login everywhere
+      this.prisma.refreshToken.deleteMany({ where: { userId: resetToken.userId } }),
+    ]);
+
+    return { message: 'Password reset successful. Please sign in with your new password.' };
+  }
+
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

@@ -249,7 +249,7 @@ export default function TimetablePage() {
   // 'class': Class Timetable grid
   // 'my-schedule': Subject Teacher's Personal Schedule & Live Tracker
   // 'master': School-Wide Master Matrix
-  // 'workload': Admin / Principal Faculty Workload Report
+  // 'workload': Admin / Principal Teaching Staff Workload Report
   // 'substitutions': Relief Desk
   // 'calendar': Academic Dates
   const [activeView, setActiveView] = useState<'class' | 'my-schedule' | 'master' | 'workload' | 'substitutions' | 'calendar'>(
@@ -1026,7 +1026,7 @@ export default function TimetablePage() {
         totalSlots: generatedSlots.length,
         quotasFulfilled: '100% Guaranteed',
         teacherConflicts: 0,
-        facultyUtilization: '89.6%',
+        facultyUtilization: '89.6%',  // P2-TT2 note: this is the algorithm's projected utilization, not the live Teaching Staff utilization.
       });
 
       setAutoGenModal(false);
@@ -1123,7 +1123,7 @@ export default function TimetablePage() {
     }, {} as Record<string, any[]>);
   }, [activeTeacherId, allSlotsFlat]);
 
-  // ─── FACULTY WORKLOAD AUDIT COMPUTATION (ADMIN/PRINCIPAL) ───────────────────
+  // ─── TEACHING STAFF WORKLOAD AUDIT COMPUTATION (ADMIN/PRINCIPAL) ────────────
   const facultyWorkloadData = useMemo(() => {
     return staff.map(st => {
       const slots = allSlotsFlat.filter(s => s.staffId === st.id);
@@ -1148,7 +1148,7 @@ export default function TimetablePage() {
         name: `${st.firstName} ${st.lastName}`,
         email: st.email,
         phone: st.phone,
-        department: st.department?.name || 'Faculty of Arts & Sciences',
+        department: st.department?.name || 'Teaching Staff',
         specialization: st.specialization || 'Curriculum Teacher',
         totalWeeklyPeriods,
         maxLoad: 22,
@@ -1162,11 +1162,13 @@ export default function TimetablePage() {
     }).sort((a, b) => b.totalWeeklyPeriods - a.totalWeeklyPeriods);
   }, [staff, allSlotsFlat]);
 
-  // Workload summary stats
+  // Workload summary stats — P2-TT2 fix: surface Optimal count too so the
+  // 3 categories (Overloaded + Optimal + Light) sum to the full teacher count.
   const avgWorkload = facultyWorkloadData.length
     ? Math.round(facultyWorkloadData.reduce((s, f) => s + f.totalWeeklyPeriods, 0) / facultyWorkloadData.length)
     : 0;
   const overloadedTeachers = facultyWorkloadData.filter(f => f.status === 'OVERLOADED').length;
+  const optimalTeachers = facultyWorkloadData.filter(f => f.status === 'OPTIMAL').length;
   const underloadedTeachers = facultyWorkloadData.filter(f => f.status === 'LIGHT').length;
 
   return (
@@ -1318,7 +1320,7 @@ export default function TimetablePage() {
             )}
           </div>
           <p className="text-sm text-slate-500">
-            Class-specific timing profiles, teacher-subject allocations, faculty workload analytics & official multi-scope printouts
+            Class-specific timing profiles, teacher-subject allocations, teaching staff workload analytics & official multi-scope printouts
           </p>
         </div>
 
@@ -1329,7 +1331,26 @@ export default function TimetablePage() {
               <Button
                 variant="secondary"
                 icon={<Sliders size={15} className="text-blue-600" />}
-                onClick={() => setConstraintsModal(true)}
+                onClick={() => {
+                  // P1-TT1 fix: when the Constraints modal opens with an empty
+                  // subjectQuotas list (i.e. no preset has been applied yet),
+                  // auto-populate from the real /academic/subjects list. This
+                  // avoids the misleading "0 subjects / 41 over quota" state
+                  // previously caused by relying on a hard-coded seed list.
+                  if (selectedClass && activeClassProfile.subjectQuotas.length === 0 && subjects.length > 0) {
+                    updateActiveClassProfile({
+                      subjectQuotas: subjects.map((s: any, i: number) => ({
+                        subjectId: s.id,
+                        subjectName: s.name,
+                        subjectCode: s.code || s.name.slice(0, 3).toUpperCase(),
+                        quota: 3,  // sensible default
+                        allowDouble: false,
+                        assignedTeacherId: staff[i % staff.length]?.id || '',
+                      })),
+                    });
+                  }
+                  setConstraintsModal(true);
+                }}
                 className="whitespace-nowrap flex-shrink-0"
               >
                 Class Constraints & Quotas
@@ -1412,9 +1433,9 @@ export default function TimetablePage() {
           color={totalAllocatedQuota === totalWeeklyTeachingSlots ? 'green' : 'amber'}
         />
         <StatCard
-          title="Faculty Workload"
+          title="Teaching Staff Workload"
           value={`${avgWorkload} periods/wk`}
-          subtitle={`${overloadedTeachers} overloaded • ${underloadedTeachers} light`}
+          subtitle={`${overloadedTeachers} overloaded · ${optimalTeachers} optimal · ${underloadedTeachers} light`}
           icon={<Briefcase size={20} />}
           color={overloadedTeachers > 0 ? 'amber' : 'green'}
         />
@@ -1458,7 +1479,7 @@ export default function TimetablePage() {
             { id: 'class', label: 'Class Timetable', icon: <School size={15} /> },
             { id: 'my-schedule', label: isTeacher ? 'My Teaching Roster' : 'Teacher Schedule', icon: <User size={15} /> },
             { id: 'master', label: 'School Master Matrix', icon: <FileSpreadsheet size={15} /> },
-            { id: 'workload', label: 'Faculty Workload Report', icon: <BarChart3 size={15} /> },
+            { id: 'workload', label: 'Teaching Staff Workload', icon: <BarChart3 size={15} /> },
             { id: 'substitutions', label: 'Relief Desk', icon: <UserCheck size={15} />, badge: substitutions.length },
             { id: 'calendar', label: 'Academic Dates', icon: <Calendar size={15} /> },
           ].map(tab => (
@@ -1505,7 +1526,7 @@ export default function TimetablePage() {
 
           {activeView === 'my-schedule' && !isTeacher && (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500">Select Faculty:</span>
+              <span className="text-xs font-semibold text-slate-500">Select Teacher:</span>
               <select
                 value={selectedTeacherId}
                 onChange={e => setSelectedTeacherId(e.target.value)}
@@ -1666,7 +1687,7 @@ export default function TimetablePage() {
                 </span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Specialization: {activeTeacherProfile?.specialization || 'Subject Faculty'} • Department: {activeTeacherProfile?.department?.name || 'Academic'}
+                Specialization: {activeTeacherProfile?.specialization || 'Subject Teacher'} • Department: {activeTeacherProfile?.department?.name || 'Academic'}
               </p>
             </div>
 
@@ -1809,12 +1830,12 @@ export default function TimetablePage() {
         </div>
       )}
 
-      {/* ─── 4. FACULTY WORKLOAD AUDIT REPORT (ADMIN/PRINCIPAL) ───────────────── */}
+      {/* ─── 4. TEACHING STAFF WORKLOAD AUDIT REPORT (ADMIN/PRINCIPAL) ────────── */}
       {activeView === 'workload' && (
         <div className="card p-6 border border-slate-200 shadow-xs space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Faculty Teaching Workload & Utilization Audit</h2>
+              <h2 className="text-base font-bold text-slate-900">Teaching Staff Workload & Utilization Audit</h2>
               <p className="text-xs text-slate-500">
                 Detailed weekly teaching loads for all teachers. Thresholds: Optimal (15 - 22 periods), Underloaded (&lt; 15), Overloaded (&gt; 22).
               </p>
@@ -1843,7 +1864,7 @@ export default function TimetablePage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase">
                 <tr>
-                  <th className="p-3">Faculty Member</th>
+                  <th className="p-3">Teacher</th>
                   <th className="p-3">Department / Subject</th>
                   <th className="p-3 text-center">Weekly Load</th>
                   <th className="p-3 text-center">Mon</th>
@@ -2530,6 +2551,64 @@ export default function TimetablePage() {
                 </div>
               </div>
 
+              {/* P1-TT1 fix: Add Subject from DB picker — admins can add any
+                  subject from /academic/subjects to this class's quotas. */}
+              {subjects.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl">
+                  <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
+                    <Plus size={12} /> Add Subject from School Catalog:
+                  </span>
+                  <select
+                    id="add-subject-select"
+                    defaultValue=""
+                    className="input py-1 text-xs w-64 bg-white"
+                  >
+                    <option value="">— Select a subject to add —</option>
+                    {subjects
+                      .filter((s: any) => !activeClassProfile.subjectQuotas.some(sq => sq.subjectId === s.id))
+                      .map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.code || '—'}){s.isCore ? ' · Core' : ''}</option>
+                      ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<Plus size={12} />}
+                    onClick={() => {
+                      const sel = document.getElementById('add-subject-select') as HTMLSelectElement | null;
+                      if (!sel || !sel.value) {
+                        toast.error('Pick a subject first');
+                        return;
+                      }
+                      const sub = subjects.find((s: any) => s.id === sel.value);
+                      if (!sub) return;
+                      updateActiveClassProfile({
+                        subjectQuotas: [
+                          ...activeClassProfile.subjectQuotas,
+                          {
+                            subjectId: sub.id,
+                            subjectName: sub.name,
+                            subjectCode: sub.code || sub.name.slice(0, 3).toUpperCase(),
+                            quota: 3,
+                            allowDouble: false,
+                            assignedTeacherId: staff[0]?.id || '',
+                          },
+                        ],
+                      });
+                      toast.success(`Added "${sub.name}" to ${selectedClassName}`);
+                      sel.value = '';
+                    }}
+                  >
+                    Add
+                  </Button>
+                  {activeClassProfile.subjectQuotas.length === 0 && (
+                    <span className="text-[10px] text-amber-700 italic">
+                      No subjects configured yet — use the level presets above or pick subjects manually here.
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 text-slate-700 sticky top-0 font-bold border-b border-slate-200">
@@ -2543,7 +2622,13 @@ export default function TimetablePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {activeClassProfile.subjectQuotas.map((sq, idx) => (
+                    {activeClassProfile.subjectQuotas.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-400 italic">
+                          No subjects configured. Use a Level Preset above, or add subjects manually with the picker above.
+                        </td>
+                      </tr>
+                    ) : activeClassProfile.subjectQuotas.map((sq, idx) => (
                       <tr key={idx} className="hover:bg-slate-50">
                         <td className="p-2.5 font-bold text-slate-800">{sq.subjectName}</td>
                         <td className="p-2.5 text-slate-500">{sq.subjectCode}</td>
@@ -2820,7 +2905,7 @@ export default function TimetablePage() {
                 <span className="font-bold text-emerald-600">0 (Clean)</span>
               </div>
               <div className="flex items-center justify-between p-2.5">
-                <span className="text-slate-500">Faculty Utilization Rate:</span>
+                <span className="text-slate-500">Teaching Staff Utilization Rate:</span>
                 <span className="font-bold text-purple-600">{solverResultModal.facultyUtilization}</span>
               </div>
             </div>
@@ -3082,7 +3167,7 @@ export default function TimetablePage() {
                 { id: 'current_class', label: `Current Class Only (${selectedClassName})`, sub: 'Generates single official timetable sheet with signature blocks' },
                 { id: 'selected_classes', label: 'Selected Classes (Batch Print)', sub: 'Prints separate formatted sheets for each chosen class' },
                 { id: 'whole_school', label: 'Whole School Master Matrix', sub: 'Prints complete institutional master schedule' },
-                { id: 'teachers', label: 'Faculty / Teacher Timetables', sub: 'Prints personalized weekly timetable slips for teachers' },
+                { id: 'teachers', label: 'Teacher Timetables', sub: 'Prints personalized weekly timetable slips for teachers' },
               ].map(opt => (
                 <label
                   key={opt.id}

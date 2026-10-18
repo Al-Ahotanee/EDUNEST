@@ -12,6 +12,14 @@ export class SaasController {
   @Post('register')
   registerSchool(@Body() body: any) { return this.saasService.registerSchool(body); }
 
+  // EDN-slug fix: live availability check used by the registration form
+  // so users can see whether a slug is taken BEFORE submitting. Returns
+  // { available: boolean, slug: string, suggestion?: string }.
+  @Public()
+  @Get('check-slug/:slug')
+  @ApiOperation({ summary: 'Check if a school slug (subdomain) is available' })
+  checkSlug(@Param('slug') slug: string) { return this.saasService.checkSlugAvailability(slug); }
+
   @Public()
   @Get('school/:slug')
   getSchoolInfo(@Param('slug') slug: string) { return this.saasService.getPublicSchoolInfo(slug); }

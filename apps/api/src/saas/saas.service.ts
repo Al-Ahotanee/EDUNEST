@@ -9,10 +9,94 @@ import { Prisma } from '@prisma/client';
 export class SaasService {
   constructor(private prisma: PrismaService) {}
 
+  // ─── SLUG VALIDATION ─────────────────────────────────────────────────────────
+  // Slugs map directly to subdomains: <slug>.edunest.com
+  // Rules:
+  //   - 3 to 30 characters
+  //   - lowercase alphanumeric + hyphens only
+  //   - must start and end with a letter or digit (no leading/trailing hyphens)
+  //   - no consecutive hyphens
+  //   - reserved subdomains (www, api, app, admin, mail, ftp) are blocked
+  private static readonly RESERVED_SLUGS = new Set([
+    'www', 'api', 'app', 'admin', 'mail', 'ftp', 'smtp', 'imap',
+    'ns1', 'ns2', 'cdn', 'assets', 'static', 'portal', 'login',
+    'register', 'auth', 'edunest', 'support', 'help', 'blog',
+    'docs', 'dev', 'staging', 'test', 'demo', 'sandbox',
+  ]);
+
+  private validateSlug(slug: string): { valid: boolean; reason?: string } {
+    if (!slug || typeof slug !== 'string') {
+      return { valid: false, reason: 'Slug is required' };
+    }
+    const s = slug.trim().toLowerCase();
+    if (s.length < 3) return { valid: false, reason: 'Must be at least 3 characters' };
+    if (s.length > 30) return { valid: false, reason: 'Must be 30 characters or fewer' };
+    if (!/^[a-z0-9-]+$/.test(s)) {
+      return { valid: false, reason: 'Only lowercase letters, digits, and hyphens allowed' };
+    }
+    if (!/^[a-z0-9]/.test(s) || !/[a-z0-9]$/.test(s)) {
+      return { valid: false, reason: 'Must start and end with a letter or digit' };
+    }
+    if (s.includes('--')) {
+      return { valid: false, reason: 'Consecutive hyphens not allowed' };
+    }
+    if (SaasService.RESERVED_SLUGS.has(s)) {
+      return { valid: false, reason: `'${s}' is a reserved subdomain` };
+    }
+    return { valid: true };
+  }
+
+  // Public availability check — called by the registration form via debounce.
+  // Always returns 200 with { available, slug, reason? } so the frontend can
+  // render inline validation messages without distinguishing 4xx errors.
+  async checkSlugAvailability(rawSlug: string) {
+    const slug = (rawSlug || '').trim().toLowerCase();
+    const validation = this.validateSlug(slug);
+    if (!validation.valid) {
+      return successResponse({
+        available: false,
+        slug,
+        reason: validation.reason,
+        suggestion: null,
+      });
+    }
+    const existing = await this.prisma.tenant.findUnique({ where: { slug } });
+    if (existing) {
+      // Suggest an alternative by appending a digit
+      let suggestion: string | null = null;
+      for (let i = 2; i <= 9; i++) {
+        const candidate = `${slug}-${i}`;
+        const taken = await this.prisma.tenant.findUnique({ where: { slug: candidate } });
+        if (!taken) { suggestion = candidate; break; }
+      }
+      return successResponse({
+        available: false,
+        slug,
+        reason: 'This subdomain is already taken',
+        suggestion,
+      });
+    }
+    return successResponse({
+      available: true,
+      slug,
+      reason: null,
+      suggestion: null,
+    });
+  }
+
   async registerSchool(body: any) {
     const { school, admin, plan, referralCode, documents } = body;
+
+    // EDN-slug fix: strict validation BEFORE checking the DB so we never
+    // persist a malformed slug. The frontend also runs the same checks live
+    // but the backend is the source of truth.
+    const slugValidation = this.validateSlug(school.slug);
+    if (!slugValidation.valid) {
+      throw new BadRequestException(`Invalid school URL: ${slugValidation.reason}`);
+    }
+
     const existing = await this.prisma.tenant.findUnique({ where: { slug: school.slug } });
-    if (existing) throw new ConflictException('School URL slug already taken. Choose a different name.');
+    if (existing) throw new ConflictException('This subdomain is already taken. Choose a different name.');
 
     // Validate referral code
     let marketerId: string | null = null;

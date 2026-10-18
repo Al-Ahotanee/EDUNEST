@@ -11,6 +11,8 @@ import LandingPage from './pages/landing/LandingPage';
 import SaasRegisterPage from './pages/saas/SaasRegisterPage';
 import ParentPortalPage from './pages/parent-portal/ParentPortalPage';
 import LoginPage from './pages/auth/LoginPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SchoolLandingPage from './pages/school-portal/SchoolLandingPage';
 import AdmissionApplicationPage from './pages/school-portal/AdmissionApplicationPage';
 
@@ -105,6 +107,8 @@ export default function App() {
           <Route path="/parent-portal/login" element={<ParentPortalPage />} />
           <Route path="/login" element={<Public><LoginPage /></Public>} />
           <Route path="/login/:tenantSlug" element={<Public><LoginPage /></Public>} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* ── School Public Portals ── */}
           <Route path="/school/:slug" element={<SchoolLandingPage />} />

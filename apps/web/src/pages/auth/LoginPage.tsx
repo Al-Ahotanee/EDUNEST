@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
-import { Eye, EyeOff, Shield, Building2, CheckCircle, ArrowRight, Sparkles, Server, Settings, AlertCircle, RefreshCw, X, CheckCircle2, GraduationCap, Lock, BookOpen, Award, Users } from 'lucide-react';
+import { Eye, EyeOff, Shield, Building2, CheckCircle, ArrowRight, Sparkles, Server, Settings, AlertCircle, RefreshCw, X, CheckCircle2, GraduationCap, Lock, BookOpen, Award, Users, KeyRound } from 'lucide-react';
 import { api, resolveApiBase } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useQuery } from '@tanstack/react-query';
@@ -233,7 +233,9 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</label>
-                    <a href="mailto:support@school.edu.ng?subject=Password%20Reset" className="text-xs text-slate-500 hover:text-slate-900">Forgot password?</a>
+                    <Link to="/forgot-password" className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1">
+                      <KeyRound size={11} /> Forgot password?
+                    </Link>
                   </div>
                   <div className="relative">
                     <input type={showPass ? 'text' : 'password'} required value={form.password}

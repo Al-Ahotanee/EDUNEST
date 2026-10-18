@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Building2, User, FileText, CheckCircle, ChevronRight,
-  ChevronLeft, Upload, Check, Shield, Globe, School,
+  ChevronLeft, Upload, Check, Shield, Globe, School, Loader2, X, AlertCircle,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -65,7 +65,7 @@ export default function SaasRegisterPage() {
   const [school, setSchool] = useState({
     schoolName: '',
     slug: '',
-    schoolType: 'SECONDARY',
+    schoolType: 'PRIMARY',
     email: '',
     phone: '',
     address: '',
@@ -91,6 +91,68 @@ export default function SaasRegisterPage() {
   const [documents, setDocuments] = useState<Record<string, { name: string; dataUrl: string }>>({});
   const [agreed, setAgreed] = useState(false);
 
+  // ─── SLUG LIVE AVAILABILITY CHECK ────────────────────────────────────────────
+  // EDN-slug fix: each school gets a subdomain like disc.edunest.com.
+  // We validate + check availability on the backend via /saas/check-slug/:slug
+  // with a 400ms debounce so the user sees inline feedback as they type.
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [slugMessage, setSlugMessage] = useState<string>('');
+  const [slugSuggestion, setSlugSuggestion] = useState<string | null>(null);
+
+  // Strict client-side slug normalization: lowercase, alphanumeric + hyphens,
+  // no leading/trailing hyphens, no consecutive hyphens.
+  const normalizeSlug = (raw: string): string => {
+    return raw
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]+/g, '-')   // non-alphanumeric → hyphen
+      .replace(/-{2,}/g, '-')         // collapse multiple hyphens
+      .replace(/^-+|-+$/g, '');       // trim leading/trailing hyphens
+  };
+
+  useEffect(() => {
+    if (!school.slug) {
+      setSlugStatus('idle');
+      setSlugMessage('');
+      setSlugSuggestion(null);
+      return;
+    }
+    const slug = school.slug;
+    // Quick client-side length check (faster than round-trip)
+    if (slug.length < 3) {
+      setSlugStatus('invalid');
+      setSlugMessage('Slug must be at least 3 characters');
+      return;
+    }
+    if (slug.length > 30) {
+      setSlugStatus('invalid');
+      setSlugMessage('Slug must be 30 characters or fewer');
+      return;
+    }
+    setSlugStatus('checking');
+    setSlugMessage('');
+    setSlugSuggestion(null);
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get(`/saas/check-slug/${encodeURIComponent(slug)}`);
+        const data = res.data?.data || res.data;
+        if (data?.available) {
+          setSlugStatus('available');
+          setSlugMessage('Available');
+          setSlugSuggestion(null);
+        } else {
+          setSlugStatus(data?.reason?.includes('reserved') ? 'invalid' : 'taken');
+          setSlugMessage(data?.reason || 'Not available');
+          setSlugSuggestion(data?.suggestion || null);
+        }
+      } catch {
+        // Network error — don't block the user, just stay in 'checking' state
+        setSlugStatus('idle');
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [school.slug]);
+
   const handleFileUpload = (key: string, file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -104,17 +166,35 @@ export default function SaasRegisterPage() {
   };
 
   const setSchoolField = (k: string, v: string) => {
-    setSchool(f => ({ ...f, [k]: v }));
     if (k === 'schoolName') {
-      const slug = v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      setSchool(f => ({ ...f, schoolName: v, slug }));
+      // Auto-suggest a slug from the school name on first entry. The slug is
+      // editable separately so the user can override it. We only auto-fill
+      // when the slug is empty or still matches the previous auto-suggestion.
+      const suggested = normalizeSlug(v);
+      setSchool(f => ({
+        ...f,
+        schoolName: v,
+        slug: f.slug && f.slug !== normalizeSlug(f.schoolName) ? f.slug : suggested,
+      }));
+      return;
     }
+    if (k === 'slug') {
+      // Normalize slug as the user types — strip illegal chars immediately
+      const normalized = normalizeSlug(v);
+      setSchool(f => ({ ...f, slug: normalized }));
+      return;
+    }
+    setSchool(f => ({ ...f, [k]: v }));
   };
 
   const validateStep = () => {
     if (step === 1) {
       if (!school.schoolName.trim()) { toast.error('Please enter the official school name'); return false; }
-      if (!school.slug.trim()) { toast.error('Please specify a portal URL slug'); return false; }
+      if (!school.slug.trim()) { toast.error('Please choose a subdomain slug'); return false; }
+      if (slugStatus !== 'available') {
+        toast.error('Subdomain is not available — please pick another');
+        return false;
+      }
       if (!school.email.trim()) { toast.error('Please provide an official school email'); return false; }
     }
     if (step === 2) {
@@ -244,20 +324,70 @@ export default function SaasRegisterPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className={labelClass}>Portal Domain Subdomain *</label>
-                    <div className="flex items-center">
+                  <div className="md:col-span-2">
+                    <label className={labelClass}>Subdomain URL *</label>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Your school's white-label entry point. This is the single URL every
+                      principal, admin, teacher, parent, and visitor will use to reach your portal.
+                    </p>
+                    <div className="flex items-stretch">
                       <input
                         type="text"
                         required
-                        placeholder="dutse-college"
+                        placeholder="disc"
                         value={school.slug}
                         onChange={e => setSchoolField('slug', e.target.value)}
-                        className={`${inputClass} rounded-r-none font-mono text-xs`}
+                        className={`${inputClass} rounded-r-none font-mono text-xs lowercase`}
+                        style={{ textTransform: 'lowercase' }}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
                       />
-                      <span className="h-11 px-3 flex items-center bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl text-xs font-mono text-slate-500">
-                        .edunest.ng
+                      <span className="h-11 px-3 flex items-center bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl text-xs font-mono text-slate-500 whitespace-nowrap">
+                        .edunest.com
                       </span>
+                    </div>
+                    {/* Live availability status */}
+                    <div className="mt-2 min-h-[20px]">
+                      {slugStatus === 'checking' && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <Loader2 size={12} className="animate-spin" /> Checking availability…
+                        </div>
+                      )}
+                      {slugStatus === 'available' && (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
+                          <CheckCircle size={13} /> Available! URL will be{' '}
+                          <span className="font-mono">{school.slug}.edunest.com</span>
+                        </div>
+                      )}
+                      {slugStatus === 'taken' && (
+                        <div className="flex items-start gap-1.5 text-xs text-rose-700">
+                          <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold">{slugMessage}</p>
+                            {slugSuggestion && (
+                              <button
+                                type="button"
+                                onClick={() => setSchoolField('slug', slugSuggestion)}
+                                className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md text-rose-800 font-mono font-semibold transition-colors"
+                              >
+                                Use <strong>{slugSuggestion}</strong>.edunest.com →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {slugStatus === 'invalid' && (
+                        <div className="flex items-start gap-1.5 text-xs text-amber-700">
+                          <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                          <span>{slugMessage}</span>
+                        </div>
+                      )}
+                      {slugStatus === 'idle' && school.slug === '' && (
+                        <p className="text-[11px] text-slate-400">
+                          Lowercase letters, digits, and hyphens. 3-30 characters.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -268,10 +398,11 @@ export default function SaasRegisterPage() {
                       onChange={e => setSchoolField('schoolType', e.target.value)}
                       className={inputClass}
                     >
-                      <option value="PRIMARY">Primary School (Nursery / Basic)</option>
-                      <option value="SECONDARY">Secondary / High School (JSS & SSS)</option>
+                      <option value="NURSERY">Pre-Nursery / Early Years (Crèche, Playgroup)</option>
+                      <option value="PRIMARY">Primary School (Nursery &amp; Basic 1-6)</option>
+                      <option value="SECONDARY">Secondary School (JSS &amp; SSS)</option>
+                      <option value="COMBINED">Comprehensive K-12 (Pre-Nursery → SSS)</option>
                       <option value="TERTIARY">Tertiary College / Polytechnic</option>
-                      <option value="K12">Comprehensive K-12 Academy</option>
                     </select>
                   </div>
 
