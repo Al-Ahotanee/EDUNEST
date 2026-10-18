@@ -13,7 +13,6 @@ import {
 import { Button, Modal, Input, Select, StatCard, Badge } from '../../components/ui';
 import { api, academicApi } from '../../services/api';
 import { cn, formatDate } from '../../lib/utils';
-import { EduNestIcon } from '../../components/common/EduNestLogo';
 import { useAuthStore } from '../../store/authStore';
 
 const tapi = {
@@ -658,8 +657,8 @@ export default function TimetablePage() {
       day: 'Monday',
       period: '',
       subjectName: '',
-      absentTeacher: '',
-      reliefTeacher: '',
+      absentStaffId: '',          // EDN-008 fix: pass UUID, not just the name
+      reliefStaffId: '',          // EDN-008 fix: pass UUID, not just the name
       reason: 'Approved Sick Leave',
     }
   });
@@ -2582,16 +2581,42 @@ export default function TimetablePage() {
         >
           <form
             onSubmit={reliefForm.handleSubmit(data => {
-              // P0-18 fix: persist via POST /api/v1/timetable/relief
-              // Map the form's "absentTeacher" / "reliefTeacher" / "day" fields to the API's field names
+              // EDN-008 fix: pass actual staff UUIDs so the backend can run
+              // real validation (absent ≠ relief, scheduling conflict check,
+              // staff existence in this school). Also map the names so the
+              // persisted row remains readable even if staff is later deleted.
+              if (!data.absentStaffId) {
+                toast.error('Please select the absent teacher');
+                return;
+              }
+              if (!data.reliefStaffId) {
+                toast.error('Please select a relief teacher');
+                return;
+              }
+              if (data.absentStaffId === data.reliefStaffId) {
+                toast.error('The absent teacher and the relief teacher cannot be the same person');
+                return;
+              }
+              // Resolve human-readable names from staff list (for legacy display)
+              const absentStaff = staff.find((s: any) => s.id === data.absentStaffId);
+              const reliefStaff = staff.find((s: any) => s.id === data.reliefStaffId);
+              const absentName = absentStaff ? `${absentStaff.firstName} ${absentStaff.lastName}` : '—';
+              const reliefName = reliefStaff ? `${reliefStaff.firstName} ${reliefStaff.lastName}` : '—';
+              // Look up class & subject IDs if possible
+              const cls = classes.find((c: any) => c.name === data.className);
+              const subj = subjects.find((s: any) => s.name === data.subjectName);
               createReliefMutation.mutate({
                 date: new Date().toISOString(),
                 dayOfWeek: data.day,
                 period: data.period,
+                classId: cls?.id || null,
                 className: data.className,
+                subjectId: subj?.id || null,
                 subjectName: data.subjectName || '—',
-                absentTeacherName: data.absentTeacher || '—',
-                reliefTeacherName: data.reliefTeacher,
+                absentStaffId: data.absentStaffId,
+                absentTeacherName: absentName,
+                reliefStaffId: data.reliefStaffId,
+                reliefTeacherName: reliefName,
                 reason: data.reason,
                 status: 'CONFIRMED',
               });
@@ -2631,24 +2656,43 @@ export default function TimetablePage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">Absent Teacher</label>
-              <select {...reliefForm.register('absentTeacher')} className="input w-full">
+              <select {...reliefForm.register('absentStaffId', { required: true })} className="input w-full">
+                <option value="">— Select absent teacher —</option>
                 {staff.map(st => (
-                  <option key={st.id} value={`${st.firstName} ${st.lastName}`}>
-                    {st.firstName} {st.lastName}
+                  <option key={st.id} value={st.id}>
+                    {st.firstName} {st.lastName}{st.email ? ` · ${st.email}` : ''}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Relief Teacher (Free Period)</label>
-              <select {...reliefForm.register('reliefTeacher', { required: true })} className="input w-full">
-                {staff.map(st => (
-                  <option key={st.id} value={`${st.firstName} ${st.lastName}`}>
-                    {st.firstName} {st.lastName} (Available)
-                  </option>
-                ))}
+              <label className="block text-slate-700 font-bold mb-1">
+                Relief Teacher <span className="text-slate-400 font-normal">(free-period info shown)</span>
+              </label>
+              <select {...reliefForm.register('reliefStaffId', { required: true })} className="input w-full">
+                <option value="">— Select relief teacher —</option>
+                {staff.map(st => {
+                  // EDN-008 fix: compute real free periods per week instead of
+                  // the misleading hardcoded "(Available)" tag.
+                  const load = facultyWorkloadData.find(f => f.staffId === st.id);
+                  const freePw = load ? load.freePeriodsPerWeek : 35;
+                  const totalPw = load ? load.totalWeeklyPeriods : 0;
+                  const status = load?.status || 'OPTIMAL';
+                  const tag =
+                    status === 'OVERLOADED' ? '⚠️ Overloaded' :
+                    status === 'LIGHT' ? '✓ Light load' :
+                    '✓ Optimal';
+                  return (
+                    <option key={st.id} value={st.id}>
+                      {st.firstName} {st.lastName} · {totalPw}/wk · {freePw} free · {tag}
+                    </option>
+                  );
+                })}
               </select>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Shows actual weekly load + free periods (max 35/wk). Verify the chosen period is open for this teacher.
+              </p>
             </div>
 
             <div>
@@ -2658,6 +2702,10 @@ export default function TimetablePage() {
                 <option value="Official Institutional Assignment">Official Institutional Assignment</option>
                 <option value="TRCN / Ministry Workshop">TRCN / Ministry Workshop</option>
                 <option value="Personal Emergency">Personal Emergency</option>
+                <option value="Bereavement Leave">Bereavement Leave</option>
+                <option value="Maternity / Paternity Leave">Maternity / Paternity Leave</option>
+                <option value="Medical Appointment">Medical Appointment</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 

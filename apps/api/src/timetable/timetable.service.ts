@@ -143,8 +143,23 @@ export class TimetableService {
       const relief = await this.prisma.staff.findFirst({ where: { id: data.reliefStaffId, schoolId } });
       if (!relief) throw new BadRequestException('Relief staff not found in this school');
 
-      // Check for scheduling conflict — relief teacher should not already be teaching at this period
-      // (Best-effort: skip the conflict check if class/subject/day info is incomplete)
+      // EDN-008 fix: real scheduling conflict check — the relief teacher must
+      // not already be teaching another class at the same day/period. We map
+      // day name → dayOfWeek integer (1=Monday … 5=Friday) and look up the
+      // relief teacher's existing timetable slots.
+      const dayIndex = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+        .indexOf(data.dayOfWeek) + 1;
+      if (dayIndex > 0) {
+        const conflict = await this.prisma.timetableSlot.findFirst({
+          where: { staffId: data.reliefStaffId, dayOfWeek: dayIndex },
+        });
+        if (conflict) {
+          throw new BadRequestException(
+            `Scheduling conflict: ${relief.firstName} ${relief.lastName} is already teaching ` +
+            `another class on ${data.dayOfWeek}. Choose a different relief teacher or day.`
+          );
+        }
+      }
     }
 
     const assignment = await this.prisma.reliefAssignment.create({

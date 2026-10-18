@@ -8,9 +8,12 @@ import {
   Calendar, Bell, BarChart3, Settings, ChevronDown, ChevronRight,
   School, LogOut, ClipboardCheck, Award, FileText, Building2, X, Briefcase,
 } from 'lucide-react';
-import { EduNestIcon } from '../common/EduNestLogo';
 
-// School-branded logo component — uses school name first letter when no logo
+// School-branded logo component — uses school name first letter when no logo.
+// EDN-brand: EduNest logo is intentionally NOT used in the school admin
+// Sidebar. Each school's portal shows ONLY the school's branding (logo,
+// colors, name). The EduNest mark appears only on the SaaS landing page,
+// platform admin console, marketer portal, and tenant registration page.
 function SchoolLogo({ school, size = 22 }: { school: any; size?: number }) {
   if (school?.logo) {
     return <img src={school.logo} alt={school.name} className="rounded-xl object-contain bg-white p-0.5" style={{ width: size + 14, height: size + 14 }} />;

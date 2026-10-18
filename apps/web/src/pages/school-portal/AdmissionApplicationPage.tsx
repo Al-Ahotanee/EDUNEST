@@ -28,6 +28,8 @@ export default function AdmissionApplicationPage() {
     parentName: '', parentPhone: '', parentEmail: '', parentOccupation: '',
     email: '', phone: '',
     emergencyContact: '', emergencyPhone: '',
+    // EDN-001: honeypot field — real users never see this; bots will fill it
+    website: '',
   });
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -280,6 +282,18 @@ export default function AdmissionApplicationPage() {
                 {submitMut.isPending ? 'Submitting Application...' : 'SUBMIT APPLICATION →'}
               </button>
             </div>
+
+            {/* EDN-001: honeypot — hidden from humans, filled by spam bots */}
+            <input
+              type="text"
+              name="website"
+              value={form.website}
+              onChange={e => set('website', e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              style={{ position: 'absolute', left: '-9999px', top: 'auto', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+            />
           </form>
         </div>
       </div>

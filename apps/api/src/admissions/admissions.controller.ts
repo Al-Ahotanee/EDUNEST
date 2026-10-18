@@ -1,7 +1,6 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AdmissionsService } from './admissions.service';
-import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -11,7 +10,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 export class AdmissionsController {
   constructor(private admissionsService: AdmissionsService) {}
 
-  // Admin routes
+  // ─── Admin routes (require auth) ────────────────────────────────────────────
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -48,22 +47,12 @@ export class AdmissionsController {
   }
 }
 
-@ApiTags('Public')
-@Controller('public')
-export class PublicController {
-  constructor(private admissionsService: AdmissionsService) {}
-
-  @Public()
-  @Get('school/:slug')
-  getSchool(@Param('slug') slug: string) {
-    const saasService = (this.admissionsService as any).prisma;
-    return (this.admissionsService as any).saasService?.getPublicSchoolInfo(slug)
-      || this.admissionsService['prisma'].tenant.findUnique({ where: { slug, isActive: true } }).then((t: any) => ({ success: true, data: t }));
-  }
-
-  @Public()
-  @Post('admissions/:slug')
-  submit(@Param('slug') slug: string, @Body() body: any) {
-    return this.admissionsService.submitApplication(slug, body);
-  }
-}
+// ─── NOTE ────────────────────────────────────────────────────────────────────
+// The previous PublicController exposed duplicate /public/school/:slug and
+// /public/admissions/:slug endpoints that conflicted with the canonical
+// /saas/school/:slug and /saas/school/:slug/apply routes in SaasController.
+// The duplicate routes used a different field mapping (parentFirstName +
+// parentLastName) and a broken getSchool() helper that bypassed the SaaS
+// service. Public admission submission is now exclusively handled by
+// SaasController → SaasService.submitAdmissionApplication(slug, data).
+// This resolves EDN-005 (slug resolution inconsistency).

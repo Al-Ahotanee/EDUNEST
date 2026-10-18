@@ -113,6 +113,10 @@ export const studentsApi = {
   // Returns latest term results for all students in the school (used by Promotions page)
   promotionResults: () => api.get('/students/promotion-results').catch(() => ({ data: [] })),
   promote: (id: string, data: any) => api.post(`/students/${id}/promote`, data),
+  // EDN-014: Unassigned students + bulk-assign to class
+  unassigned: () => api.get('/students/unassigned'),
+  bulkAssign: (data: { studentIds: string[]; classId: string; sessionId?: string }) =>
+    api.post('/students/bulk-assign', data),
 };
 
 // ─── Academic (alias: classesApi) ─────────────────────────────────────────────

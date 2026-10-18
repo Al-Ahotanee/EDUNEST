@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Plus, Eye, Edit, Trash2, Download, GraduationCap, Filter, RefreshCw, Contact, Printer, Camera, CheckSquare, Square } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, Download, GraduationCap, Filter, RefreshCw, Contact, Printer, Camera, CheckSquare, Square, AlertTriangle, UserPlus } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, Badge,
   ConfirmDialog, Avatar, StatCard, PageLoader, Card,
@@ -83,6 +83,34 @@ export default function StudentsPage() {
     queryKey: ['gen-adm-no'],
     queryFn: () => studentsApi.genAdmNo().then((r) => r.data),
     enabled: modalOpen && !editingStudent,
+  });
+
+  // EDN-014: Unassigned students — surfaced in the admin UI with a bulk-assign
+  // action so admins can move them into a class for the current session.
+  const isAdmin = user?.roles?.some((r: any) => r.name === 'Super Admin') || user?.isSuperAdmin;
+  const [showUnassigned, setShowUnassigned] = useState(false);
+  const [unassignedSelected, setUnassignedSelected] = useState<Set<string>>(new Set());
+  const [bulkClassId, setBulkClassId] = useState('');
+
+  const { data: unassignedData, isLoading: unassignedLoading, refetch: refetchUnassigned } = useQuery({
+    queryKey: ['students-unassigned'],
+    queryFn: () => studentsApi.unassigned().then(r => r.data?.data || { students: [], total: 0 }),
+    enabled: isAdmin && showUnassigned,
+  });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: (payload: { studentIds: string[]; classId: string }) =>
+      studentsApi.bulkAssign(payload),
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'Students assigned to class');
+      setUnassignedSelected(new Set());
+      setBulkClassId('');
+      setShowUnassigned(false);
+      refetchUnassigned();
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-stats'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Bulk assignment failed'),
   });
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<StudentForm>({
@@ -477,6 +505,129 @@ setTimeout(function() {
         <StatCard title="Male" value={(statsData?.male || 0).toLocaleString()} icon={<GraduationCap size={20} />} color="cyan" />
         <StatCard title="Female" value={(statsData?.female || 0).toLocaleString()} icon={<GraduationCap size={20} />} color="purple" />
       </div>
+
+      {/* EDN-014: Unassigned Students panel — admin-only */}
+      {isAdmin && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Unassigned Students</h3>
+                <p className="text-xs text-slate-600">
+                  Students without a class enrollment in the current academic session. Assign them to a class to enable attendance, results, and timetable features.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              icon={<UserPlus size={15} />}
+              onClick={() => setShowUnassigned(s => !s)}
+            >
+              {showUnassigned ? 'Hide List' : 'View Unassigned'}
+            </Button>
+          </div>
+
+          {showUnassigned && (
+            <div className="mt-4 border-t border-amber-200 pt-4">
+              {unassignedLoading ? (
+                <p className="text-xs text-slate-500">Loading unassigned students…</p>
+              ) : !unassignedData?.students?.length ? (
+                <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
+                  <CheckSquare size={14} /> All students are enrolled in a class for the current session.
+                  {unassignedData?.sessionName && ` Session: ${unassignedData.sessionName}.`}
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+                    <p className="text-xs font-bold text-amber-800">
+                      {unassignedData.total} unassigned student{unassignedData.total === 1 ? '' : 's'}
+                      {unassignedData?.sessionName && ` · Session: ${unassignedData.sessionName}`}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setUnassignedSelected(new Set(unassignedData.students.map((s: any) => s.id)))}
+                        className="text-xs text-slate-600 hover:text-slate-900 underline"
+                      >Select all</button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setUnassignedSelected(new Set())}
+                        className="text-xs text-slate-600 hover:text-slate-900 underline"
+                      >Clear</button>
+                      <select
+                        value={bulkClassId}
+                        onChange={(e) => setBulkClassId(e.target.value)}
+                        className="input w-48 py-1.5 text-xs"
+                      >
+                        <option value="">— Assign to class —</option>
+                        {classes.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        disabled={unassignedSelected.size === 0 || !bulkClassId || bulkAssignMutation.isPending}
+                        onClick={() => bulkAssignMutation.mutate({
+                          studentIds: Array.from(unassignedSelected),
+                          classId: bulkClassId,
+                        })}
+                        icon={<UserPlus size={14} />}
+                      >
+                        Assign {unassignedSelected.size > 0 ? `(${unassignedSelected.size})` : ''}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                      {unassignedData.students.map((s: any) => {
+                        const checked = unassignedSelected.has(s.id);
+                        return (
+                          <label
+                            key={s.id}
+                            className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-amber-50 transition-colors ${checked ? 'bg-amber-50' : ''}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                setUnassignedSelected(prev => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(s.id);
+                                  else next.delete(s.id);
+                                  return next;
+                                });
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <Avatar name={`${s.firstName} ${s.lastName}`} photo={s.photo} size="sm" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-900">
+                                {s.firstName} {s.otherName ? s.otherName + ' ' : ''}{s.lastName}
+                              </p>
+                              <p className="text-xs text-slate-500 font-mono">{s.admissionNumber}</p>
+                            </div>
+                            <Badge
+                              status={s.gender}
+                              label={s.gender || '—'}
+                            />
+                            <span className="text-xs text-slate-400">
+                              {s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3">

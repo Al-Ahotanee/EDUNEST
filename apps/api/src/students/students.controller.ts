@@ -53,6 +53,24 @@ export class StudentsController {
     return this.studentsService.generateAdmissionNumber(schoolId);
   }
 
+  // ─── EDN-014 fix: surface unassigned students ──────────────────────────────
+  @Get('unassigned')
+  @Roles('Super Admin')
+  @ApiOperation({ summary: 'List students with no class enrollment in the current session (EDN-014)' })
+  listUnassigned(@CurrentUser('schoolId') schoolId: string) {
+    return this.studentsService.findUnassigned(schoolId);
+  }
+
+  @Post('bulk-assign')
+  @Roles('Super Admin')
+  @ApiOperation({ summary: 'Bulk-assign multiple students to a class for the current session (EDN-014)' })
+  bulkAssign(
+    @CurrentUser('schoolId') schoolId: string,
+    @Body() body: { studentIds: string[]; classId: string; sessionId?: string },
+  ) {
+    return this.studentsService.bulkAssignClass(schoolId, body);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get student by ID' })
   findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {

@@ -311,6 +311,119 @@ export class StudentsService {
     return `${school?.code || 'SCH'}/${year}/${String(count + 1).padStart(4, '0')}`;
   }
 
+  // ─── EDN-014 fix: Unassigned students ───────────────────────────────────────
+  // Students with NO active ClassEnrollment in the current academic session.
+  // Surfaces them in the admin UI so they can be bulk-assigned to a class.
+  async findUnassigned(schoolId: string) {
+    // Resolve the current academic session for this school
+    const currentSession = await this.prisma.academicSession.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { createdAt: 'desc' },
+    }) || await this.prisma.academicSession.findFirst({
+      where: { schoolId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!currentSession) {
+      // No sessions exist → all students are "unassigned" by definition
+      const all = await this.prisma.student.findMany({
+        where: { schoolId, deletedAt: null },
+        select: {
+          id: true, admissionNumber: true, firstName: true, lastName: true,
+          otherName: true, gender: true, status: true, dateOfBirth: true,
+          photo: true, createdAt: true,
+        },
+        orderBy: { firstName: 'asc' },
+      });
+      return successResponse({ students: all, total: all.length, sessionId: null, sessionName: null });
+    }
+
+    // Students whose enrollment for the current session doesn't exist
+    const enrolledStudentIds = await this.prisma.classEnrollment.findMany({
+      where: { sessionId: currentSession.id, student: { schoolId, deletedAt: null } },
+      select: { studentId: true },
+    });
+    const enrolledIdSet = new Set(enrolledStudentIds.map(e => e.studentId));
+
+    const all = await this.prisma.student.findMany({
+      where: { schoolId, deletedAt: null },
+      select: {
+        id: true, admissionNumber: true, firstName: true, lastName: true,
+        otherName: true, gender: true, status: true, dateOfBirth: true,
+        photo: true, createdAt: true,
+      },
+      orderBy: { firstName: 'asc' },
+    });
+    const unassigned = all.filter(s => !enrolledIdSet.has(s.id));
+
+    return successResponse({
+      students: unassigned,
+      total: unassigned.length,
+      sessionId: currentSession.id,
+      sessionName: currentSession.name,
+    });
+  }
+
+  // Bulk-assign many students to one class for the current session.
+  // Used by the admin UI when a new term begins and students need to be
+  // distributed into classes.
+  async bulkAssignClass(
+    schoolId: string,
+    body: { studentIds: string[]; classId: string; sessionId?: string },
+  ) {
+    if (!body?.studentIds?.length) {
+      throw new BadRequestException('studentIds is required and must be non-empty');
+    }
+    if (!body?.classId) {
+      throw new BadRequestException('classId is required');
+    }
+
+    // Verify the class belongs to this school
+    const cls = await this.prisma.class.findFirst({
+      where: { id: body.classId, schoolId },
+    });
+    if (!cls) throw new BadRequestException('Class not found in this school');
+
+    // Resolve target session (provided or current)
+    const session = body.sessionId
+      ? await this.prisma.academicSession.findFirst({ where: { id: body.sessionId, schoolId } })
+      : await this.prisma.academicSession.findFirst({
+          where: { schoolId, isCurrent: true },
+          orderBy: { createdAt: 'desc' },
+        }) || await this.prisma.academicSession.findFirst({
+          where: { schoolId },
+          orderBy: { createdAt: 'desc' },
+        });
+    if (!session) throw new BadRequestException('No academic session found. Create a session first.');
+
+    // Verify all studentIds belong to this school
+    const validStudents = await this.prisma.student.findMany({
+      where: { id: { in: body.studentIds }, schoolId, deletedAt: null },
+      select: { id: true },
+    });
+    const validIds = new Set(validStudents.map(s => s.id));
+    const invalidIds = body.studentIds.filter(id => !validIds.has(id));
+    if (invalidIds.length) {
+      throw new BadRequestException(`${invalidIds.length} student(s) not found in this school`);
+    }
+
+    // Upsert enrollments (idempotent — re-assigning overwrites the class)
+    const results = await this.prisma.$transaction(
+      body.studentIds.map(studentId =>
+        this.prisma.classEnrollment.upsert({
+          where: { studentId_sessionId: { studentId, sessionId: session.id } },
+          create: { studentId, classId: body.classId, sessionId: session.id },
+          update: { classId: body.classId },
+        })
+      )
+    );
+
+    return successResponse(
+      { assigned: results.length, classId: body.classId, className: cls.name, sessionId: session.id, sessionName: session.name },
+      `${results.length} student(s) assigned to ${cls.name} for ${session.name} session`,
+    );
+  }
+
   /**
    * Returns latest term results for all students in the school.
    * Used by the Promotions page to compute average scores and identify promotion candidates.

@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Headers } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Body, Param, Query, Headers, Ip, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SaasService } from './saas.service';
 import { Public } from '../common/decorators/public.decorator';
 
@@ -16,9 +16,27 @@ export class SaasController {
   @Get('school/:slug')
   getSchoolInfo(@Param('slug') slug: string) { return this.saasService.getPublicSchoolInfo(slug); }
 
+  // EDN-001: Public admission submission endpoint. Uses honeypot field
+  // (`website` — must be empty for humans) to filter bots. Combined with
+  // NestJS rate-limit middleware (configured in main.ts), this prevents
+  // automated spam submissions without blocking legitimate parents.
   @Public()
   @Post('school/:slug/apply')
-  applyAdmission(@Param('slug') slug: string, @Body() body: any) { return this.saasService.submitAdmissionApplication(slug, body); }
+  @ApiOperation({ summary: 'Submit a public admission application' })
+  applyAdmission(
+    @Param('slug') slug: string,
+    @Body() body: any,
+    @Ip() ip: string,
+  ) {
+    // Honeypot: real users never fill the hidden `website` field.
+    // Bots that auto-fill all form fields will trip this.
+    if (body?.website && body.website.trim().length > 0) {
+      throw new BadRequestException('Invalid submission');
+    }
+    // Strip honeypot + internal metadata before persistence
+    const { website, _csrf, _honeypot, ...clean } = body;
+    return this.saasService.submitAdmissionApplication(slug, clean);
+  }
 
   @Public()
   @Post('webhook/paystack')
