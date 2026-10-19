@@ -6,10 +6,14 @@ import * as bcrypt from 'bcrypt';
 import { successResponse, PaginationDto, paginate, safeSkip, safeTake } from '../common/dto/pagination.dto';
 import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { FinanceService } from '../finance/finance.service';
 
 @Injectable()
 export class AdmissionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private financeService: FinanceService,
+  ) {}
 
   // ─── Public: submit application ──────────────────────────────────────────────
   async submitApplication(schoolSlug: string, data: any) {
@@ -262,59 +266,19 @@ export class AdmissionsService {
       }
     }
 
-    // ─── Phase 2+3: Auto-generate initial invoice from published class fees ───
+    // ─── Auto-generate initial invoice from published class fee schedule ───
     let initialInvoice: any = null;
     if (targetClassId) {
       try {
-        const publishedFees = await this.prisma.feeStructure.findMany({
-          where: {
-            schoolId,
-            status: 'PUBLISHED',
-            OR: [{ classId: targetClassId }, { classId: null }],
-          },
+        const invRes = await this.financeService.generateInvoiceForStudent(student.id, schoolId, {
+          sessionId: currentSession?.id,
+          studentCategory: 'NEW_STUDENT',
+          skipApplicationFeeIfPaid: true,
+          isInitialEnrollment: true,
         });
-
-        if (publishedFees.length > 0) {
-          const activeTerm = currentSession ? await this.prisma.term.findFirst({
-            where: { sessionId: currentSession.id, isCurrent: true },
-          }) : null;
-
-          const totalAmount = publishedFees.reduce((sum, f) => sum + (f.amount || 0), 0);
-          const invoiceCount = await this.prisma.invoice.count({ where: { student: { schoolId } } });
-          const schoolCode = school?.code || 'SCH';
-          const invoiceNo = `INV-${schoolCode}-${year}-${String(invoiceCount + 1).padStart(5, '0')}`;
-
-          initialInvoice = await this.prisma.invoice.create({
-            data: {
-              studentId: student.id,
-              invoiceNo,
-              subtotal: totalAmount,
-              discount: 0,
-              total: totalAmount,
-              balance: totalAmount,
-              amountPaid: 0,
-              dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-              status: 'UNPAID',
-              schoolId,
-              sessionId: currentSession?.id || null,
-              termId: activeTerm?.id || null,
-              classId: targetClassId,
-              notes: 'Initial admission fee invoice',
-              items: {
-                create: publishedFees.map((fee) => ({
-                  description: fee.name,
-                  amount: fee.amount,
-                  quantity: 1,
-                  subtotal: fee.amount,
-                  feeStructureId: fee.id,
-                })),
-              },
-            },
-            include: { items: true },
-          });
-        }
-      } catch (err) {
-        console.warn(`Failed to auto-generate initial invoice for student ${student.admissionNumber}:`, err);
+        initialInvoice = invRes.data || invRes;
+      } catch (err: any) {
+        console.warn(`Initial invoice auto-generation skipped for student ${student.admissionNumber}:`, err?.message || err);
       }
     }
 

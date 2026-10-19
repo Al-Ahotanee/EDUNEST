@@ -14,6 +14,25 @@ export class FinanceService {
 
   // ─── FEE STRUCTURES ──────────────────────────────────────────────────────────
 
+  // ─── FEE CATALOGUE & STRUCTURES ──────────────────────────────────────────────
+
+  getFeeCatalogue() {
+    return successResponse([
+      { category: 'TUITION', name: 'School Fees / Tuition', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Core academic instruction and tuition fee' },
+      { category: 'APPLICATION', name: 'Application Fee', defaultFrequency: 'ONE_TIME', applicableTo: 'NEW_STUDENT', description: 'Admission application processing fee' },
+      { category: 'ADMISSION', name: 'Admission / Registration Fee', defaultFrequency: 'ONE_TIME', applicableTo: 'NEW_STUDENT', description: 'One-time admission registration fee' },
+      { category: 'UNIFORM', name: 'School Uniform', defaultFrequency: 'ONE_TIME', applicableTo: 'NEW_STUDENT', description: 'Standard school uniform set (shirts, trousers/skirts, tie, badge)' },
+      { category: 'SPORTSWEAR', name: 'Sportswear / PE Kit', defaultFrequency: 'ONE_TIME', applicableTo: 'NEW_STUDENT', description: 'Inter-house sportswear and physical education kit' },
+      { category: 'BOOKS', name: 'Textbooks & Learning Materials', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Prescribed textbooks, workbooks and stationery' },
+      { category: 'LAB', name: 'Laboratory Equipment & STEM Fee', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Science laboratory chemicals, apparatus and digital computing access' },
+      { category: 'EXAM', name: 'Examination & Assessment Fee', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Continuous assessment and termly examination materials' },
+      { category: 'PTA', name: 'PTA Levy', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Parents-Teachers Association statutory development contribution' },
+      { category: 'DEVELOPMENT', name: 'Development Levy', defaultFrequency: 'ANNUAL', applicableTo: 'ALL', description: 'School infrastructure and facilities development levy' },
+      { category: 'FACILITY', name: 'Utility & Facility Maintenance', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Clean power, sanitation and campus facilities maintenance' },
+      { category: 'OTHER', name: 'Other Authorized Charge', defaultFrequency: 'TERM', applicableTo: 'ALL', description: 'Miscellaneous school-approved charges' },
+    ]);
+  }
+
   async createFeeStructure(data: any, schoolId: string) {
     // Validate classId if provided
     if (data.classId) {
@@ -23,18 +42,153 @@ export class FinanceService {
 
     const fee = await this.prisma.feeStructure.create({
       data: {
-        ...data,
+        name: data.name,
+        amount: Number(data.amount) || 0,
+        description: data.description || null,
+        termBased: data.termBased !== undefined ? Boolean(data.termBased) : true,
         schoolId,
-        // New fields with defaults
         classId: data.classId || null,
         sessionId: data.sessionId || null,
         termId: data.termId || null,
-        feeType: data.feeType || 'TERM',
-        status: data.status || 'DRAFT',
+        feeType: (data.feeType || 'TERM').toUpperCase(),
+        status: data.status || 'PUBLISHED',
+        applicableTo: data.applicableTo || 'ALL',
+        isCompulsory: data.isCompulsory !== undefined ? Boolean(data.isCompulsory) : true,
+        category: data.category || null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
       },
       include: { class: true },
     });
     return successResponse(fee, 'Fee structure created');
+  }
+
+  async createOrUpdateClassFeeSchedule(schoolId: string, data: {
+    classId: string;
+    sessionId?: string;
+    termId?: string;
+    status?: string;
+    items: Array<{
+      id?: string;
+      name: string;
+      amount: number;
+      category?: string;
+      feeType?: string;
+      applicableTo?: string;
+      isCompulsory?: boolean;
+      description?: string;
+      dueDate?: string;
+    }>;
+  }) {
+    if (!data.classId) throw new BadRequestException('Class ID is required');
+    const cls = await this.prisma.class.findFirst({ where: { id: data.classId, schoolId } });
+    if (!cls) throw new BadRequestException('Selected class does not exist in this school');
+
+    let sessionId = data.sessionId;
+    let termId = data.termId;
+
+    if (!sessionId) {
+      const activeSession = await this.prisma.academicSession.findFirst({
+        where: { schoolId, isCurrent: true },
+      }) || await this.prisma.academicSession.findFirst({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      });
+      sessionId = activeSession?.id;
+    }
+
+    if (!termId && sessionId) {
+      const activeTerm = await this.prisma.term.findFirst({
+        where: { sessionId, isCurrent: true },
+      }) || await this.prisma.term.findFirst({
+        where: { sessionId },
+        orderBy: { createdAt: 'desc' },
+      });
+      termId = activeTerm?.id;
+    }
+
+    const createdItems: any[] = [];
+
+    // Save or update each item
+    for (const item of (data.items || [])) {
+      if (!item.name || Number(item.amount) < 0) continue;
+
+      if (item.id) {
+        // Update existing item
+        const updated = await this.prisma.feeStructure.update({
+          where: { id: item.id },
+          data: {
+            name: item.name,
+            amount: Number(item.amount),
+            category: item.category || null,
+            feeType: (item.feeType || 'TERM').toUpperCase(),
+            applicableTo: item.applicableTo || 'ALL',
+            isCompulsory: item.isCompulsory !== undefined ? Boolean(item.isCompulsory) : true,
+            description: item.description || null,
+            status: data.status || 'PUBLISHED',
+            sessionId: sessionId || null,
+            termId: termId || null,
+            dueDate: item.dueDate ? new Date(item.dueDate) : null,
+          },
+        });
+        createdItems.push(updated);
+      } else {
+        // Create new item
+        const created = await this.prisma.feeStructure.create({
+          data: {
+            schoolId,
+            classId: data.classId,
+            sessionId: sessionId || null,
+            termId: termId || null,
+            name: item.name,
+            amount: Number(item.amount),
+            category: item.category || null,
+            feeType: (item.feeType || 'TERM').toUpperCase(),
+            applicableTo: item.applicableTo || 'ALL',
+            isCompulsory: item.isCompulsory !== undefined ? Boolean(item.isCompulsory) : true,
+            description: item.description || null,
+            status: data.status || 'PUBLISHED',
+            dueDate: item.dueDate ? new Date(item.dueDate) : null,
+          },
+        });
+        createdItems.push(created);
+      }
+    }
+
+    return successResponse(createdItems, `Fee schedule updated with ${createdItems.length} fee items for ${cls.name}`);
+  }
+
+  async getClassFeeSchedulePreview(classId: string, schoolId: string, options?: { sessionId?: string; termId?: string }) {
+    const cls = await this.prisma.class.findFirst({ where: { id: classId, schoolId } });
+    if (!cls) throw new NotFoundException('Class not found');
+
+    const fees = await this.prisma.feeStructure.findMany({
+      where: {
+        schoolId,
+        status: 'PUBLISHED',
+        OR: [{ classId }, { classId: null }],
+        AND: [
+          options?.sessionId ? { OR: [{ sessionId: options.sessionId }, { sessionId: null }] } : {},
+          options?.termId ? { OR: [{ termId: options.termId }, { termId: null }] } : {},
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const newStudentItems = fees.filter(f => f.applicableTo === 'ALL' || f.applicableTo === 'NEW_STUDENT');
+    const returningStudentItems = fees.filter(f => (f.applicableTo === 'ALL' || f.applicableTo === 'RETURNING_STUDENT') && f.feeType !== 'ONE_TIME');
+
+    const newStudentTotal = newStudentItems.reduce((sum, f) => sum + (f.amount || 0), 0);
+    const returningStudentTotal = returningStudentItems.reduce((sum, f) => sum + (f.amount || 0), 0);
+
+    return successResponse({
+      class: { id: cls.id, name: cls.name },
+      fees,
+      newStudentItems,
+      returningStudentItems,
+      newStudentTotal,
+      returningStudentTotal,
+      totalAllItems: fees.reduce((sum, f) => sum + (f.amount || 0), 0),
+    });
   }
 
   async getFeeStructures(schoolId: string, query: PaginationDto & { classId?: string; status?: string }) {
@@ -88,11 +242,81 @@ export class FinanceService {
     return successResponse({ fees, total });
   }
 
+  // ─── Student Category Determination (New vs. Returning) ──────────────────
+  async determineStudentCategory(
+    studentId: string,
+    schoolId: string,
+    sessionId?: string,
+    termId?: string,
+  ): Promise<'NEW_STUDENT' | 'RETURNING_STUDENT'> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, schoolId },
+      include: {
+        classEnrollments: { orderBy: { createdAt: 'asc' } },
+        invoices: {
+          where: { schoolId },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!student) return 'NEW_STUDENT';
+
+    // 1. If student has 0 prior invoices in this school, they are a NEW student
+    if (!student.invoices || student.invoices.length === 0) {
+      return 'NEW_STUDENT';
+    }
+
+    // 2. Resolve target session
+    let targetSessionId = sessionId;
+    if (!targetSessionId) {
+      const activeSession = await this.prisma.academicSession.findFirst({
+        where: { schoolId, isCurrent: true },
+      }) || await this.prisma.academicSession.findFirst({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      });
+      targetSessionId = activeSession?.id;
+    }
+
+    // 3. If student has invoices in a prior academic session, they are definitely RETURNING
+    const priorSessionInvoices = student.invoices.filter(
+      (inv) => inv.sessionId && targetSessionId && inv.sessionId !== targetSessionId
+    );
+    if (priorSessionInvoices.length > 0) {
+      return 'RETURNING_STUDENT';
+    }
+
+    // 4. If in the same session: check if they were already invoiced for a prior term (e.g. First Term)
+    if (targetSessionId && termId) {
+      const priorTermInvoices = student.invoices.filter(
+        (inv) => inv.sessionId === targetSessionId && inv.termId && inv.termId !== termId
+      );
+      if (priorTermInvoices.length > 0) {
+        // They were billed in First Term; for Second/Third Term they are RETURNING
+        return 'RETURNING_STUDENT';
+      }
+    }
+
+    // 5. If student has more than 1 class enrollment, they have progressed -> RETURNING
+    if (student.classEnrollments.length > 1) {
+      return 'RETURNING_STUDENT';
+    }
+
+    // 6. Otherwise, for their initial term in the school, they are NEW_STUDENT
+    return student.invoices.length === 0 ? 'NEW_STUDENT' : 'RETURNING_STUDENT';
+  }
+
   // ─── Generate invoices from published fee structures ──────────────────────
   async generateInvoicesFromClass(
     classId: string,
     schoolId: string,
-    options?: { sessionId?: string; termId?: string; isInitialEnrollment?: boolean }
+    options?: {
+      sessionId?: string;
+      termId?: string;
+      isInitialEnrollment?: boolean;
+      studentCategory?: 'ALL' | 'NEW_STUDENT' | 'RETURNING_STUDENT';
+    }
   ) {
     // 1. Resolve session and term
     let sessionId = options?.sessionId;
@@ -118,20 +342,22 @@ export class FinanceService {
       termId = activeTerm?.id;
     }
 
-    // 2. Get all published fee structures for this class (or class-agnostic)
+    // 2. Validate published fee structures exist
     const fees = await this.prisma.feeStructure.findMany({
       where: {
         schoolId,
         status: 'PUBLISHED',
-        OR: [
-          { classId },
-          { classId: null },
+        OR: [{ classId }, { classId: null }],
+        AND: [
+          sessionId ? { OR: [{ sessionId }, { sessionId: null }] } : {},
+          termId ? { OR: [{ termId }, { termId: null }] } : {},
         ],
       },
+      orderBy: { createdAt: 'asc' },
     });
 
     if (fees.length === 0) {
-      throw new BadRequestException('No published fee structures found for this class. Publish fee items first.');
+      throw new BadRequestException('No published fee structures found for this class. Please configure and publish fee items first.');
     }
 
     // 3. Get all active students enrolled in this class
@@ -159,14 +385,23 @@ export class FinanceService {
     for (const enrollment of enrollments) {
       const student = enrollment.student;
 
-      // Check if invoice already exists for this student for this session and term
+      // Determine category (NEW_STUDENT vs RETURNING_STUDENT)
+      const detectedCategory = await this.determineStudentCategory(student.id, schoolId, sessionId, termId);
+
+      // Filter by requested category if specified
+      if (options?.studentCategory && options.studentCategory !== 'ALL' && detectedCategory !== options.studentCategory) {
+        continue;
+      }
+
+      // Check if invoice already exists for this student for this session and term (Idempotency)
       const existingInvoice = student.invoices.find((inv: any) => {
         if (sessionId && termId && inv.sessionId === sessionId && inv.termId === termId) {
           return true;
         }
-        // Fallback: check if created within the current calendar month
-        const thisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-        return new Date(inv.createdAt) >= thisMonth && inv.classId === classId;
+        if (inv.classId === classId && sessionId && inv.sessionId === sessionId) {
+          return true;
+        }
+        return false;
       });
 
       if (existingInvoice) {
@@ -174,21 +409,28 @@ export class FinanceService {
         continue;
       }
 
-      // Filter applicable fee items based on frequency (ONE_TIME vs ANNUAL vs TERM)
+      // Filter applicable fee items based on category and frequency
       const applicableFees = fees.filter((fee) => {
+        // Category check
+        const feeApplicableTo = fee.applicableTo || 'ALL';
+        if (feeApplicableTo !== 'ALL' && feeApplicableTo !== detectedCategory) {
+          return false;
+        }
+
         const feeType = (fee.feeType || 'TERM').toUpperCase();
 
         if (feeType === 'ONE_TIME') {
-          // If this is not an initial enrollment, or student has already been billed for this fee before, skip it
-          if (!options?.isInitialEnrollment && student.invoices.length > 0) {
-            // Check if student was ever billed for this fee item
-            const alreadyBilled = student.invoices.some((inv: any) =>
-              inv.items.some((item: any) =>
-                item.feeStructureId === fee.id || item.description?.toLowerCase() === fee.name.toLowerCase()
-              )
-            );
-            if (alreadyBilled) return false;
+          // Returning students do not pay one-time fees (e.g. uniform, application, admission)
+          if (detectedCategory === 'RETURNING_STUDENT') {
+            return false;
           }
+          // If already billed for this fee item historically, skip
+          const alreadyBilled = student.invoices.some((inv: any) =>
+            inv.items.some((item: any) =>
+              item.feeStructureId === fee.id || item.description?.toLowerCase() === fee.name.toLowerCase()
+            )
+          );
+          if (alreadyBilled) return false;
         } else if (feeType === 'ANNUAL') {
           // Check if already billed in this academic session
           if (sessionId) {
@@ -251,7 +493,7 @@ export class FinanceService {
         totalAmount: totalGeneratedAmount,
         feeItems: fees.length,
       },
-      `Generated ${invoicesCreated} invoice(s) for ${classId}. Skipped ${duplicatesSkipped} duplicate(s).`
+      `Generated ${invoicesCreated} invoice(s) for ${enrollments[0]?.classId || classId}. Skipped ${duplicatesSkipped} duplicate(s).`
     );
   }
 
@@ -259,13 +501,21 @@ export class FinanceService {
   async generateInvoiceForStudent(
     studentId: string,
     schoolId: string,
-    options?: { sessionId?: string; termId?: string; isInitialEnrollment?: boolean }
+    options?: {
+      sessionId?: string;
+      termId?: string;
+      isInitialEnrollment?: boolean;
+      studentCategory?: 'NEW_STUDENT' | 'RETURNING_STUDENT';
+      skipApplicationFeeIfPaid?: boolean;
+      dueDate?: Date;
+    }
   ) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId, deletedAt: null },
       include: {
         classEnrollments: { orderBy: { createdAt: 'desc' }, take: 1, include: { class: true } },
-        invoices: { include: { items: true } },
+        invoices: { include: { items: true }, orderBy: { createdAt: 'desc' } },
+        admissions: { take: 1, orderBy: { createdAt: 'desc' } },
       },
     });
 
@@ -305,35 +555,73 @@ export class FinanceService {
       termId = activeTerm?.id;
     }
 
-    // Get published fees for this class
+    // Idempotency: check if an active invoice already exists for this student + session + term
+    const existingInvoice = student.invoices.find((inv: any) => {
+      if (sessionId && termId && inv.sessionId === sessionId && inv.termId === termId) {
+        return true;
+      }
+      return false;
+    });
+
+    if (existingInvoice) {
+      return successResponse(
+        existingInvoice,
+        `Invoice ${existingInvoice.invoiceNo} already exists for this term (₦${existingInvoice.total.toLocaleString()}).`
+      );
+    }
+
+    // Determine category: NEW_STUDENT vs RETURNING_STUDENT
+    const studentCategory = options?.studentCategory || await this.determineStudentCategory(student.id, schoolId, sessionId, termId);
+
+    // Get published fees for this class (or class-agnostic)
     const fees = await this.prisma.feeStructure.findMany({
       where: {
         schoolId,
         status: 'PUBLISHED',
         OR: [{ classId }, { classId: null }],
+        AND: [
+          sessionId ? { OR: [{ sessionId }, { sessionId: null }] } : {},
+          termId ? { OR: [{ termId }, { termId: null }] } : {},
+        ],
       },
+      orderBy: { createdAt: 'asc' },
     });
 
     if (fees.length === 0) {
       throw new BadRequestException(`No published fee structures found for class ${enrollment.class?.name || classId}.`);
     }
 
-    // Filter fees by frequency
-    const isInitial = options?.isInitialEnrollment ?? (student.invoices.length === 0);
-
+    // Filter fees based on student category and frequency
     const applicableFees = fees.filter((fee) => {
+      // 1. Applicability rule
+      const feeApplicableTo = fee.applicableTo || 'ALL';
+      if (feeApplicableTo !== 'ALL' && feeApplicableTo !== studentCategory) {
+        return false;
+      }
+
       const feeType = (fee.feeType || 'TERM').toUpperCase();
 
       if (feeType === 'ONE_TIME') {
-        if (!isInitial) {
-          const alreadyBilled = student.invoices.some((inv: any) =>
-            inv.items.some((item: any) =>
-              item.feeStructureId === fee.id || item.description?.toLowerCase() === fee.name.toLowerCase()
-            )
-          );
-          if (alreadyBilled) return false;
+        // Returning students do not pay one-time fees (Uniform, Application, Admission)
+        if (studentCategory === 'RETURNING_STUDENT') {
+          return false;
         }
+
+        // Skip application fee if student already paid during admission application
+        const isAppFee = fee.category === 'APPLICATION' || fee.name.toLowerCase().includes('application');
+        if (isAppFee && options?.skipApplicationFeeIfPaid) {
+          return false;
+        }
+
+        // Check if student was ever billed for this item
+        const alreadyBilled = student.invoices.some((inv: any) =>
+          inv.items.some((item: any) =>
+            item.feeStructureId === fee.id || item.description?.toLowerCase() === fee.name.toLowerCase()
+          )
+        );
+        if (alreadyBilled) return false;
       } else if (feeType === 'ANNUAL') {
+        // Check if already billed in this academic session
         if (sessionId) {
           const billedThisSession = student.invoices.some((inv: any) =>
             inv.sessionId === sessionId &&
@@ -349,11 +637,12 @@ export class FinanceService {
     });
 
     if (applicableFees.length === 0) {
-      throw new BadRequestException('No applicable fee items to invoice for this student.');
+      throw new BadRequestException(`No applicable fee items to invoice for student (${studentCategory}).`);
     }
 
     const totalAmount = applicableFees.reduce((sum, f) => sum + (f.amount || 0), 0);
     const invoiceNo = await this.generateInvoiceNumber(schoolId);
+    const dueDate = options?.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     const invoice = await this.prisma.invoice.create({
       data: {
@@ -364,12 +653,13 @@ export class FinanceService {
         total: totalAmount,
         balance: totalAmount,
         amountPaid: 0,
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        dueDate,
         status: 'UNPAID',
         schoolId,
         sessionId: sessionId || null,
         termId: termId || null,
         classId,
+        notes: `${studentCategory === 'NEW_STUDENT' ? 'New Student' : 'Returning Student'} ${enrollment.class?.name || ''} fee invoice`,
         items: {
           create: applicableFees.map((fee) => ({
             description: fee.name,
@@ -383,7 +673,10 @@ export class FinanceService {
       include: { items: true, student: true },
     });
 
-    return successResponse(invoice, `Generated invoice ${invoiceNo} for ${student.firstName} ${student.lastName} (₦${totalAmount.toLocaleString()})`);
+    return successResponse(
+      invoice,
+      `Generated invoice ${invoiceNo} for ${student.firstName} ${student.lastName} (${studentCategory === 'NEW_STUDENT' ? 'New Student' : 'Returning Student'}, ₦${totalAmount.toLocaleString()})`
+    );
   }
 
   // ─── Student Financial Statement (Chronological Ledger) ─────────────────────

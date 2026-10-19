@@ -8,10 +8,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto, paginate, safeSkip, safeTake, successResponse } from '../common/dto/pagination.dto';
 import { CreateStudentDto, UpdateStudentDto, CreateGuardianDto } from './students.dto';
 import { Prisma } from '@prisma/client';
+import { FinanceService } from '../finance/finance.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private financeService: FinanceService,
+  ) {}
 
   async create(dto: CreateStudentDto & { classId?: string; sessionId?: string }, schoolId: string) {
     const existing = await this.prisma.student.findUnique({
@@ -69,6 +73,19 @@ export class StudentsService {
 
       return newStudent;
     });
+
+    // Auto-generate initial class fee invoice
+    if (classId) {
+      try {
+        await this.financeService.generateInvoiceForStudent(student.id, schoolId, {
+          sessionId: activeSessionId,
+          studentCategory: 'NEW_STUDENT',
+          isInitialEnrollment: true,
+        });
+      } catch (err: any) {
+        console.warn(`Initial invoice auto-generation for student ${dto.admissionNumber} skipped:`, err?.message || err);
+      }
+    }
 
     // Return student with enrollment info
     const studentWithEnrollment = await this.prisma.student.findUnique({

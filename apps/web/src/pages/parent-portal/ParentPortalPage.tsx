@@ -233,8 +233,8 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
     toast.success('Message sent to class teacher');
   };
 
-  const handleViewReceipt = (inv: any) => {
-    const postedPayment = inv.payments?.find((p: any) => p.status === 'POSTED') || inv.payments?.[0];
+  const handleViewReceipt = (inv: any, specificPayment?: any) => {
+    const postedPayment = specificPayment || inv.payments?.find((p: any) => p.status === 'POSTED') || inv.payments?.[0];
     if (!postedPayment && (inv.amountPaid || 0) <= 0) {
       toast.error('No cleared payment receipt recorded for this invoice yet.');
       return;
@@ -549,6 +549,39 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
                         </div>
                       </div>
 
+                      {/* Posted Payments / Partial Receipts List */}
+                      {inv.payments && inv.payments.length > 0 && (
+                        <div className="px-5 py-3 border-t border-slate-100 bg-white space-y-2">
+                          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Payment Transactions & Receipts ({inv.payments.length})</p>
+                          <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+                            {inv.payments.map((p: any, pIdx: number) => (
+                              <div key={p.id || pIdx} className="p-2.5 flex items-center justify-between text-xs bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-bold">
+                                    {pIdx + 1}
+                                  </span>
+                                  <div>
+                                    <span className="font-bold text-slate-800 font-mono">₦{(p.amount || 0).toLocaleString()}</span>
+                                    <span className="text-slate-400 mx-1.5">•</span>
+                                    <span className="text-slate-600 font-medium">{p.method}</span>
+                                    <span className="text-slate-400 mx-1.5">•</span>
+                                    <span className="text-slate-400 text-[11px]">{formatDate(p.paymentDate || p.createdAt)}</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleViewReceipt(inv, p)}
+                                  className="btn-secondary btn-sm py-1 px-2.5 text-xs gap-1 font-semibold"
+                                  title="View and print official bursary receipt for this transaction"
+                                >
+                                  <Receipt size={12} />
+                                  <span>{p.receiptNo ? `Receipt #${p.receiptNo}` : 'View Receipt'}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="p-4 bg-slate-50 flex items-center justify-between flex-wrap gap-3 text-xs">
                         <div className="flex items-center gap-4">
                           <span>Paid: <strong className="font-mono text-emerald-700">₦{paidAmount.toLocaleString()}</strong></span>
@@ -562,7 +595,7 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
                           >
                             <Eye size={13} /> View Breakdown
                           </button>
-                          {paidAmount > 0 && (
+                          {paidAmount > 0 && (!inv.payments || inv.payments.length === 0) && (
                             <button
                               onClick={() => handleViewReceipt(inv)}
                               className="btn-secondary btn-sm gap-1"

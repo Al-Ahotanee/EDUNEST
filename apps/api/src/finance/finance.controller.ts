@@ -29,11 +29,41 @@ export class FinanceController {
     return this.financeService.getMonthlyTrend(schoolId, year || new Date().getFullYear());
   }
 
+  @Get('fee-structures/catalogue')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
+  @ApiOperation({ summary: 'Get standard reusable fee item catalogue' })
+  getFeeCatalogue() {
+    return this.financeService.getFeeCatalogue();
+  }
+
   @Post('fee-structures')
   @Roles('Super Admin', 'Accountant')
   @ApiOperation({ summary: 'Create fee structure (supports classId, feeType, status)' })
   createFeeStructure(@Body() body: any, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.createFeeStructure(body, schoolId);
+  }
+
+  @Post('fee-structures/class/:classId')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
+  @ApiOperation({ summary: 'Batch save or update fee schedule for a class' })
+  saveClassFeeSchedule(
+    @Param('classId') classId: string,
+    @Body() body: any,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.financeService.createOrUpdateClassFeeSchedule(schoolId, { ...body, classId });
+  }
+
+  @Get('fee-structures/class/:classId/preview')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
+  @ApiOperation({ summary: 'Preview fee schedule with New vs. Returning student totals' })
+  getClassFeeSchedulePreview(
+    @Param('classId') classId: string,
+    @CurrentUser('schoolId') schoolId: string,
+    @Query('sessionId') sessionId?: string,
+    @Query('termId') termId?: string,
+  ) {
+    return this.financeService.getClassFeeSchedulePreview(classId, schoolId, { sessionId, termId });
   }
 
   @Get('fee-structures')

@@ -17,6 +17,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SchoolLandingPage from './pages/school-portal/SchoolLandingPage';
 import AdmissionApplicationPage from './pages/school-portal/AdmissionApplicationPage';
 import AdmissionStatusCheckerPage from './pages/school-portal/AdmissionStatusCheckerPage';
+import SchoolFeesPublicPage from './pages/school-portal/SchoolFeesPublicPage';
 import WebsiteBuilderPage from './pages/settings/WebsiteBuilderPage';
 
 // Super Admin
@@ -126,6 +127,7 @@ export default function App() {
 
           {/* ── School Public Portals ── */}
           <Route path="/school/:slug" element={<SchoolLandingPage />} />
+          <Route path="/school/:slug/fees" element={<SchoolFeesPublicPage />} />
           <Route path="/school/:slug/apply" element={<AdmissionApplicationPage />} />
           <Route path="/school/:slug/apply/status" element={<AdmissionStatusCheckerPage />} />
 

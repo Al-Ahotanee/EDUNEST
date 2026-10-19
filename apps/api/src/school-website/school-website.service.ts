@@ -294,6 +294,12 @@ export class SchoolWebsiteService {
       yearEstablished: school.tenant.yearEstablished,
     };
 
+    const publishedFees = await this.prisma.feeStructure.findMany({
+      where: { schoolId: school.id, status: 'PUBLISHED' },
+      include: { class: { select: { id: true, name: true, level: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
     return successResponse({
       id: config.id,
       schoolId: school.id,
@@ -305,6 +311,50 @@ export class SchoolWebsiteService {
       metaDescription: config.metaDescription,
       ogImage: config.ogImage,
       branding,
+      feeSchedules: publishedFees,
+    });
+  }
+
+  async getPublicFeeSchedules(idOrSlug: string) {
+    const school = await this.resolveSchool(idOrSlug);
+    const fees = await this.prisma.feeStructure.findMany({
+      where: { schoolId: school.id, status: 'PUBLISHED' },
+      include: { class: { select: { id: true, name: true, level: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Group fees by class
+    const classMap: Record<string, any> = {};
+    for (const f of fees) {
+      const clsKey = f.classId || 'GENERAL';
+      const clsName = f.class?.name || 'All Classes / General Charges';
+      if (!classMap[clsKey]) {
+        classMap[clsKey] = {
+          classId: f.classId,
+          className: clsName,
+          items: [],
+          newStudentTotal: 0,
+          returningStudentTotal: 0,
+        };
+      }
+      classMap[clsKey].items.push(f);
+      if (f.applicableTo === 'ALL' || f.applicableTo === 'NEW_STUDENT') {
+        classMap[clsKey].newStudentTotal += (f.amount || 0);
+      }
+      if ((f.applicableTo === 'ALL' || f.applicableTo === 'RETURNING_STUDENT') && f.feeType !== 'ONE_TIME') {
+        classMap[clsKey].returningStudentTotal += (f.amount || 0);
+      }
+    }
+
+    return successResponse({
+      school: {
+        id: school.id,
+        name: school.name || school.tenant.name,
+        code: school.code,
+        logo: school.logo || school.tenant.logo,
+      },
+      schedulesByClass: Object.values(classMap),
+      allFees: fees,
     });
   }
 

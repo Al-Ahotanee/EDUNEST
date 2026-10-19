@@ -130,8 +130,11 @@ export class FinancialWorkflowService {
       } else {
         initialStatus = 'POSTED';
       }
+    } else if (data.method === 'ONLINE') {
+      // Verified online payment clearing (Paystack)
+      initialStatus = 'POSTED';
     } else {
-      // Parent or other — pending verification
+      // Parent or other manual submission — pending verification
       initialStatus = 'PENDING_VERIFICATION';
     }
 

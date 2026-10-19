@@ -84,7 +84,20 @@ export default function FinancePage() {
   // Payment form
   const paymentForm = useForm({ defaultValues: { amount: 0, method: 'CASH', reference: '', notes: '' } });
   // Fee form
-  const feeForm = useForm({ defaultValues: { name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'PUBLISHED' } });
+  const feeForm = useForm({
+    defaultValues: {
+      name: '',
+      amount: 0,
+      description: '',
+      termBased: true,
+      classId: '',
+      feeType: 'TERM',
+      applicableTo: 'ALL',
+      isCompulsory: true,
+      category: 'TUITION',
+      status: 'PUBLISHED',
+    },
+  });
 
   // Fetch classes for fee structure dropdown
   const { data: classesData } = useQuery({
@@ -93,6 +106,16 @@ export default function FinancePage() {
     enabled: tab === 'fees' || tab === 'create-fee' || tab === 'create-invoice',
   });
   const classes = Array.isArray(classesData) ? classesData : [];
+
+  // Fetch fee catalogue
+  const { data: catalogueData } = useQuery({
+    queryKey: ['fee-catalogue'],
+    queryFn: () => financeApi.getFeeCatalogue().then((r) => r.data?.data || r.data || []),
+    enabled: tab === 'create-fee' || tab === 'fees',
+  });
+  const catalogue: any[] = Array.isArray(catalogueData) ? catalogueData : [];
+
+  const [generationCategory, setGenerationCategory] = useState<'ALL' | 'NEW_STUDENT' | 'RETURNING_STUDENT'>('ALL');
 
   const selectedStudentId = invoiceForm.watch('studentId');
   const selectedStudent = (studentsData || []).find((s: any) => s.id === selectedStudentId);
@@ -143,13 +166,6 @@ export default function FinancePage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
-  // P5 fix: use the new submitPayment workflow instead of the legacy recordPayment.
-  // This routes through FinancialWorkflowService which:
-  //   - Auto-posts cash/POS payments (Accountant recording directly)
-  //   - Sets bank transfers to PENDING_VERIFICATION
-  //   - Generates official receipts for posted payments
-  //   - Writes to the financial audit log
-  //   - Supports idempotency keys to prevent duplicate submissions
   const recordPaymentMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => financeApi.submitPayment({
       invoiceId: id,
@@ -177,7 +193,10 @@ export default function FinancePage() {
       toast.success('Fee structure created and published!');
       queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
       setTab('fees');
-      feeForm.reset({ name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'PUBLISHED' });
+      feeForm.reset({
+        name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM',
+        applicableTo: 'ALL', isCompulsory: true, category: 'TUITION', status: 'PUBLISHED',
+      });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
@@ -192,11 +211,13 @@ export default function FinancePage() {
   });
 
   const generateInvoicesMutation = useMutation({
-    mutationFn: (classId: string) => financeApi.generateInvoicesFromClass(classId),
+    mutationFn: ({ classId, studentCategory }: { classId: string; studentCategory?: string }) =>
+      financeApi.generateInvoicesFromClass(classId, { studentCategory }),
     onSuccess: (resp: any) => {
       const data = resp.data?.data || resp.data;
       toast.success(`Generated ${data.invoicesCreated} invoice(s) from ${data.feeItems} fee item(s). Skipped ${data.duplicatesSkipped} duplicates.`);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to generate invoices'),
   });
@@ -512,11 +533,12 @@ export default function FinancePage() {
             <div className="table-container">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Fee Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Class</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
+                  <tr className="border-b border-slate-100 bg-slate-50/70">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Fee Name & Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Class Scope</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Applicable To</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Billing Frequency</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Unit Amount</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Actions</th>
                   </tr>
@@ -528,15 +550,27 @@ export default function FinancePage() {
                       <tr key={fee.id} className="hover:bg-slate-50/70">
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-900 text-sm">{fee.name}</div>
+                          {fee.category && <div className="text-[11px] text-blue-600 font-mono uppercase">{fee.category}</div>}
                           {fee.description && <div className="text-xs text-slate-400">{fee.description}</div>}
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">{fee.class?.name || 'All Classes'}</td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-600 text-sm">{formatCurrency(fee.amount)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{fee.class?.name || 'All Classes (School-wide)'}</td>
                         <td className="px-4 py-3">
-                          <span className={`badge ${fee.feeType === 'ONE_TIME' ? 'badge-purple' : fee.feeType === 'ANNUAL' ? 'badge-blue' : 'badge-green'}`}>
-                            {fee.feeType || 'TERM'}
+                          <span className={`badge ${
+                            fee.applicableTo === 'NEW_STUDENT'
+                              ? 'bg-amber-100 text-amber-800'
+                              : fee.applicableTo === 'RETURNING_STUDENT'
+                                ? 'bg-cyan-100 text-cyan-800'
+                                : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {fee.applicableTo === 'NEW_STUDENT' ? 'New Students Only' : fee.applicableTo === 'RETURNING_STUDENT' ? 'Returning Only' : 'All Students'}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          <span className={`badge ${fee.feeType === 'ONE_TIME' ? 'badge-purple' : fee.feeType === 'ANNUAL' ? 'badge-blue' : 'badge-green'}`}>
+                            {fee.feeType === 'ONE_TIME' ? 'One-Time' : fee.feeType === 'ANNUAL' ? 'Annual (Term 1)' : 'Per Term'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-blue-600 text-sm">{formatCurrency(fee.amount)}</td>
                         <td className="px-4 py-3">
                           <span className={`badge ${fee.status === 'PUBLISHED' ? 'badge-green' : 'badge-yellow'}`}>
                             {fee.status || 'DRAFT'}
@@ -557,75 +591,99 @@ export default function FinancePage() {
                     ))}
                   {(feesData?.data || []).filter((fee: any) => !selectedClassForFees || fee.classId === selectedClassForFees).length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
-                        No fee structures yet. Click "Add Fee Item" to create one.
+                      <td colSpan={7} className="px-4 py-12 text-center text-slate-400 text-sm">
+                        No fee structures defined yet. Click "Add Fee Item" to configure charges.
                       </td>
                     </tr>
                   )}
                 </tbody>
-                {(feesData?.data || []).length > 0 && (
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-200 bg-slate-50">
-                      <td colSpan={2} className="px-4 py-3 font-bold text-slate-900 text-sm">Total (all items):</td>
-                      <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">
-                        {formatCurrency((feesData?.data || []).reduce((sum: number, f: any) => sum + (f.amount || 0), 0))}
-                      </td>
-                      <td colSpan={3}></td>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
             </div>
           </div>
 
-          {/* Fee Breakdown Preview by Class */}
-          {selectedClassForFees && (
-            <div className="card p-6">
-              <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <FileText size={18} className="text-blue-600" />
-                Fee Breakdown — {classes.find((c: any) => c.id === selectedClassForFees)?.name || 'Selected Class'}
-              </h3>
-              <div className="space-y-2">
-                {(feesData?.data || [])
-                  .filter((fee: any) => fee.classId === selectedClassForFees || (!fee.classId && fee.status === 'PUBLISHED'))
-                  .map((fee: any) => (
-                    <div key={fee.id} className="flex items-center justify-between py-2 border-b border-slate-50">
-                      <div>
-                        <span className="text-sm font-medium text-slate-700">{fee.name}</span>
-                        <span className="ml-2 text-xs text-slate-400">({fee.feeType || 'TERM'})</span>
-                      </div>
-                      <span className="text-sm font-bold text-slate-900">{formatCurrency(fee.amount)}</span>
+          {/* Fee Breakdown & Automated Bulk Invoicing Card */}
+          {selectedClassForFees && (() => {
+            const classFees = (feesData?.data || []).filter((fee: any) => fee.classId === selectedClassForFees || (!fee.classId && fee.status === 'PUBLISHED'));
+            const newStudentTotal = classFees
+              .filter((f: any) => f.applicableTo === 'ALL' || f.applicableTo === 'NEW_STUDENT')
+              .reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+            const returningStudentTotal = classFees
+              .filter((f: any) => (f.applicableTo === 'ALL' || f.applicableTo === 'RETURNING_STUDENT') && f.feeType !== 'ONE_TIME')
+              .reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+
+            return (
+              <div className="card p-6 space-y-6">
+                <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                      <FileText size={20} className="text-blue-600" />
+                      Class Fee Schedule & Automated Billing — {classes.find((c: any) => c.id === selectedClassForFees)?.name || 'Selected Class'}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      The system automatically computes distinct charges for new vs. returning students and generates invoices idempotently.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Two Calculated Cards: New vs Returning */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200">
+                    <p className="text-xs font-bold uppercase tracking-wider text-amber-700">New Students Schedule (Term 1)</p>
+                    <p className="text-3xl font-black text-amber-900 mt-1">{formatCurrency(newStudentTotal)}</p>
+                    <p className="text-xs text-amber-700 mt-2">
+                      Includes tuition, registration/admission fee, uniforms, sports kit, lab, textbooks, and termly levies.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Returning Students Schedule</p>
+                    <p className="text-3xl font-black text-blue-900 mt-1">{formatCurrency(returningStudentTotal)}</p>
+                    <p className="text-xs text-blue-700 mt-2">
+                      Excludes one-time admission, registration, and uniform pack fees. Includes recurring tuition and termly levies.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Invoice Generation Trigger */}
+                <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">⚡ Class-Wide Automated Invoicing</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Generate itemized invoices for all active enrolled students in this class. Existing invoices for the current term will not be duplicated.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Target Student Cohort</label>
+                      <select
+                        value={generationCategory}
+                        onChange={(e) => setGenerationCategory(e.target.value as any)}
+                        className="input w-full py-2 text-xs"
+                      >
+                        <option value="ALL">All Eligible Students (Automatic New vs. Returning)</option>
+                        <option value="NEW_STUDENT">New Students Only ({formatCurrency(newStudentTotal)})</option>
+                        <option value="RETURNING_STUDENT">Returning Students Only ({formatCurrency(returningStudentTotal)})</option>
+                      </select>
                     </div>
-                  ))}
-                <div className="flex items-center justify-between py-3 mt-2 border-t-2 border-slate-200">
-                  <span className="font-bold text-slate-900">Total</span>
-                  <span className="font-bold text-blue-600 text-lg">
-                    {formatCurrency(
-                      (feesData?.data || [])
-                        .filter((fee: any) => fee.classId === selectedClassForFees || (!fee.classId && fee.status === 'PUBLISHED'))
-                        .reduce((sum: number, f: any) => sum + (f.amount || 0), 0)
-                    )}
-                  </span>
+
+                    <div className="pt-5">
+                      <Button
+                        variant="primary"
+                        loading={generateInvoicesMutation.isPending}
+                        onClick={() => generateInvoicesMutation.mutate({
+                          classId: selectedClassForFees,
+                          studentCategory: generationCategory,
+                        })}
+                      >
+                        ⚡ Generate Invoices for {classes.find((c: any) => c.id === selectedClassForFees)?.name || 'Class'}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <p className="text-xs text-slate-400 mt-3">
-                This breakdown is what parents of students in this class will see in their portal.
-                Only PUBLISHED fee items are visible to parents.
-              </p>
-              <Button
-                size="sm"
-                variant="primary"
-                className="mt-3"
-                loading={generateInvoicesMutation.isPending}
-                onClick={() => generateInvoicesMutation.mutate(selectedClassForFees)}
-              >
-                Generate Invoices for This Class
-              </Button>
-              <p className="text-xs text-slate-400 mt-1">
-                Creates invoices for all active students in this class from published fee items.
-              </p>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -913,6 +971,33 @@ export default function FinancePage() {
 
           <div className="card p-8 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Standard Catalogue Preset Dropdown */}
+              {catalogue.length > 0 && (
+                <div className="sm:col-span-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="label text-xs font-bold text-slate-700">⚡ Autofill from Standard School Fee Catalogue</label>
+                  <select
+                    className="input w-full text-xs"
+                    onChange={(e) => {
+                      const item = catalogue.find(c => c.name === e.target.value);
+                      if (item) {
+                        feeForm.setValue('name', item.name);
+                        feeForm.setValue('category', item.category);
+                        feeForm.setValue('feeType', item.defaultFrequency || 'TERM');
+                        feeForm.setValue('applicableTo', item.applicableTo || 'ALL');
+                        if (item.description) feeForm.setValue('description', item.description);
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose Catalogue Preset (e.g. Tuition, Uniform, Books, Lab, PE Kit) --</option>
+                    {catalogue.map((cat: any) => (
+                      <option key={cat.category} value={cat.name}>
+                        {cat.name} ({cat.applicableTo === 'NEW_STUDENT' ? 'New Students Only' : 'All Students'}, {cat.defaultFrequency})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="sm:col-span-2">
                 <label className="label">Fee Item Name *</label>
                 <input
@@ -945,6 +1030,35 @@ export default function FinancePage() {
                 <p className="text-[11px] text-slate-400 mt-1">
                   If set to "All Classes", every active student in the school will be charged this item upon bulk invoice generation.
                 </p>
+              </div>
+
+              <div className="sm:col-span-2 space-y-2">
+                <label className="label">Student Cohort Applicability *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { id: 'ALL', label: 'All Students', desc: 'Applies to both newly admitted and returning students.' },
+                    { id: 'NEW_STUDENT', label: 'New Students Only', desc: 'Charged strictly on initial admission/enrollment (e.g. Uniform, Registration).' },
+                    { id: 'RETURNING_STUDENT', label: 'Returning Only', desc: 'Charged strictly to continuing/promoted students.' },
+                  ].map((cohort) => {
+                    const currentCohort = feeForm.watch('applicableTo');
+                    const isSelected = currentCohort === cohort.id;
+                    return (
+                      <div
+                        key={cohort.id}
+                        onClick={() => feeForm.setValue('applicableTo', cohort.id)}
+                        className={cn(
+                          'p-4 rounded-xl border cursor-pointer transition-all space-y-1',
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-600/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                        )}
+                      >
+                        <p className="font-bold text-sm">{cohort.label}</p>
+                        <p className="text-xs text-slate-500 leading-normal">{cohort.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="sm:col-span-2 space-y-2">

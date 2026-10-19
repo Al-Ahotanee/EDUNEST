@@ -757,6 +757,10 @@ model FeeStructure {
   termId      String? // if set, applies only to this term
   feeType     String  @default("TERM") // ONE_TIME | ANNUAL | TERM
   status      String  @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  applicableTo String @default("ALL") // ALL | NEW_STUDENT | RETURNING_STUDENT
+  isCompulsory Boolean @default(true)
+  category    String? // TUITION | APPLICATION | ADMISSION | UNIFORM | BOOKS | LAB | EXAM | PTA | OTHER
+  dueDate     DateTime?
 
   // ─── Phase 2: Approval workflow tracking ──────────────────────────────────
   createdById   String? // User who created the fee structure

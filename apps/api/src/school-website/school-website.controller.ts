@@ -29,6 +29,12 @@ export class SchoolWebsiteController {
   }
 
   @Public()
+  @Get('fee-schedules')
+  getPublicFeeSchedules(@Param('idOrSlug') idOrSlug: string) {
+    return this.websiteService.getPublicFeeSchedules(idOrSlug);
+  }
+
+  @Public()
   @Post('inquiries')
   submitInquiry(@Param('idOrSlug') idOrSlug: string, @Body() body: any) {
     return this.websiteService.submitInquiry(idOrSlug, body);
