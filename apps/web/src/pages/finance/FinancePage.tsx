@@ -11,6 +11,7 @@ import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, Avatar, PageLoader, Card,
 } from '../../components/ui';
 import { ReceiptViewer } from '../../components/finance/ReceiptViewer';
+import { EduNestIcon } from '../../components/common/EduNestLogo';
 import { financeApi, studentsApi, academicApi } from '../../services/api';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';

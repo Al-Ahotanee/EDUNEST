@@ -163,6 +163,7 @@ export default function App() {
             <Route index element={<Navigate to="/app/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="students" element={<StudentsPage />} />
+            <Route path="students/new" element={<StudentsPage />} />
             <Route path="students/promotions" element={<PromotionsPage />} />
             <Route path="students/:id" element={<StudentDetailPage />} />
             <Route path="admissions" element={<AdminAdmissionsPage />} />

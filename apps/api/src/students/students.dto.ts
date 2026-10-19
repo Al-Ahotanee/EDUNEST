@@ -32,6 +32,13 @@ export class CreateStudentDto {
   @ApiPropertyOptional() @IsOptional() @IsString() nationality?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() photo?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() genotype?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() tribe?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() medicalCondition?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() previousSchool?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() previousClass?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() birthCertificate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() immunizationCard?: string;
   @ApiPropertyOptional({ enum: StudentStatus }) @IsOptional() @IsEnum(StudentStatus) status?: StudentStatus;
   // ─── Round 6: Class assignment at registration time (auto-enrolls student) ──
   @ApiPropertyOptional() @IsOptional() @IsString() classId?: string;

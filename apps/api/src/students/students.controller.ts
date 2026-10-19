@@ -18,7 +18,7 @@ export class StudentsController {
   constructor(private studentsService: StudentsService) {}
 
   @Post()
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'Teacher', 'Accountant')
   @ApiOperation({ summary: 'Create a new student' })
   create(@Body() dto: CreateStudentDto, @CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.create(dto, schoolId);
@@ -47,7 +47,7 @@ export class StudentsController {
   }
 
   @Get('generate-admission-number')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'Teacher', 'Accountant')
   @ApiOperation({ summary: 'Generate next admission number' })
   generateAdmissionNumber(@CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.generateAdmissionNumber(schoolId);

@@ -11,9 +11,10 @@ import {
 } from '../../components/ui';
 import { studentsApi, schoolsApi, academicApi } from '../../services/api';
 import { formatDate, getStatusBadge } from '../../lib/utils';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { StudentIDCard, StudentIDCardData } from '../../components/idcard';
+import StudentRegistrationForm from './StudentRegistrationForm';
 
 const studentSchema = z.object({
   admissionNumber: z.string().min(1, 'Required'),
@@ -37,13 +38,15 @@ type StudentForm = z.infer<typeof studentSchema>;
 export default function StudentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [modalOpen, setModalOpen] = useState(searchParams.get('action') === 'new');
+  const isNewRoute = searchParams.get('action') === 'new' || location.pathname.endsWith('/new') || location.pathname.endsWith('/register');
+  const [modalOpen, setModalOpen] = useState(isNewRoute);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [viewStudent, setViewStudent] = useState<any>(null);
@@ -468,6 +471,33 @@ setTimeout(function() {
     },
   ];
 
+  if (modalOpen) {
+    return (
+      <StudentRegistrationForm
+        initialData={editingStudent}
+        onBack={() => {
+          setModalOpen(false);
+          setEditingStudent(null);
+          searchParams.delete('action');
+          setSearchParams(searchParams);
+          if (location.pathname !== '/app/students') {
+            navigate('/app/students');
+          }
+        }}
+        onSuccess={() => {
+          setModalOpen(false);
+          setEditingStudent(null);
+          searchParams.delete('action');
+          setSearchParams(searchParams);
+          if (location.pathname !== '/app/students') {
+            navigate('/app/students');
+          }
+          refetch();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -660,148 +690,6 @@ setTimeout(function() {
         } : undefined}
         emptyMessage="No students found. Click 'Register Student' to add one."
       />
-
-      {/* Create / Edit Modal */}
-      <Modal
-        open={modalOpen}
-        onClose={handleClose}
-        title={editingStudent ? 'Edit Student' : 'Register New Student'}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={handleClose}>Cancel</Button>
-            <Button
-              onClick={handleSubmit(onSubmit)}
-              loading={createMutation.isPending || updateMutation.isPending}
-            >
-              {editingStudent ? 'Update Student' : 'Register Student'}
-            </Button>
-          </>
-        }
-      >
-        <form className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" {...register('firstName')} error={errors.firstName?.message} placeholder="First name" />
-            <Input label="Last Name" {...register('lastName')} error={errors.lastName?.message} placeholder="Last name" />
-          </div>
-          <Input label="Other Name" {...register('otherName')} placeholder="Middle name (optional)" />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Admission Number" {...register('admissionNumber')} error={errors.admissionNumber?.message} placeholder="Auto-generated" />
-            <Select
-              label="Gender"
-              {...register('gender')}
-              error={errors.gender?.message}
-              options={[{ value: 'MALE', label: 'Male' }, { value: 'FEMALE', label: 'Female' }]}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Date of Birth" type="date" {...register('dateOfBirth')} error={errors.dateOfBirth?.message} />
-            <Select
-              label="Blood Group"
-              {...register('bloodGroup')}
-              options={['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((v) => ({ value: v, label: v }))}
-              placeholder="Select blood group"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="State of Origin" {...register('stateOfOrigin')} placeholder="e.g. Jigawa" />
-            <Input label="LGA" {...register('lga')} placeholder="Local Government Area" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Religion"
-              {...register('religion')}
-              options={[
-                { value: 'Islam', label: 'Islam' },
-                { value: 'Christianity', label: 'Christianity' },
-                { value: 'Others', label: 'Others' },
-              ]}
-              placeholder="Select religion"
-            />
-            <Select
-              label="Status"
-              {...register('status')}
-              options={[
-                { value: 'ACTIVE', label: 'Active' },
-                { value: 'INACTIVE', label: 'Inactive' },
-                { value: 'GRADUATED', label: 'Graduated' },
-                { value: 'TRANSFERRED', label: 'Transferred' },
-              ]}
-            />
-          </div>
-          <Input label="Address" {...register('address')} placeholder="Home address" />
-
-          {/* Class Assignment — prevents future unassigned students */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="form-group">
-              <label className="label">Assign to Class *</label>
-              <select
-                {...register('classId')}
-                className="input"
-                defaultValue=""
-              >
-                <option value="">— Select Class —</option>
-                {classes.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-400 mt-1">Student will be auto-enrolled in this class for the current session.</p>
-            </div>
-            <Select
-              label="Status"
-              {...register('status')}
-              options={[
-                { value: 'ACTIVE', label: 'Active' },
-                { value: 'INACTIVE', label: 'Inactive' },
-                { value: 'GRADUATED', label: 'Graduated' },
-                { value: 'TRANSFERRED', label: 'Transferred' },
-              ]}
-            />
-          </div>
-
-          {/* Photo Upload */}
-          <div className="form-group">
-            <label className="label">Student Photo</label>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
-                {photoPreview || editingStudent?.photo ? (
-                  <img src={photoPreview || editingStudent?.photo} alt="Student" className="w-full h-full object-cover" />
-                ) : (
-                  <Camera size={24} className="text-slate-300" />
-                )}
-              </div>
-              <div className="flex-1">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  icon={<Camera size={14} />}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {photoPreview || editingStudent?.photo ? 'Change Photo' : 'Upload Photo'}
-                </Button>
-                {photoPreview && (
-                  <button
-                    type="button"
-                    onClick={() => { setPhotoPreview(''); setValue('photo' as any, ''); }}
-                    className="ml-2 text-xs text-red-500 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                )}
-                <p className="text-xs text-slate-400 mt-1">JPG/PNG, max 2MB. Used on ID card.</p>
-              </div>
-            </div>
-          </div>
-        </form>
-      </Modal>
 
       {/* Delete Confirm */}
       <ConfirmDialog
