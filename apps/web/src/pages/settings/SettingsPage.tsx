@@ -3,9 +3,9 @@ import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
 import { Button, Input, Select, Card, Modal } from '../../components/ui';
-import { schoolsApi, authApi, usersApi } from '../../services/api';
+import { schoolsApi, authApi, usersApi, uploadApi } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Settings, Building, Bell, Shield, User, Palette } from 'lucide-react';
+import { Settings, Building, Bell, Shield, User, Palette, Upload } from 'lucide-react';
 import { applyThemeColors } from '../../hooks/useTenantTheme';
 
 export default function SettingsPage() {
@@ -83,6 +83,45 @@ export default function SettingsPage() {
       });
     }
   }, [user, profileForm]);
+
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (PNG, JPG, WEBP, SVG)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo image must be under 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        schoolForm.setValue('logo', base64);
+        try {
+          const uploadedUrl = await uploadApi.uploadLogo(base64, file.name);
+          if (uploadedUrl) {
+            schoolForm.setValue('logo', uploadedUrl);
+          }
+        } catch (err) {
+          console.warn('Direct upload fallback to base64 data URL:', err);
+        }
+        toast.success('Logo selected! Click "Save Changes" to apply.');
+        setUploadingLogo(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error('Failed to read logo image');
+      setUploadingLogo(false);
+    }
+  };
 
   const updateSchoolMutation = useMutation({
     mutationFn: (data: any) => schoolsApi.updateCurrent(data),
@@ -199,13 +238,55 @@ export default function SettingsPage() {
 
               {/* Logo */}
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
-                  {user?.tenant?.name?.[0] || 'S'}
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <div className="relative w-20 h-20 rounded-2xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center shadow-sm">
+                  {schoolForm.watch('logo') ? (
+                    <img
+                      src={schoolForm.watch('logo')}
+                      alt="School Logo"
+                      className="w-full h-full object-contain p-1"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white text-2xl font-black">
+                      {user?.tenant?.name?.[0] || 'S'}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800">{user?.tenant?.name}</p>
                   <p className="text-sm text-slate-400 mt-0.5">{user?.school?.name}</p>
-                  <Button variant="secondary" size="sm" className="mt-2">Change Logo</Button>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => logoInputRef.current?.click()}
+                      loading={uploadingLogo}
+                    >
+                      <Upload size={14} className="mr-1.5" />
+                      {schoolForm.watch('logo') ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                    {schoolForm.watch('logo') && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => schoolForm.setValue('logo', '')}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 

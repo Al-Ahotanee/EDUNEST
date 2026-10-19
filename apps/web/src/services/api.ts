@@ -313,4 +313,30 @@ export const usersApi = {
   roles: () => api.get('/users/roles'),
 };
 
+// ─── Uploads ──────────────────────────────────────────────────────────────────
+export const uploadApi = {
+  uploadBase64: async (data: string, filename?: string, folder = 'images') => {
+    const res = await api.post('/upload/image', { data, filename, folder });
+    return res.data?.data?.url || res.data?.url;
+  },
+  uploadLogo: async (data: string, filename?: string) => {
+    const res = await api.post('/upload/logo', { data, filename });
+    return res.data?.data?.url || res.data?.url;
+  },
+  uploadDocument: async (data: string, filename?: string) => {
+    const res = await api.post('/upload/document', { data, filename });
+    return res.data?.data?.url || res.data?.url;
+  },
+  uploadFile: async (file: File, folder = 'images') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    const res = await api.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data?.data?.url || res.data?.url;
+  },
+};
+
+
 

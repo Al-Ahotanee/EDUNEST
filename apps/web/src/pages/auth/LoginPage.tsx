@@ -60,6 +60,7 @@ export default function LoginPage() {
   const primaryColor = school?.primaryColor || '#1a56db';
   const secondaryColor = school?.secondaryColor || '#7e3af2';
   const hasSchoolBranding = !!school;
+  const [logoError, setLogoError] = useState(false);
 
   React.useEffect(() => {
     if (school) {
@@ -147,8 +148,8 @@ export default function LoginPage() {
       {/* Top bar — school-branded, no EduNest mentions */}
       <header className="h-16 border-b border-slate-200/80 bg-white/80 backdrop-blur-md px-6 flex items-center justify-between">
         <Link to={slugFromQuery ? `/school/${slugFromQuery}` : '/'} className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-          {schoolLogo ? (
-            <img src={schoolLogo} alt={schoolName} className="w-8 h-8 object-contain rounded-lg" />
+          {schoolLogo && !logoError ? (
+            <img src={schoolLogo} alt={schoolName} onError={() => setLogoError(true)} className="w-8 h-8 object-contain rounded-lg" />
           ) : hasSchoolBranding ? (
             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ background: primaryColor }}>
               {schoolName?.[0] || 'S'}
@@ -186,9 +187,9 @@ export default function LoginPage() {
             <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-black/10 rounded-full blur-3xl" />
 
             <div className="relative z-10">
-              {schoolLogo ? (
+              {schoolLogo && !logoError ? (
                 <div className="mb-6 bg-white/10 border border-white/10 p-2.5 rounded-xl inline-block">
-                  <img src={schoolLogo} alt={schoolName} className="w-12 h-12 object-contain rounded-lg" />
+                  <img src={schoolLogo} alt={schoolName} onError={() => setLogoError(true)} className="w-12 h-12 object-contain rounded-lg" />
                 </div>
               ) : (
                 <div className="mb-6 w-14 h-14 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">

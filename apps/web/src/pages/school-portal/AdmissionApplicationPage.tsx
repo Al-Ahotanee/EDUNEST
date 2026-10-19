@@ -1,7 +1,8 @@
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { api } from '../../services/api';
-import { CheckCircle, Upload, ArrowLeft, Printer, Search } from 'lucide-react';
+import { api, uploadApi } from '../../services/api';
+import { CheckCircle, Upload, ArrowLeft, Printer, Search, Check, FileCheck } from 'lucide-react';
 import { applyThemeColors } from '../../hooks/useTenantTheme';
 import toast from 'react-hot-toast';
 
@@ -39,9 +40,64 @@ export default function AdmissionApplicationPage() {
     parentName: '', parentPhone: '', parentEmail: '', parentOccupation: '',
     email: '', phone: '',
     emergencyContact: '', emergencyPhone: '',
+    photo: '',
+    birthCertificate: '',
+    lastReportCard: '',
     // EDN-001: honeypot field — real users never see this; bots will fill it
     website: '',
   });
+
+  const passportInputRef = React.useRef<HTMLInputElement>(null);
+  const birthCertInputRef = React.useRef<HTMLInputElement>(null);
+  const reportCardInputRef = React.useRef<HTMLInputElement>(null);
+  const [passportPreview, setPassportPreview] = useState<string>('');
+  const [docNames, setDocNames] = useState<Record<string, string>>({});
+
+  const handlePassportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (PNG, JPG)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Passport photo must be under 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      setPassportPreview(base64);
+      setForm(f => ({ ...f, photo: base64 }));
+      try {
+        const url = await uploadApi.uploadBase64(base64, file.name, 'images');
+        if (url) setForm(f => ({ ...f, photo: url }));
+      } catch {}
+      toast.success('Passport photo attached!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDocUpload = (key: 'birthCertificate' | 'lastReportCard', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Document must be under 10MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      setForm(f => ({ ...f, [key]: base64 }));
+      setDocNames(prev => ({ ...prev, [key]: file.name }));
+      try {
+        const url = await uploadApi.uploadDocument(base64, file.name);
+        if (url) setForm(f => ({ ...f, [key]: url }));
+      } catch {}
+      toast.success(`${file.name} attached!`);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -211,11 +267,35 @@ export default function AdmissionApplicationPage() {
                 </div>
                 {/* Passport Photo Box */}
                 <div className="flex-shrink-0">
-                  <div className="w-32 h-40 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-center p-3 bg-gray-50">
-                    <Upload size={20} className="text-gray-300 mb-2" />
-                    <p className="text-xs text-gray-400 font-medium">Passport</p>
-                    <p className="text-xs text-gray-400">Photograph</p>
-                    <p className="text-[10px] text-gray-300 mt-1">2×2 white bg</p>
+                  <input
+                    type="file"
+                    ref={passportInputRef}
+                    accept="image/*"
+                    onChange={handlePassportUpload}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => passportInputRef.current?.click()}
+                    className="w-32 h-40 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-center p-2 bg-gray-50 hover:bg-gray-100 hover:border-blue-400 cursor-pointer transition-all relative overflow-hidden group shadow-xs"
+                    title="Click to upload passport photo"
+                  >
+                    {passportPreview ? (
+                      <>
+                        <img src={passportPreview} alt="Passport" className="w-full h-full object-cover rounded-lg" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-semibold transition-opacity">
+                          Change Photo
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={22} className="text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" />
+                        <p className="text-xs text-gray-700 font-semibold">Passport</p>
+                        <p className="text-[11px] text-gray-400">Photograph</p>
+                        <span className="text-[10px] text-blue-600 mt-2 font-medium bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          Upload Photo
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -255,21 +335,91 @@ export default function AdmissionApplicationPage() {
                 <div className="w-8 h-8 rounded-lg text-white text-sm font-black flex items-center justify-center flex-shrink-0" style={{ background: primary }}>D</div>
                 <h2 className="text-lg font-black text-gray-800 uppercase tracking-wide">Documents</h2>
               </div>
+              <input
+                type="file"
+                ref={birthCertInputRef}
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={e => handleDocUpload('birthCertificate', e)}
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={reportCardInputRef}
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={e => handleDocUpload('lastReportCard', e)}
+                className="hidden"
+              />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: 'Birth Certificate / Age Declaration', required: true },
-                  { label: 'Passport Photograph (3 copies)', required: true },
-                  { label: 'Last School Report Card', required: false },
-                  { label: 'Immunization Card', required: false },
-                ].map(({ label, required }) => (
-                  <div key={label} className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-gray-300 transition-colors bg-gray-50">
-                    <Upload size={20} className="mx-auto mb-2 text-gray-300" />
-                    <p className="text-xs text-gray-500 font-medium leading-tight">{label}</p>
-                    {required && <span className="text-xs text-red-400 mt-1 block">Required</span>}
-                  </div>
-                ))}
+                <div
+                  onClick={() => birthCertInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                    docNames['birthCertificate'] ? 'border-emerald-400 bg-emerald-50/50' : 'border-gray-200 hover:border-blue-400 bg-gray-50'
+                  }`}
+                >
+                  {docNames['birthCertificate'] ? (
+                    <>
+                      <FileCheck size={22} className="mx-auto mb-1 text-emerald-600" />
+                      <p className="text-xs text-emerald-800 font-semibold truncate">{docNames['birthCertificate']}</p>
+                      <span className="text-[10px] text-emerald-600 font-bold block mt-1">Attached</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={20} className="mx-auto mb-2 text-gray-400" />
+                      <p className="text-xs text-gray-600 font-medium leading-tight">Birth Certificate / Age Declaration</p>
+                      <span className="text-xs text-blue-600 font-semibold mt-1 block">Click to upload</span>
+                    </>
+                  )}
+                </div>
+
+                <div
+                  onClick={() => passportInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                    passportPreview ? 'border-emerald-400 bg-emerald-50/50' : 'border-gray-200 hover:border-blue-400 bg-gray-50'
+                  }`}
+                >
+                  {passportPreview ? (
+                    <>
+                      <Check size={22} className="mx-auto mb-1 text-emerald-600" />
+                      <p className="text-xs text-emerald-800 font-semibold">Passport Photo</p>
+                      <span className="text-[10px] text-emerald-600 font-bold block mt-1">Attached</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={20} className="mx-auto mb-2 text-gray-400" />
+                      <p className="text-xs text-gray-600 font-medium leading-tight">Passport Photograph</p>
+                      <span className="text-xs text-red-500 font-medium mt-1 block">Required</span>
+                    </>
+                  )}
+                </div>
+
+                <div
+                  onClick={() => reportCardInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                    docNames['lastReportCard'] ? 'border-emerald-400 bg-emerald-50/50' : 'border-gray-200 hover:border-blue-400 bg-gray-50'
+                  }`}
+                >
+                  {docNames['lastReportCard'] ? (
+                    <>
+                      <FileCheck size={22} className="mx-auto mb-1 text-emerald-600" />
+                      <p className="text-xs text-emerald-800 font-semibold truncate">{docNames['lastReportCard']}</p>
+                      <span className="text-[10px] text-emerald-600 font-bold block mt-1">Attached</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={20} className="mx-auto mb-2 text-gray-400" />
+                      <p className="text-xs text-gray-600 font-medium leading-tight">Last School Report Card</p>
+                      <span className="text-xs text-gray-400 mt-1 block">Optional</span>
+                    </>
+                  )}
+                </div>
+
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center bg-gray-50 opacity-75">
+                  <Upload size={20} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-xs text-gray-500 font-medium leading-tight">Immunization Card</p>
+                  <span className="text-xs text-gray-400 mt-1 block">Present at Interview</span>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-3">Physical documents will be required during screening. Please bring originals and photocopies.</p>
+              <p className="text-xs text-gray-400 mt-3">Uploaded files will be processed securely. Please bring physical originals during screening.</p>
             </div>
 
             {/* Section E — Declaration */}

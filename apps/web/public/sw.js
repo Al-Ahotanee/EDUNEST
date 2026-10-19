@@ -30,12 +30,20 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Bypass API requests to allow syncEngine and network to handle them
-  if (url.pathname.startsWith('/api') || url.pathname.includes('/auth/')) {
+  // Bypass API requests, auth routes, and non-http schemes
+  if (url.pathname.startsWith('/api') || url.pathname.includes('/auth/') || !url.protocol.startsWith('http')) {
     return;
   }
 
-  // Navigation requests (HTML)
+  // Cross-origin requests (e.g. external CDNs, images): network-only with safe catch
+  if (url.origin !== self.location.origin) {
+    event.respondWith(
+      fetch(event.request).catch(() => new Response('', { status: 404, statusText: 'Not Found' }))
+    );
+    return;
+  }
+
+  // Navigation requests (HTML fallback for SPA client-side routing)
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/index.html'))
@@ -43,7 +51,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (cache first, then network)
+  // Same-origin static assets (cache first, then network)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -58,7 +66,7 @@ self.addEventListener('fetch', (event) => {
           cache.put(event.request, responseToCache);
         });
         return response;
-      });
+      }).catch(() => new Response('', { status: 404, statusText: 'Not Found' }));
     })
   );
 });

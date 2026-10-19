@@ -14,7 +14,7 @@ model Tenant {
   name                String
   slug                String             @unique
   domain              String?            @unique
-  logo                String?
+  logo                String?            @db.LongText
   motto               String?
   address             String?
   city                String?
@@ -59,11 +59,11 @@ model School {
   address            String?
   phone              String?
   email              String?
-  logo               String?
+  logo               String?            @db.LongText
   motto              String?
   website            String?
-  principalSignature String?
-  stampSeal          String?
+  principalSignature String?            @db.LongText
+  stampSeal          String?            @db.LongText
   isActive           Boolean    @default(true)
   // P0 fix: persist timetable publish state so it survives reloads.
   // When false, the timetable is "Draft" and not visible on Student/Parent portals.
@@ -327,9 +327,9 @@ model Student {
   tribe            String?
   nationality      String        @default("Nigerian")
   address          String?
-  photo            String?
-  birthCertificate String?
-  immunizationCard String?
+  photo            String?       @db.LongText
+  birthCertificate String?       @db.LongText
+  immunizationCard String?       @db.LongText
   previousSchool   String?
   previousClass    String?
   status           StudentStatus @default(ACTIVE)
@@ -408,9 +408,9 @@ model Admission {
   rejectionReason  String?         @db.Text
   notes            String?
   admittedAt       DateTime?
-  photo            String?
-  birthCertificate String?
-  lastReportCard   String?
+  photo            String?         @db.LongText
+  birthCertificate String?         @db.LongText
+  lastReportCard   String?         @db.LongText
   stateOfOrigin    String?
   religion         String?
   bloodGroup       String?
@@ -1160,7 +1160,7 @@ model Staff {
   phone          String?
   email          String?
   address        String?
-  photo          String?
+  photo          String?        @db.LongText
   departmentId   String?
   designation    String?
   employmentType EmploymentType @default(FULL_TIME)

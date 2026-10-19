@@ -16,8 +16,17 @@ import {
 // colors, name). The EduNest mark appears only on the SaaS landing page,
 // platform admin console, marketer portal, and tenant registration page.
 function SchoolLogo({ school, size = 22 }: { school: any; size?: number }) {
-  if (school?.logo) {
-    return <img src={school.logo} alt={school.name} className="rounded-xl object-contain bg-white p-0.5" style={{ width: size + 14, height: size + 14 }} />;
+  const [imgError, setImgError] = useState(false);
+  if (school?.logo && !imgError) {
+    return (
+      <img
+        src={school.logo}
+        alt={school.name}
+        onError={() => setImgError(true)}
+        className="rounded-xl object-contain bg-white p-0.5"
+        style={{ width: size + 14, height: size + 14 }}
+      />
+    );
   }
   // Use first letter of school name as the logo
   const initial = school?.name?.[0] || 'S';

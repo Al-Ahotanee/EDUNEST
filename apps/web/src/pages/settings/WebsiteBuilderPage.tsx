@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { websiteApi } from '../../services/api';
+import { websiteApi, uploadApi } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import {
   Layout, Eye, Smartphone, Tablet, Monitor, Save, Globe,
   CheckCircle, ArrowUp, ArrowDown, ToggleLeft, ToggleRight,
   Sparkles, Layers, MessageSquare, ExternalLink, RefreshCw,
-  Building, BookOpen, Shield, HelpCircle, PhoneCall
+  Building, BookOpen, Shield, HelpCircle, PhoneCall, Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -92,6 +92,45 @@ export default function WebsiteBuilderPage() {
     principalMessage: '',
   });
   const [selectedInquiryStatus, setSelectedInquiryStatus] = useState('ALL');
+
+  const heroBgInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingHeroBg, setUploadingHeroBg] = useState(false);
+
+  const handleHeroBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (PNG, JPG, WEBP)');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('Hero background image must be under 8MB');
+      return;
+    }
+
+    setUploadingHeroBg(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        setHeroForm(prev => ({ ...prev, bgImage: base64 }));
+        try {
+          const uploadedUrl = await uploadApi.uploadBase64(base64, file.name, 'images');
+          if (uploadedUrl) {
+            setHeroForm(prev => ({ ...prev, bgImage: uploadedUrl }));
+          }
+        } catch (err) {
+          console.warn('Fallback to base64 data URL:', err);
+        }
+        toast.success('Hero background image loaded!');
+        setUploadingHeroBg(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error('Failed to read image file');
+      setUploadingHeroBg(false);
+    }
+  };
 
   // Load website config
   const { data: configData, isLoading: loadingConfig } = useQuery({
@@ -413,14 +452,51 @@ export default function WebsiteBuilderPage() {
                 />
               </div>
               <div>
-                <label className="label">Hero Background Image URL</label>
+                <label className="label">Hero Background Image</label>
                 <input
-                  type="text"
-                  value={heroForm.bgImage}
-                  onChange={(e) => setHeroForm({ ...heroForm, bgImage: e.target.value })}
-                  className="input"
-                  placeholder="https://images.unsplash.com/..."
+                  type="file"
+                  ref={heroBgInputRef}
+                  accept="image/*"
+                  onChange={handleHeroBgUpload}
+                  className="hidden"
                 />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={heroForm.bgImage}
+                    onChange={(e) => setHeroForm({ ...heroForm, bgImage: e.target.value })}
+                    className="input flex-1"
+                    placeholder="https://images.unsplash.com/... or upload below"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => heroBgInputRef.current?.click()}
+                    disabled={uploadingHeroBg}
+                    className="btn-secondary btn-sm flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <Upload size={14} />
+                    {uploadingHeroBg ? 'Uploading...' : 'Upload Image'}
+                  </button>
+                </div>
+                {heroForm.bgImage && (
+                  <div className="mt-2 h-24 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative">
+                    <img
+                      src={heroForm.bgImage}
+                      alt="Hero Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setHeroForm({ ...heroForm, bgImage: '' })}
+                      className="absolute top-1 right-1 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] hover:bg-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

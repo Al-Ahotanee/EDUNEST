@@ -20,6 +20,10 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Increase payload limit for base64 image/document uploads
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
