@@ -117,6 +117,9 @@ async function bootstrap() {
       app.use(express.static(clientDist));
       app.use((req: any, res: any, next: any) => {
         if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/ping') && !req.path.startsWith('/healthz')) {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
           res.sendFile(join(clientDist, 'index.html'));
         } else {
           next();

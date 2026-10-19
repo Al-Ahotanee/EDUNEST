@@ -1,7 +1,5 @@
-const CACHE_NAME = 'schoolos-pwa-v1';
+const CACHE_NAME = 'schoolos-pwa-v2';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/favicon.svg',
   '/icons.svg',
@@ -20,7 +18,12 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log('[SW] Deleting stale cache:', key);
+            return caches.delete(key);
+          }
+        })
       );
     })
   );
@@ -43,15 +46,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests (HTML fallback for SPA client-side routing)
+  // Navigation requests: NETWORK FIRST so users always get the latest HTML and bundle hashes
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
     );
     return;
   }
 
-  // Same-origin static assets (cache first, then network)
+  // Same-origin static assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -66,7 +77,7 @@ self.addEventListener('fetch', (event) => {
           cache.put(event.request, responseToCache);
         });
         return response;
-      }).catch(() => new Response('', { status: 404, statusText: 'Not Found' }));
+      });
     })
   );
 });
