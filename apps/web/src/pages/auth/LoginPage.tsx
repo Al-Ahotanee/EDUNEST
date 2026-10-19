@@ -147,7 +147,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans antialiased text-slate-800">
       {/* Top bar — school-branded, no EduNest mentions */}
       <header className="h-16 border-b border-slate-200/80 bg-white/80 backdrop-blur-md px-6 flex items-center justify-between">
-        <Link to={slugFromQuery ? `/school/${slugFromQuery}` : '/'} className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+        <Link to={activeSlug ? `/school/${activeSlug}` : '/'} className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           {schoolLogo && !logoError ? (
             <img src={schoolLogo} alt={schoolName} onError={() => setLogoError(true)} className="w-8 h-8 object-contain rounded-lg" />
           ) : hasSchoolBranding ? (
