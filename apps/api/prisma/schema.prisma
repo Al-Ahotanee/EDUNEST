@@ -41,11 +41,11 @@ model Tenant {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  schools   School[]
-  users     User[]
-  roles     Role[]
-  auditLogs AuditLog[]
-  marketer  Marketer?  @relation(fields: [marketerId], references: [id])
+  schools         School[]
+  users           User[]
+  roles           Role[]
+  auditLogs       AuditLog[]
+  marketer        Marketer?              @relation(fields: [marketerId], references: [id])
   // ─── Phase 2: Financial module relation ──────────────────────────────────
   financialPolicy TenantFinancialPolicy?
 }
@@ -73,7 +73,7 @@ model School {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  tenant             Tenant               @relation(fields: [tenantId], references: [id])
   users              User[]
   students           Student[]
   staff              Staff[]
@@ -92,24 +92,65 @@ model School {
   receipts           Receipt[]
   creditNotes        CreditNote[]
   financialAuditLogs FinancialAuditLog[]
+  // ─── White-Label & Website CMS relations ──────────────────────────────────
+  websiteConfig      SchoolWebsiteConfig?
+  inquiries          SchoolInquiry[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
+}
+
+// ─── SCHOOL WEBSITE CMS & INQUIRIES ──────────────────────────────────────────
+
+model SchoolWebsiteConfig {
+  id               String    @id @default(uuid())
+  schoolId         String    @unique
+  template         String    @default("MODERN_ACADEMY") // MODERN_ACADEMY, CLASSIC_HERITAGE, VIBRANT_CAMPUS, MINIMAL_EXCELLENCE, COMPREHENSIVE_COMMUNITY
+  isPublished      Boolean   @default(true)
+  publishedAt      DateTime? @default(now())
+  draftContent     Json?
+  publishedContent Json?
+  metaTitle        String?
+  metaDescription  String?   @db.Text
+  ogImage          String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model SchoolInquiry {
+  id         String   @id @default(uuid())
+  schoolId   String
+  name       String
+  email      String
+  phone      String?
+  subject    String?
+  message    String   @db.Text
+  status     String   @default("NEW") // NEW, CONTACTED, CLOSED
+  adminNotes String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([status])
 }
 
 /// Academic calendar event — milestones like resumption, CA weeks, exams,
 /// holidays, vacations. Surfaced in the Timetable > Academic Dates view
 /// (P2 fix: previously hard-coded; now persisted via CRUD endpoints).
 model AcademicEvent {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   schoolId    String
   title       String
-  type        String   @default("ACADEMIC")  // ACADEMIC | EXAMINATION | HOLIDAY | VACATION | EVENT
+  type        String    @default("ACADEMIC") // ACADEMIC | EXAMINATION | HOLIDAY | VACATION | EVENT
   startDate   DateTime
   endDate     DateTime?
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
@@ -144,17 +185,17 @@ model User {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  tenant             Tenant?             @relation(fields: [tenantId], references: [id])
-  school             School?             @relation(fields: [schoolId], references: [id])
-  userRoles          UserRole[]
-  refreshTokens      RefreshToken[]
+  tenant              Tenant?              @relation(fields: [tenantId], references: [id])
+  school              School?              @relation(fields: [schoolId], references: [id])
+  userRoles           UserRole[]
+  refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
-  auditLogs          AuditLog[]
-  notifications      Notification[]
-  sentMessages       Message[]           @relation("SentMessages")
-  receivedMessages   Message[]           @relation("ReceivedMessages")
-  loginHistory       LoginHistory[]
-  teacherAssignments TeacherAssignment[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+  sentMessages        Message[]            @relation("SentMessages")
+  receivedMessages    Message[]            @relation("ReceivedMessages")
+  loginHistory        LoginHistory[]
+  teacherAssignments  TeacherAssignment[]
   // ─── Phase 2: Financial module relations ──────────────────────────────────
   parentStudentLinks  ParentStudentLink[]
 
@@ -176,13 +217,13 @@ model RefreshToken {
 /// Password reset token issued by /auth/forgot-password and consumed by
 /// /auth/reset-password. Single-use, expires after 30 minutes.
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -360,7 +401,11 @@ model Admission {
   applyingForClass String
   boardingDay      String?
   status           AdmissionStatus @default(PENDING)
+  stage            String          @default("SUBMITTED") // SUBMITTED, UNDER_REVIEW, EXAM_SCHEDULED, INTERVIEW_SCHEDULED, APPROVED, REJECTED, ENROLLED
   examScore        Float?
+  examDate         DateTime?
+  interviewDate    DateTime?
+  rejectionReason  String?         @db.Text
   notes            String?
   admittedAt       DateTime?
   photo            String?
@@ -700,28 +745,28 @@ model ExamResponse {
 // ─── FINANCE ──────────────────────────────────────────────────────────────────
 
 model FeeStructure {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   schoolId    String
   name        String
   amount      Float
   description String?
-  termBased   Boolean  @default(true)
+  termBased   Boolean @default(true)
   // ─── Round 6 enhancements: class-scoped, session/term-scoped fee schedules ──
-  classId     String?  // if set, this fee structure applies only to this class
-  sessionId   String?  // if set, applies only to this academic session
-  termId      String?  // if set, applies only to this term
-  feeType     String   @default("TERM") // ONE_TIME | ANNUAL | TERM
-  status      String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  classId     String? // if set, this fee structure applies only to this class
+  sessionId   String? // if set, applies only to this academic session
+  termId      String? // if set, applies only to this term
+  feeType     String  @default("TERM") // ONE_TIME | ANNUAL | TERM
+  status      String  @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
 
   // ─── Phase 2: Approval workflow tracking ──────────────────────────────────
-  createdById   String?   // User who created the fee structure
-  publishedById String?   // User who published it
+  createdById   String? // User who created the fee structure
+  publishedById String? // User who published it
   publishedAt   DateTime?
   archivedAt    DateTime?
-  version       Int       @default(1)  // increments on each publish
+  version       Int       @default(1) // increments on each publish
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   school       School        @relation(fields: [schoolId], references: [id])
   class        Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
@@ -748,20 +793,20 @@ model Invoice {
   updatedAt  DateTime      @updatedAt
 
   // ─── Phase 2: Academic scoping for proper invoice filtering ────────────────
-  schoolId   String?       // tenant school that issued the invoice
-  sessionId  String?       // academic session
-  termId     String?      // academic term
-  classId    String?       // student's class at time of issuance
+  schoolId  String? // tenant school that issued the invoice
+  sessionId String? // academic session
+  termId    String? // academic term
+  classId   String? // student's class at time of issuance
 
   // ─── Phase 2: Workflow tracking ───────────────────────────────────────────
-  generatedById String?    // User who generated the invoice
-  cancelledAt   DateTime?
-  cancelledById String?
+  generatedById      String? // User who generated the invoice
+  cancelledAt        DateTime?
+  cancelledById      String?
   cancellationReason String?
 
-  student  Student       @relation(fields: [studentId], references: [id])
-  items    InvoiceItem[]
-  payments Payment[]
+  student     Student             @relation(fields: [studentId], references: [id])
+  items       InvoiceItem[]
+  payments    Payment[]
   allocations PaymentAllocation[]
   creditNotes CreditNote[]
 
@@ -781,8 +826,8 @@ model InvoiceItem {
   quantity       Int     @default(1)
   subtotal       Float
 
-  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  feeStructure FeeStructure? @relation(fields: [feeStructureId], references: [id])
+  invoice      Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeStructure FeeStructure?       @relation(fields: [feeStructureId], references: [id])
   allocations  PaymentAllocation[]
 
   @@index([invoiceId])
@@ -802,34 +847,34 @@ model Payment {
 
   // ─── Phase 2: Financial module enhancements ──────────────────────────────
   // Payment status state machine — tracks lifecycle from submission to posting
-  status      PaymentStatus @default(POSTED)  // default POSTED for backward compat
+  status PaymentStatus @default(POSTED) // default POSTED for backward compat
 
   // Workflow tracking — who recorded, verified, approved, posted
-  recordedById    String?   // User who recorded/submitted the payment
-  verifiedById    String?   // School Accountant who verified
-  approvedById    String?   // School Accountant who approved (for Class Master submissions)
+  recordedById    String? // User who recorded/submitted the payment
+  verifiedById    String? // School Accountant who verified
+  approvedById    String? // School Accountant who approved (for Class Master submissions)
   verifiedAt      DateTime?
   approvedAt      DateTime?
-  postedAt        DateTime?  // when the payment was officially posted
-  rejectionReason String?   // required if status = REJECTED
+  postedAt        DateTime? // when the payment was officially posted
+  rejectionReason String? // required if status = REJECTED
 
   // Class Master cash submission context
   isClassMasterSubmission Boolean @default(false)
-  submissionNotes String?
+  submissionNotes         String?
 
   // Reversal tracking
-  reversedAt      DateTime?
-  reversedById    String?
-  reversalReason  String?
-  reversedByPaymentId String?  // links to the compensating payment if reversed
+  reversedAt          DateTime?
+  reversedById        String?
+  reversalReason      String?
+  reversedByPaymentId String? // links to the compensating payment if reversed
 
   // Idempotency — prevent duplicate submissions from retries
-  idempotencyKey  String?  @unique
+  idempotencyKey String? @unique
 
-  invoice      Invoice             @relation(fields: [invoiceId], references: [id])
-  allocations  PaymentAllocation[]
-  receipt      Receipt?
-  creditNotes  CreditNote[]
+  invoice     Invoice             @relation(fields: [invoiceId], references: [id])
+  allocations PaymentAllocation[]
+  receipt     Receipt?
+  creditNotes CreditNote[]
 
   @@index([invoiceId])
   @@index([status])
@@ -843,23 +888,23 @@ model Payment {
 /// while the invoice remains "UNPAID" — the invoice balance only decreases
 /// when the payment reaches POSTED status.
 enum PaymentStatus {
-  INITIATED                       // Payment initiated but not yet submitted
-  PENDING_VERIFICATION            // Awaiting verification (e.g. bank transfer screenshot)
-  PENDING_ACCOUNTANT_APPROVAL    // Class Master cash submission awaiting Accountant approval
-  VERIFIED                        // Verified by School Accountant, awaiting posting
-  POSTED                          // Officially posted — reduces invoice balance
-  FAILED                          // Failed (e.g. gateway declined)
-  REJECTED                        // Rejected by School Accountant
-  REVERSED                        // Reversed after posting (compensating entry)
-  REFUNDED                        // Refunded to payer
+  INITIATED // Payment initiated but not yet submitted
+  PENDING_VERIFICATION // Awaiting verification (e.g. bank transfer screenshot)
+  PENDING_ACCOUNTANT_APPROVAL // Class Master cash submission awaiting Accountant approval
+  VERIFIED // Verified by School Accountant, awaiting posting
+  POSTED // Officially posted — reduces invoice balance
+  FAILED // Failed (e.g. gateway declined)
+  REJECTED // Rejected by School Accountant
+  REVERSED // Reversed after posting (compensating entry)
+  REFUNDED // Refunded to payer
 }
 
 /// Tenant-level financial policy. Controls school-wide financial behavior
 /// including Class Master collection permissions and approval thresholds.
 /// One record per tenant (school). Created on first access if missing.
 model TenantFinancialPolicy {
-  id                 String   @id @default(uuid())
-  tenantId           String   @unique
+  id       String @id @default(uuid())
+  tenantId String @unique
 
   // Class Master collection mode:
   //   VIEW_ONLY        — Class Masters can only view, cannot record payments
@@ -899,16 +944,16 @@ model TenantFinancialPolicy {
 /// Supports partial payments, multi-invoice allocation, and overpayment tracking.
 /// A single Payment can have multiple PaymentAllocation records (one per invoice item paid).
 model PaymentAllocation {
-  id           String  @id @default(uuid())
-  paymentId    String
-  invoiceId    String
-  invoiceItemId String?  // optional — if null, allocation is to the invoice generally
-  amount       Float       // amount allocated to this invoice/item
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  paymentId     String
+  invoiceId     String
+  invoiceItemId String? // optional — if null, allocation is to the invoice generally
+  amount        Float // amount allocated to this invoice/item
+  createdAt     DateTime @default(now())
 
-  payment      Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  invoice      Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  invoiceItem  InvoiceItem? @relation(fields: [invoiceItemId], references: [id], onDelete: SetNull)
+  payment     Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceItem InvoiceItem? @relation(fields: [invoiceItemId], references: [id], onDelete: SetNull)
 
   @@index([paymentId])
   @@index([invoiceId])
@@ -918,35 +963,35 @@ model PaymentAllocation {
 /// Official receipt record. Generated when a payment reaches POSTED status.
 /// One receipt per posted payment. Reprints tracked via reprintCount.
 model Receipt {
-  id              String   @id @default(uuid())
-  receiptNo       String   @unique
-  paymentId       String   @unique  // one receipt per payment
-  schoolId        String
+  id        String @id @default(uuid())
+  receiptNo String @unique
+  paymentId String @unique // one receipt per payment
+  schoolId  String
 
   // Receipt content (snapshot at time of issuance)
-  studentName     String
+  studentName        String
   studentAdmissionNo String
-  className        String?
-  payerName       String?
-  amountInFigures Float
-  amountInWords   String
-  paymentDate     DateTime
-  paymentMethod   String
-  transactionRef  String?
-  sessionId       String?
-  termId          String?
-  invoiceAllocations String?  // JSON summary of which invoices were paid
+  className          String?
+  payerName          String?
+  amountInFigures    Float
+  amountInWords      String
+  paymentDate        DateTime
+  paymentMethod      String
+  transactionRef     String?
+  sessionId          String?
+  termId             String?
+  invoiceAllocations String? // JSON summary of which invoices were paid
 
-  issuedById      String   // User who issued/authorized the receipt
-  issuedAt        DateTime @default(now())
-  reprintCount    Int      @default(0)
-  lastReprintedAt DateTime?
+  issuedById        String // User who issued/authorized the receipt
+  issuedAt          DateTime  @default(now())
+  reprintCount      Int       @default(0)
+  lastReprintedAt   DateTime?
   lastReprintedById String?
 
   // Cancellation support
-  isCancelled     Boolean  @default(false)
-  cancelledAt     DateTime?
-  cancelledById   String?
+  isCancelled        Boolean   @default(false)
+  cancelledAt        DateTime?
+  cancelledById      String?
   cancellationReason String?
 
   createdAt DateTime @default(now())
@@ -963,11 +1008,11 @@ model Receipt {
 /// Each credit note has an approval workflow and links to the original
 /// invoice/payment being adjusted.
 enum CreditNoteType {
-  DISCOUNT         // Approved discount on an invoice
-  WAIVER           // Fee waiver (full or partial)
-  REFUND           // Refund to payer
-  ADJUSTMENT       // Manual adjustment (debit or credit)
-  REVERSAL         // Reversal of a posted payment
+  DISCOUNT // Approved discount on an invoice
+  WAIVER // Fee waiver (full or partial)
+  REFUND // Refund to payer
+  ADJUSTMENT // Manual adjustment (debit or credit)
+  REVERSAL // Reversal of a posted payment
 }
 
 enum CreditNoteStatus {
@@ -980,39 +1025,39 @@ enum CreditNoteStatus {
 }
 
 model CreditNote {
-  id              String           @id @default(uuid())
-  schoolId        String
-  creditNoteNo    String           @unique
-  type            CreditNoteType
-  status          CreditNoteStatus @default(DRAFT)
+  id           String           @id @default(uuid())
+  schoolId     String
+  creditNoteNo String           @unique
+  type         CreditNoteType
+  status       CreditNoteStatus @default(DRAFT)
 
   // What is being credited
-  invoiceId       String?          // invoice being adjusted
-  paymentId       String?          // payment being reversed/refunded
-  studentId       String
+  invoiceId String? // invoice being adjusted
+  paymentId String? // payment being reversed/refunded
+  studentId String
 
   // Financial details
-  amount          Float            // positive = credit to student, negative = debit
-  reason          String
-  description     String?
+  amount      Float // positive = credit to student, negative = debit
+  reason      String
+  description String?
 
   // Approval workflow
-  requestedById   String           // User who requested
-  approvedById    String?          // User who approved (null if pending)
+  requestedById   String // User who requested
+  approvedById    String? // User who approved (null if pending)
   approvedAt      DateTime?
   rejectionReason String?
 
   // Posting
-  postedAt        DateTime?
-  postedById      String?
+  postedAt   DateTime?
+  postedById String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  invoice  Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
   @@index([studentId])
@@ -1045,18 +1090,18 @@ enum FinancialAction {
 }
 
 model FinancialAuditLog {
-  id           String           @id @default(uuid())
-  schoolId     String
-  action       FinancialAction
-  entityType   String           // 'Invoice' | 'Payment' | 'FeeStructure' | 'Receipt' | 'CreditNote'
-  entityId     String           // ID of the affected entity
-  userId       String?          // User who performed the action
-  userRole     String?          // Role at time of action
-  ipAddress    String?
-  userAgent    String?
-  description  String           // human-readable summary
-  metadata     String?          // JSON string with before/after values
-  createdAt    DateTime         @default(now())
+  id          String          @id @default(uuid())
+  schoolId    String
+  action      FinancialAction
+  entityType  String // 'Invoice' | 'Payment' | 'FeeStructure' | 'Receipt' | 'CreditNote'
+  entityId    String // ID of the affected entity
+  userId      String? // User who performed the action
+  userRole    String? // Role at time of action
+  ipAddress   String?
+  userAgent   String?
+  description String // human-readable summary
+  metadata    String? // JSON string with before/after values
+  createdAt   DateTime        @default(now())
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
@@ -1071,17 +1116,17 @@ model FinancialAuditLog {
 /// A parent can be linked to multiple students; a student can have multiple
 /// linked parent users.
 model ParentStudentLink {
-  id          String   @id @default(uuid())
-  userId      String   // User account (parent/guardian)
-  studentId   String   // Student record
+  id           String   @id @default(uuid())
+  userId       String // User account (parent/guardian)
+  studentId    String // Student record
   relationship String? // 'father' | 'mother' | 'guardian' | etc.
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, studentId])  // prevent duplicate links
+  @@unique([userId, studentId]) // prevent duplicate links
   @@index([userId])
   @@index([studentId])
 }
@@ -1544,11 +1589,11 @@ enum SubscriptionStatus {
 }
 
 enum SchoolType {
-  NURSERY          // Pre-Nursery / Early Years (Crèche, Playgroup)
-  PRIMARY          // Primary School (Nursery & Basic 1-6)
-  SECONDARY        // Secondary School (JSS & SSS)
-  COMBINED         // K-12 Comprehensive (Pre-Nursery → SSS)
-  TERTIARY         // Tertiary College / Polytechnic
+  NURSERY // Pre-Nursery / Early Years (Crèche, Playgroup)
+  PRIMARY // Primary School (Nursery & Basic 1-6)
+  SECONDARY // Secondary School (JSS & SSS)
+  COMBINED // K-12 Comprehensive (Pre-Nursery → SSS)
+  TERTIARY // Tertiary College / Polytechnic
 }
 
 enum Gender {

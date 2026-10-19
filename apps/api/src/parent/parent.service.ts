@@ -50,23 +50,31 @@ export class ParentService {
     });
     if (!user) throw new NotFoundException('User not found');
 
-    // Get guardians linked to this parent's email
-    const guardians = await this.prisma.guardian.findMany({
-      where: { email: user.email },
+    // Get linked student IDs via both ParentStudentLink and Guardian.email
+    const [links, guardians] = await Promise.all([
+      this.prisma.parentStudentLink.findMany({
+        where: { userId, isActive: true },
+        select: { studentId: true },
+      }),
+      this.prisma.guardian.findMany({
+        where: { email: user.email },
+        select: { studentId: true },
+      }),
+    ]);
+
+    const studentIds = Array.from(new Set([...links.map(l => l.studentId), ...guardians.map(g => g.studentId)]));
+
+    const students = await this.prisma.student.findMany({
+      where: { id: { in: studentIds }, deletedAt: null },
       include: {
-        student: {
-          include: {
-            classEnrollments: { include: { class: true }, orderBy: { createdAt: 'desc' }, take: 1 },
-            invoices: { where: { status: { not: 'PAID' } } },
-            results: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 10, include: { subject: true } },
-            attendances: { orderBy: { date: 'desc' }, take: 30 },
-          },
-        },
+        classEnrollments: { include: { class: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        invoices: { where: { status: { not: 'PAID' } } },
+        results: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 10, include: { subject: true } },
+        attendances: { orderBy: { date: 'desc' }, take: 30 },
       },
     });
 
-    const children = guardians.map(g => {
-      const s = g.student;
+    const children = students.map(s => {
       const totalAttendance = s.attendances.length;
       const presentDays = s.attendances.filter(a => a.status === 'PRESENT').length;
       const totalScore = s.results.reduce((acc, r) => acc + (r.totalScore || 0), 0);
@@ -94,11 +102,11 @@ export class ParentService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Not found');
 
-    const guardians = await this.prisma.guardian.findMany({
-      where: { email: user.email },
-      select: { studentId: true },
-    });
-    const studentIds = guardians.map(g => g.studentId);
+    const [links, guardians] = await Promise.all([
+      this.prisma.parentStudentLink.findMany({ where: { userId, isActive: true }, select: { studentId: true } }),
+      this.prisma.guardian.findMany({ where: { email: user.email }, select: { studentId: true } }),
+    ]);
+    const studentIds = Array.from(new Set([...links.map(l => l.studentId), ...guardians.map(g => g.studentId)]));
 
     const results = await this.prisma.result.findMany({
       where: { studentId: { in: studentIds }, status: 'PUBLISHED' },
@@ -116,11 +124,11 @@ export class ParentService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Not found');
 
-    const guardians = await this.prisma.guardian.findMany({
-      where: { email: user.email },
-      select: { studentId: true },
-    });
-    const studentIds = guardians.map(g => g.studentId);
+    const [links, guardians] = await Promise.all([
+      this.prisma.parentStudentLink.findMany({ where: { userId, isActive: true }, select: { studentId: true } }),
+      this.prisma.guardian.findMany({ where: { email: user.email }, select: { studentId: true } }),
+    ]);
+    const studentIds = Array.from(new Set([...links.map(l => l.studentId), ...guardians.map(g => g.studentId)]));
 
     const records = await this.prisma.attendance.findMany({
       where: { studentId: { in: studentIds } },
@@ -144,18 +152,30 @@ export class ParentService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Not found');
 
-    const guardians = await this.prisma.guardian.findMany({
-      where: { email: user.email },
-      select: { studentId: true },
-    });
-    const studentIds = guardians.map(g => g.studentId);
+    const [links, guardians] = await Promise.all([
+      this.prisma.parentStudentLink.findMany({ where: { userId, isActive: true }, select: { studentId: true } }),
+      this.prisma.guardian.findMany({ where: { email: user.email }, select: { studentId: true } }),
+    ]);
+    const studentIds = Array.from(new Set([...links.map(l => l.studentId), ...guardians.map(g => g.studentId)]));
 
     const invoices = await this.prisma.invoice.findMany({
       where: { studentId: { in: studentIds } },
       include: {
-        student: { select: { firstName: true, lastName: true } },
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            admissionNumber: true,
+            classEnrollments: { include: { class: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+          },
+        },
         items: true,
-        payments: { orderBy: { paymentDate: 'desc' } },
+        payments: {
+          where: { status: 'POSTED' },
+          include: { receipt: true },
+          orderBy: { paymentDate: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });

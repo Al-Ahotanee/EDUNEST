@@ -101,7 +101,7 @@ export class FinancialWorkflowService {
       if (policy.classMasterCollectionMode === 'VIEW_ONLY') {
         throw new ForbiddenException(
           'Your school does not permit Class Masters to record cash payments. ' +
-          'Only the School Accountant can record payments. Please direct the parent to the bursary.'
+          'Only the School Accountant can record payments. Please direct the parent to the accounts office.'
         );
       }
       // Class Master can only record for students in their assigned classes
@@ -772,9 +772,12 @@ export class FinancialWorkflowService {
       );
     }
 
-    // 1. Validate invoice exists and belongs to this school
+    // 1. Validate invoice exists (scoped to caller school if provided)
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: data.invoiceId, student: { schoolId: context.schoolId } },
+      where: {
+        id: data.invoiceId,
+        ...(context.schoolId ? { student: { schoolId: context.schoolId } } : {}),
+      },
       include: { student: true },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
@@ -782,9 +785,11 @@ export class FinancialWorkflowService {
       throw new BadRequestException('This invoice is already fully paid');
     }
 
+    const effectiveSchoolId = context.schoolId || invoice.schoolId || invoice.student?.schoolId;
+
     // 2. Check tenant policy — online payments must be enabled
     const tenant = await this.prisma.tenant.findFirst({
-      where: { schools: { some: { id: context.schoolId } } },
+      where: effectiveSchoolId ? { schools: { some: { id: effectiveSchoolId } } } : {},
       include: { financialPolicy: true },
     });
     if (tenant?.financialPolicy && !tenant.financialPolicy.onlinePaymentsEnabled) {
@@ -842,7 +847,7 @@ export class FinancialWorkflowService {
     }
 
     // 5. Create a payment record in INITIATED state (not yet posted)
-    const receiptNo = await this.generateReceiptNumber(context.schoolId);
+    const receiptNo = await this.generateReceiptNumber(effectiveSchoolId || context.schoolId);
     const payment = await this.prisma.payment.create({
       data: {
         invoiceId: invoice.id,
@@ -859,7 +864,7 @@ export class FinancialWorkflowService {
 
     // 6. Write audit log
     await this.writeAuditLog({
-      schoolId: context.schoolId,
+      schoolId: effectiveSchoolId || context.schoolId,
       action: 'PAYMENT_SUBMITTED',
       entityType: 'Payment',
       entityId: payment.id,
@@ -899,7 +904,10 @@ export class FinancialWorkflowService {
 
     // 1. Find the payment record by reference
     const payment = await this.prisma.payment.findFirst({
-      where: { reference, invoice: { student: { schoolId: context.schoolId } } },
+      where: {
+        reference,
+        ...(context.schoolId ? { invoice: { student: { schoolId: context.schoolId } } } : {}),
+      },
       include: { invoice: { include: { student: true, items: true } } },
     });
     if (!payment) throw new NotFoundException('Payment record not found for this reference');

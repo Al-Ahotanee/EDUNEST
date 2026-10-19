@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, ConflictException,
+  Injectable, NotFoundException, ConflictException, BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -245,10 +245,87 @@ export class AdmissionsService {
     // Update admission status and link student
     await this.prisma.admission.update({
       where: { id },
-      data: { status: 'APPROVED', studentId: student.id, admittedAt: new Date() },
+      data: { status: 'APPROVED', stage: 'APPROVED', studentId: student.id, admittedAt: new Date() },
     });
 
-    return successResponse({ admission: { ...admission, status: 'APPROVED' }, student }, 'Application approved! Student record created and enrolled in class.');
+    // ─── Phase 2+3: Auto-link parent user to student for parent portal ────────
+    if (admission.email) {
+      const parentUser = await this.prisma.user.findFirst({
+        where: { email: admission.email, schoolId },
+      });
+      if (parentUser) {
+        await this.prisma.parentStudentLink.upsert({
+          where: { userId_studentId: { userId: parentUser.id, studentId: student.id } },
+          create: { userId: parentUser.id, studentId: student.id, relationship: extraData.parentRelationship || 'Parent' },
+          update: { isActive: true },
+        }).catch(() => {});
+      }
+    }
+
+    // ─── Phase 2+3: Auto-generate initial invoice from published class fees ───
+    let initialInvoice: any = null;
+    if (targetClassId) {
+      try {
+        const publishedFees = await this.prisma.feeStructure.findMany({
+          where: {
+            schoolId,
+            status: 'PUBLISHED',
+            OR: [{ classId: targetClassId }, { classId: null }],
+          },
+        });
+
+        if (publishedFees.length > 0) {
+          const activeTerm = currentSession ? await this.prisma.term.findFirst({
+            where: { sessionId: currentSession.id, isCurrent: true },
+          }) : null;
+
+          const totalAmount = publishedFees.reduce((sum, f) => sum + (f.amount || 0), 0);
+          const invoiceCount = await this.prisma.invoice.count({ where: { student: { schoolId } } });
+          const schoolCode = school?.code || 'SCH';
+          const invoiceNo = `INV-${schoolCode}-${year}-${String(invoiceCount + 1).padStart(5, '0')}`;
+
+          initialInvoice = await this.prisma.invoice.create({
+            data: {
+              studentId: student.id,
+              invoiceNo,
+              subtotal: totalAmount,
+              discount: 0,
+              total: totalAmount,
+              balance: totalAmount,
+              amountPaid: 0,
+              dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              status: 'UNPAID',
+              schoolId,
+              sessionId: currentSession?.id || null,
+              termId: activeTerm?.id || null,
+              classId: targetClassId,
+              notes: 'Initial admission fee invoice',
+              items: {
+                create: publishedFees.map((fee) => ({
+                  description: fee.name,
+                  amount: fee.amount,
+                  quantity: 1,
+                  subtotal: fee.amount,
+                  feeStructureId: fee.id,
+                })),
+              },
+            },
+            include: { items: true },
+          });
+        }
+      } catch (err) {
+        console.warn(`Failed to auto-generate initial invoice for student ${student.admissionNumber}:`, err);
+      }
+    }
+
+    return successResponse(
+      {
+        admission: { ...admission, status: 'APPROVED' },
+        student,
+        invoice: initialInvoice,
+      },
+      'Application approved! Student record created, enrolled in class, and initial invoice generated.'
+    );
   }
 
   // ─── Admin: reject application ──────────────────────────────────────────────
@@ -260,11 +337,113 @@ export class AdmissionsService {
       where: { id },
       data: {
         status: 'REJECTED',
+        stage: 'REJECTED',
+        rejectionReason: reason || null,
         notes: reason ? `${admission.notes || ''}\nRejection reason: ${reason}` : admission.notes,
       },
     });
     return successResponse(updated, 'Application rejected');
   }
+
+  // ─── Admin: update application stage ─────────────────────────────────────────
+  async updateApplicationStage(id: string, schoolId: string, body: { stage: string; examDate?: string; interviewDate?: string; examScore?: number; notes?: string }) {
+    const admission = await this.prisma.admission.findFirst({ where: { id, schoolId } });
+    if (!admission) throw new NotFoundException('Application not found');
+
+    const updateData: any = {
+      stage: body.stage,
+      ...(body.examDate && { examDate: new Date(body.examDate) }),
+      ...(body.interviewDate && { interviewDate: new Date(body.interviewDate) }),
+      ...(body.examScore !== undefined && { examScore: body.examScore }),
+      ...(body.notes && { notes: body.notes }),
+    };
+
+    if (body.stage === 'EXAM_SCHEDULED' || body.stage === 'INTERVIEW_SCHEDULED') {
+      updateData.status = 'SCREENING';
+    } else if (body.stage === 'SUBMITTED' || body.stage === 'UNDER_REVIEW') {
+      updateData.status = 'PENDING';
+    } else if (body.stage === 'APPROVED') {
+      updateData.status = 'APPROVED';
+    } else if (body.stage === 'REJECTED') {
+      updateData.status = 'REJECTED';
+    }
+
+    const updated = await this.prisma.admission.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return successResponse(updated, `Application stage updated to ${body.stage}`);
+  }
+
+  // ─── Public: check application status by applicationNo and phone ─────────────
+  async checkApplicationStatus(schoolSlug: string, applicationNo: string, phone: string) {
+    if (!schoolSlug || !applicationNo || !phone) {
+      throw new BadRequestException('schoolSlug, applicationNo, and phone are required');
+    }
+
+    const school = await this.prisma.school.findFirst({
+      where: {
+        OR: [{ tenant: { slug: schoolSlug } }, { id: schoolSlug }],
+      },
+      include: { tenant: true },
+    });
+
+    if (!school) throw new NotFoundException(`School '${schoolSlug}' not found`);
+
+    const cleanAppNo = applicationNo.trim().toUpperCase();
+    const cleanPhone = phone.trim().replace(/[^0-9]/g, '');
+
+    const admission = await this.prisma.admission.findFirst({
+      where: {
+        schoolId: school.id,
+        applicationNo: cleanAppNo,
+      },
+    });
+
+    if (!admission) {
+      throw new NotFoundException(`Application '${cleanAppNo}' not found for this school`);
+    }
+
+    // Verify phone against applicant phone, parent phone, or emergency phone
+    const phones = [
+      admission.phone?.replace(/[^0-9]/g, ''),
+      admission.parentPhone?.replace(/[^0-9]/g, ''),
+      admission.emergencyPhone?.replace(/[^0-9]/g, ''),
+    ].filter(Boolean);
+
+    const matchesPhone = phones.some(p => p && (p.endsWith(cleanPhone.slice(-7)) || cleanPhone.endsWith(p.slice(-7))));
+    if (!matchesPhone) {
+      throw new BadRequestException('Phone number does not match the application record');
+    }
+
+    return successResponse({
+      id: admission.id,
+      applicationNo: admission.applicationNo,
+      applicantName: `${admission.firstName} ${admission.lastName}`,
+      applyingForClass: admission.applyingForClass,
+      gender: admission.gender,
+      status: admission.status,
+      stage: admission.stage || 'SUBMITTED',
+      examDate: admission.examDate,
+      interviewDate: admission.interviewDate,
+      examScore: admission.examScore,
+      rejectionReason: admission.rejectionReason,
+      admittedAt: admission.admittedAt,
+      createdAt: admission.createdAt,
+      school: {
+        name: school.name,
+        slug: school.tenant.slug,
+        logo: school.logo || school.tenant.logo,
+        primaryColor: school.tenant.primaryColor,
+        secondaryColor: school.tenant.secondaryColor,
+        phone: school.phone || school.tenant.phone,
+        email: school.email || school.tenant.email,
+        address: school.address || school.tenant.address,
+      },
+    });
+  }
+
 
   // ─── Admin: admission statistics ────────────────────────────────────────────
   async getAdmissionStats(schoolId: string) {

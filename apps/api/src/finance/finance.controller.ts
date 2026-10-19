@@ -47,7 +47,7 @@ export class FinanceController {
   }
 
   @Patch('fee-structures/:id/publish')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Publish a fee structure — makes it visible to parents' })
   publishFeeStructure(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.publishFeeStructure(id, schoolId);
@@ -60,21 +60,46 @@ export class FinanceController {
   }
 
   @Post('fee-structures/generate-invoices/:classId')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Generate invoices for all students in a class from published fee structures' })
-  generateInvoices(@Param('classId') classId: string, @CurrentUser('schoolId') schoolId: string) {
-    return this.financeService.generateInvoicesFromClass(classId, schoolId);
+  generateInvoices(
+    @Param('classId') classId: string,
+    @Body() body: any,
+    @CurrentUser('schoolId') schoolId: string
+  ) {
+    return this.financeService.generateInvoicesFromClass(classId, schoolId, body);
+  }
+
+  @Post('students/:studentId/generate-invoice')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
+  @ApiOperation({ summary: 'Generate an invoice for a specific student from class fee structure' })
+  generateStudentInvoice(
+    @Param('studentId') studentId: string,
+    @Body() body: any,
+    @CurrentUser('schoolId') schoolId: string
+  ) {
+    return this.financeService.generateInvoiceForStudent(studentId, schoolId, body);
+  }
+
+  @Get('students/:studentId/statement')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant', 'Principal', 'Parent')
+  @ApiOperation({ summary: 'Get chronological financial statement / ledger for a student' })
+  getStudentStatement(
+    @Param('studentId') studentId: string,
+    @CurrentUser('schoolId') schoolId: string
+  ) {
+    return this.financeService.getStudentStatement(studentId, schoolId);
   }
 
   @Post('invoices')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Create invoice' })
   createInvoice(@Body() body: any, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.createInvoice(body, schoolId);
   }
 
   @Get('invoices')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant', 'Principal')
   @ApiOperation({ summary: 'Get all invoices' })
   getInvoices(
     @CurrentUser('schoolId') schoolId: string,
@@ -84,14 +109,14 @@ export class FinanceController {
   }
 
   @Get('invoices/:id')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant', 'Principal', 'Parent')
   @ApiOperation({ summary: 'Get invoice details' })
   getInvoice(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.getInvoice(id, schoolId);
   }
 
   @Post('invoices/:id/payments')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Record payment for invoice' })
   recordPayment(
     @Param('id') invoiceId: string,

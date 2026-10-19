@@ -141,6 +141,10 @@ export const financeApi = {
   getInvoice: (id: string) => api.get(`/finance/invoices/${id}`),
   createInvoice: (data: any) => api.post('/finance/invoices', data),
   recordPayment: (invoiceId: string, data: any) => api.post(`/finance/invoices/${invoiceId}/payments`, data),
+  generateStudentInvoice: (studentId: string, data?: any) =>
+    api.post(`/finance/students/${studentId}/generate-invoice`, data),
+  getStudentStatement: (studentId: string) =>
+    api.get(`/finance/students/${studentId}/statement`),
 
   // ─── Phase 4: Financial Workflow API ──────────────────────────────────────
   // Payment submission + approval workflow
@@ -272,6 +276,31 @@ export const notificationsApi = {
 export const schoolsApi = {
   current: () => api.get('/schools/current'),
   updateCurrent: (data: any) => api.put('/schools/current', data),
+  getBranding: (idOrSlug: string) => api.get(`/schools/${idOrSlug}/branding`),
+  updateBranding: (idOrSlug: string, data: any) => api.put(`/schools/${idOrSlug}/branding`, data),
+};
+
+// ─── School Website & CMS ─────────────────────────────────────────────────────
+export const websiteApi = {
+  getPublicWebsite: (idOrSlug: string) => api.get(`/schools/${idOrSlug}/website`),
+  getAdminWebsiteConfig: (idOrSlug: string) => api.get(`/schools/${idOrSlug}/website/admin`),
+  updateWebsiteConfig: (idOrSlug: string, data: any) => api.put(`/schools/${idOrSlug}/website`, data),
+  submitInquiry: (idOrSlug: string, data: any) => api.post(`/schools/${idOrSlug}/inquiries`, data),
+  listInquiries: (idOrSlug: string, query?: any) => api.get(`/schools/${idOrSlug}/inquiries`, { params: query }),
+  updateInquiry: (idOrSlug: string, inquiryId: string, data: any) =>
+    api.patch(`/schools/${idOrSlug}/inquiries/${inquiryId}`, data),
+};
+
+// ─── Admissions ───────────────────────────────────────────────────────────────
+export const admissionsApi = {
+  list: (params?: any) => api.get('/admissions', { params }),
+  getOne: (id: string) => api.get(`/admissions/${id}`),
+  stats: () => api.get('/admissions/stats'),
+  approve: (id: string, body?: any) => api.patch(`/admissions/${id}/approve`, body),
+  reject: (id: string, reason?: string) => api.patch(`/admissions/${id}/reject`, { reason }),
+  updateStage: (id: string, data: any) => api.patch(`/admissions/${id}/stage`, data),
+  checkStatus: (schoolSlug: string, applicationNo: string, phone: string) =>
+    api.get('/admissions/status-check', { params: { schoolSlug, applicationNo, phone } }),
 };
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -283,4 +312,5 @@ export const usersApi = {
   delete: (id: string) => api.delete(`/users/${id}`),
   roles: () => api.get('/users/roles'),
 };
+
 

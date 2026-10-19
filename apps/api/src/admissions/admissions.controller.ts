@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AdmissionsService } from './admissions.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('Admissions')
@@ -44,6 +45,27 @@ export class AdmissionsController {
   @Patch(':id/reject')
   reject(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string, @Body() body: { reason?: string }) {
     return this.admissionsService.rejectApplication(id, schoolId, body.reason);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/stage')
+  updateStage(
+    @Param('id') id: string,
+    @CurrentUser('schoolId') schoolId: string,
+    @Body() body: { stage: string; examDate?: string; interviewDate?: string; examScore?: number; notes?: string }
+  ) {
+    return this.admissionsService.updateApplicationStage(id, schoolId, body);
+  }
+
+  @Public()
+  @Get('status-check')
+  checkStatus(
+    @Query('schoolSlug') schoolSlug: string,
+    @Query('applicationNo') applicationNo: string,
+    @Query('phone') phone: string
+  ) {
+    return this.admissionsService.checkApplicationStatus(schoolSlug, applicationNo, phone);
   }
 }
 

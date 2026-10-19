@@ -7,7 +7,7 @@ import {
   DollarSign, UserCog, Monitor, Library, Bed, Heart, Package,
   Calendar, Bell, BarChart3, Settings, ChevronDown, ChevronRight,
   School, LogOut, ClipboardCheck, Award, FileText, Building2, X, Briefcase,
-  AlertTriangle,
+  AlertTriangle, Globe,
 } from 'lucide-react';
 
 // School-branded logo component — uses school name first letter when no logo.
@@ -98,6 +98,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: 'Inventory', path: '/app/inventory', icon: <Package size={18} />, adminOnly: true },
   { label: 'Notifications', path: '/app/notifications', icon: <Bell size={18} /> },
   { label: 'Reports', path: '/app/reports', icon: <BarChart3 size={18} />, adminOnly: true },
+  { label: 'Website Builder', path: '/app/website-builder', icon: <Globe size={18} />, adminOnly: true },
   { label: 'Settings', path: '/app/settings', icon: <Settings size={18} /> },
 ];
 

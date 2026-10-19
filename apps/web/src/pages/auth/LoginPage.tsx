@@ -6,6 +6,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
+import { applyThemeColors } from '../../hooks/useTenantTheme';
+
 const DEMO_PRESETS = [
   { label: 'School Admin', email: 'admin@demo.com', pass: 'password123' },
   { label: 'Subject Teacher', email: 'teacher.math@demo.com', pass: 'password123' },
@@ -16,7 +18,22 @@ const DEMO_PRESETS = [
 export default function LoginPage() {
   const { tenantSlug } = useParams<{ tenantSlug?: string }>();
   const [searchParams] = useSearchParams();
-  const slugFromQuery = searchParams.get('school') || tenantSlug || '';
+
+  const detectSubdomain = () => {
+    if (typeof window === 'undefined') return '';
+    const host = window.location.hostname.toLowerCase();
+    const parts = host.split('.');
+    if (parts.length >= 2) {
+      const firstPart = parts[0];
+      if (!['www', 'api', 'app', 'localhost', '127.0.0.1'].includes(firstPart)) {
+        if (host.includes('localhost') && parts.length === 2) return firstPart;
+        if (parts.length >= 3) return firstPart;
+      }
+    }
+    return '';
+  };
+
+  const activeSlug = searchParams.get('school') || tenantSlug || detectSubdomain();
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
 
@@ -31,9 +48,9 @@ export default function LoginPage() {
 
   // Fetch school branding when slug is known
   const { data: school } = useQuery({
-    queryKey: ['login-school', slugFromQuery],
-    queryFn: () => api.get(`/saas/school/${slugFromQuery}`).then(r => r.data.data || r.data),
-    enabled: !!slugFromQuery,
+    queryKey: ['login-school', activeSlug],
+    queryFn: () => api.get(`/saas/school/${activeSlug}`).then(r => r.data.data || r.data),
+    enabled: !!activeSlug,
     retry: false,
   });
 
@@ -44,13 +61,24 @@ export default function LoginPage() {
   const secondaryColor = school?.secondaryColor || '#7e3af2';
   const hasSchoolBranding = !!school;
 
+  React.useEffect(() => {
+    if (school) {
+      applyThemeColors({
+        primaryColor: school.primaryColor,
+        secondaryColor: school.secondaryColor,
+        name: school.name,
+        logo: school.logo,
+      });
+    }
+  }, [school]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await api.post('/auth/login', {
         ...form,
-        ...(slugFromQuery && { tenantSlug: slugFromQuery }),
+        ...(activeSlug && { tenantSlug: activeSlug }),
       });
       const { user, accessToken, refreshToken } = res.data;
       setAuth(user, accessToken, refreshToken);
@@ -259,9 +287,17 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <Link to="/parent-portal" className="hover:text-slate-900 font-medium transition-colors">Parent Portal →</Link>
-                <Link to="/marketer/login" className="hover:text-slate-900 font-medium transition-colors">Marketer Portal →</Link>
+              <div className="mt-6 pt-5 border-t border-slate-100 space-y-2 text-xs text-slate-500">
+                {activeSlug && (
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 font-semibold text-blue-600">
+                    <Link to={`/school/${activeSlug}`} className="hover:underline">← Back to School Website</Link>
+                    <Link to={`/school/${activeSlug}/apply`} className="hover:underline">Apply for Admission →</Link>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <Link to="/parent-portal" className="hover:text-slate-900 font-medium transition-colors">Parent Portal →</Link>
+                  <Link to="/marketer/login" className="hover:text-slate-900 font-medium transition-colors">Marketer Portal →</Link>
+                </div>
               </div>
             </div>
           </div>

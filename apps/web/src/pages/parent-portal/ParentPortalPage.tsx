@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BookOpen, CalendarCheck, DollarSign,
@@ -6,14 +6,15 @@ import {
   GraduationCap, TrendingUp, CheckCircle, AlertCircle, ChevronRight,
   FileText, Clock, Printer, Download, CreditCard, Send, Calendar,
   ShieldCheck, CheckCircle2, HelpCircle, PenTool, Receipt, Sparkles,
-  Plus, Search, Check, AlertTriangle, Contact
+  Plus, Search, Check, AlertTriangle, Contact, Loader2
 } from 'lucide-react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDate, cn } from '../../lib/utils';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 import { IDCardModal, StudentIDCardData } from '../../components/idcard';
+import { ReceiptViewer } from '../../components/finance/ReceiptViewer';
 
 function useParentAuth() {
   const [token, setToken] = useState(() => localStorage.getItem('parent_token'));
@@ -149,18 +150,20 @@ const navItems = [
 ];
 
 function ParentDashboardView({ token, parent }: { token: string; parent: any }) {
+  const queryClient = useQueryClient();
   const authHeader = { headers: { Authorization: `Bearer ${token}` } };
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const school = parent?.school || { name: 'EduNest International School' };
   const [idCardChild, setIdCardChild] = useState<any>(null);
 
-  // Financial Modals state
+  // Financial Modals & Viewer state
   const [viewInvoice, setViewInvoice] = useState<any>(null);
-  const [receiptModal, setReceiptModal] = useState<any>(null);
+  const [activeReceipt, setActiveReceipt] = useState<any>(null);
   const [paymentModal, setPaymentModal] = useState<any>(null);
   const [paymentPlanModal, setPaymentPlanModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'transfer' | 'ussd'>('card');
+  const [isPayingOnline, setIsPayingOnline] = useState(false);
 
   // Communication state
   const [newChatText, setNewChatText] = useState('');
@@ -196,44 +199,29 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
   const children = dashData?.children || [];
   const notifications = dashData?.notifications || [];
 
-  // Simulated Invoices if empty
-  const invoicesList = (feesData?.length ? feesData : [
-    {
-      id: 'inv_01',
-      invoiceNo: 'EDN-2026-0891',
-      title: 'First Term 2026/2027 Tuition & Compulsory Levies',
-      student: { firstName: children[0]?.firstName || 'Daniel', lastName: children[0]?.lastName || 'Smith', admissionNumber: 'EDN/2024/012' },
-      dueDate: '2026-10-31',
-      total: 345000,
-      paid: 200000,
-      balance: 145000,
-      status: 'PARTIAL',
-      items: [
-        { name: 'First Term Tuition Fee', amount: 220000 },
-        { name: 'Educational Technology & ICT Levy', amount: 45000 },
-        { name: 'Science Laboratory & Practical Kit', amount: 35000 },
-        { name: 'Textbooks & Learning Folio', amount: 25000 },
-        { name: 'Medical & Healthcare Retainer', amount: 20000 },
-      ],
-    },
-    {
-      id: 'inv_02',
-      invoiceNo: 'EDN-2026-0422',
-      title: 'Third Term 2025/2026 Tuition',
-      student: { firstName: children[0]?.firstName || 'Daniel', lastName: children[0]?.lastName || 'Smith', admissionNumber: 'EDN/2024/012' },
-      dueDate: '2026-07-15',
-      total: 320000,
-      paid: 320000,
-      balance: 0,
-      status: 'PAID',
-      items: [
-        { name: 'Tuition Fee', amount: 220000 },
-        { name: 'ICT & STEM Labs', amount: 45000 },
-        { name: 'PTA Development Levy', amount: 30000 },
-        { name: 'End of Year Activities', amount: 25000 },
-      ],
-    },
-  ]);
+  // Real Invoices list from API (no fake mock fallbacks)
+  const invoicesList: any[] = Array.isArray(feesData) ? feesData : [];
+
+  // Auto-verify Paystack transaction if redirected back with reference query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const reference = urlParams.get('reference') || urlParams.get('trxref');
+    if (reference) {
+      toast.loading('Verifying transaction with payment gateway...', { id: 'verify-ref' });
+      api.get(`/finance/workflow/payments/verify-online/${reference}`, authHeader)
+        .then((res) => {
+          toast.dismiss('verify-ref');
+          toast.success(res.data?.message || 'Payment successfully verified and posted!');
+          queryClient.invalidateQueries({ queryKey: ['parent-fees'] });
+          queryClient.invalidateQueries({ queryKey: ['parent-dashboard'] });
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })
+        .catch((err) => {
+          toast.dismiss('verify-ref');
+          console.warn('Payment verification:', err);
+        });
+    }
+  }, []);
 
   const handleSendMessage = () => {
     if (!newChatText.trim()) return;
@@ -245,15 +233,61 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
     toast.success('Message sent to class teacher');
   };
 
-  const handleSimulatedPayment = () => {
-    toast.success(`Payment of ₦${(paymentModal?.balance || 50000).toLocaleString()} confirmed via ${paymentMethod.toUpperCase()}!`);
-    setReceiptModal({
-      ...paymentModal,
-      receiptNo: `REC-${Date.now().toString().slice(-6)}`,
-      paymentDate: new Date().toISOString(),
-      amountPaid: paymentModal?.balance || 50000,
-    });
-    setPaymentModal(null);
+  const handleViewReceipt = (inv: any) => {
+    const postedPayment = inv.payments?.find((p: any) => p.status === 'POSTED') || inv.payments?.[0];
+    if (!postedPayment && (inv.amountPaid || 0) <= 0) {
+      toast.error('No cleared payment receipt recorded for this invoice yet.');
+      return;
+    }
+    if (postedPayment?.receipt) {
+      setActiveReceipt(postedPayment.receipt);
+    } else if (postedPayment?.receiptNo) {
+      setActiveReceipt({
+        receiptNo: postedPayment.receiptNo,
+        studentName: `${inv.student?.firstName || ''} ${inv.student?.lastName || ''}`.trim() || 'Student',
+        studentAdmissionNo: inv.student?.admissionNumber || '—',
+        className: inv.student?.classEnrollments?.[0]?.class?.name || '',
+        payerName: `${parent.firstName} ${parent.lastName}`,
+        amountInFigures: postedPayment.amount,
+        amountInWords: '',
+        paymentDate: postedPayment.paymentDate,
+        paymentMethod: postedPayment.method || 'ONLINE',
+        transactionRef: postedPayment.reference,
+        invoiceAllocations: JSON.stringify([{ invoiceNo: inv.invoiceNo, amount: postedPayment.amount }]),
+        issuedAt: postedPayment.postedAt || postedPayment.createdAt,
+        reprintCount: 0,
+      });
+    } else {
+      toast.error('Official receipt is being processed by the Bursary.');
+    }
+  };
+
+  const handleInitiateOnlinePayment = async (inv: any) => {
+    setIsPayingOnline(true);
+    try {
+      toast.loading('Initializing secure Paystack checkout...', { id: 'parent-pay' });
+      const callbackUrl = `${window.location.origin}${window.location.pathname}?payment_status=check`;
+      const res = await api.post(
+        '/finance/workflow/payments/initiate-online',
+        { invoiceId: inv.id, callbackUrl },
+        authHeader,
+      );
+      toast.dismiss('parent-pay');
+      const data = res.data?.data || res.data;
+      if (data?.authorizationUrl) {
+        toast.success('Redirecting to Paystack payment gateway...');
+        setTimeout(() => {
+          window.location.href = data.authorizationUrl;
+        }, 500);
+      } else {
+        toast.error('Unable to retrieve payment gateway checkout link.');
+      }
+    } catch (err: any) {
+      toast.dismiss('parent-pay');
+      toast.error(err.response?.data?.message || 'Online payment initialization failed. You can also pay via direct bank transfer.');
+    } finally {
+      setIsPayingOnline(false);
+    }
   };
 
   const renderContent = () => {
@@ -292,15 +326,15 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="bg-white/10 rounded-xl p-2.5 text-center">
-                      <p className="text-base font-black">{c.attendanceRate || 96}%</p>
+                      <p className="text-base font-black">{c.attendanceRate !== undefined ? `${c.attendanceRate}%` : '—'}</p>
                       <p className="text-[10px] text-slate-300">Attendance</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-2.5 text-center">
-                      <p className="text-base font-black">{c.averageScore || 84}%</p>
+                      <p className="text-base font-black">{c.averageScore !== undefined ? `${c.averageScore}%` : '—'}</p>
                       <p className="text-[10px] text-slate-300">Avg Grade</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-2.5 text-center">
-                      <p className="text-base font-black text-amber-300">₦{(c.feeBalance || 145000).toLocaleString()}</p>
+                      <p className="text-base font-black text-amber-300">₦{(c.feeBalance || 0).toLocaleString()}</p>
                       <p className="text-[10px] text-slate-300">Balance Due</p>
                     </div>
                   </div>
@@ -478,64 +512,78 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
             </div>
 
             <div className="space-y-4">
-              {invoicesList.map((inv: any) => (
-                <div key={inv.id} className="card overflow-hidden border border-slate-200">
-                  <div className="p-5 flex items-center justify-between border-b border-slate-100 flex-wrap gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded">
-                          {inv.invoiceNo}
-                        </span>
-                        <span className={inv.status === 'PAID' ? 'badge-green font-bold text-xs' : 'badge-yellow font-bold text-xs'}>
-                          {inv.status}
-                        </span>
-                      </div>
-                      <h4 className="font-bold text-slate-900 text-sm mt-1">{inv.title}</h4>
-                      <p className="text-xs text-slate-400">Student: {inv.student?.firstName} {inv.student?.lastName} • Due Date: {formatDate(inv.dueDate)}</p>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-xs text-slate-400 block">Total Invoiced</span>
-                      <span className="text-xl font-black font-mono text-slate-900">₦{inv.total.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 flex items-center justify-between flex-wrap gap-3 text-xs">
-                    <div className="flex items-center gap-4">
-                      <span>Paid: <strong className="font-mono text-emerald-700">₦{inv.paid.toLocaleString()}</strong></span>
-                      <span>Balance Due: <strong className="font-mono text-red-600">₦{inv.balance.toLocaleString()}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setViewInvoice(inv)}
-                        className="btn-secondary btn-sm gap-1"
-                      >
-                        <Eye size={13} /> View Breakdown
-                      </button>
-                      <button
-                        onClick={() => setReceiptModal({
-                          ...inv,
-                          receiptNo: `REC-2026-${inv.invoiceNo.slice(-4)}`,
-                          amountPaid: inv.paid,
-                          paymentDate: new Date().toISOString(),
-                        })}
-                        className="btn-secondary btn-sm gap-1"
-                      >
-                        <Receipt size={13} /> Official Receipt
-                      </button>
-                      {inv.balance > 0 && (
-                        <button
-                          onClick={() => setPaymentModal(inv)}
-                          className="btn-primary btn-sm gap-1"
-                        >
-                          <CreditCard size={13} /> Pay Now (₦{inv.balance.toLocaleString()})
-                        </button>
-                      )}
-                    </div>
-                  </div>
+              {invoicesList.length === 0 ? (
+                <div className="card p-12 text-center text-slate-400">
+                  <Receipt size={40} className="mx-auto mb-3 text-slate-300" />
+                  <h3 className="text-base font-bold text-slate-700">No Invoices Issued</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    There are currently no outstanding or posted school fee invoices for your ward(s).
+                  </p>
                 </div>
-              ))}
+              ) : (
+                invoicesList.map((inv: any) => {
+                  const paidAmount = inv.amountPaid ?? inv.paid ?? 0;
+                  const totalAmount = inv.total ?? 0;
+                  const balanceAmount = inv.balance ?? (totalAmount - paidAmount);
+                  return (
+                    <div key={inv.id} className="card overflow-hidden border border-slate-200">
+                      <div className="p-5 flex items-center justify-between border-b border-slate-100 flex-wrap gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded">
+                              {inv.invoiceNo}
+                            </span>
+                            <span className={inv.status === 'PAID' ? 'badge-green font-bold text-xs' : 'badge-yellow font-bold text-xs'}>
+                              {inv.status}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-slate-900 text-sm mt-1">{inv.title || `School Fees — ${inv.invoiceNo}`}</h4>
+                          <p className="text-xs text-slate-400">
+                            Student: {inv.student?.firstName} {inv.student?.lastName} {inv.student?.admissionNumber ? `(${inv.student?.admissionNumber})` : ''} • Due Date: {formatDate(inv.dueDate)}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-xs text-slate-400 block">Total Invoiced</span>
+                          <span className="text-xl font-black font-mono text-slate-900">₦{totalAmount.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-slate-50 flex items-center justify-between flex-wrap gap-3 text-xs">
+                        <div className="flex items-center gap-4">
+                          <span>Paid: <strong className="font-mono text-emerald-700">₦{paidAmount.toLocaleString()}</strong></span>
+                          <span>Balance Due: <strong className="font-mono text-red-600">₦{balanceAmount.toLocaleString()}</strong></span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setViewInvoice(inv)}
+                            className="btn-secondary btn-sm gap-1"
+                          >
+                            <Eye size={13} /> View Breakdown
+                          </button>
+                          {paidAmount > 0 && (
+                            <button
+                              onClick={() => handleViewReceipt(inv)}
+                              className="btn-secondary btn-sm gap-1"
+                            >
+                              <Receipt size={13} /> Official Receipt
+                            </button>
+                          )}
+                          {balanceAmount > 0 && (
+                            <button
+                              onClick={() => setPaymentModal(inv)}
+                              className="btn-primary btn-sm gap-1"
+                            >
+                              <CreditCard size={13} /> Pay Now (₦{balanceAmount.toLocaleString()})
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         );
@@ -865,8 +913,8 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
               <button onClick={() => setViewInvoice(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="space-y-2 text-xs">
-              <p className="font-bold text-slate-800">{viewInvoice.title}</p>
-              <p className="text-slate-500">Student: {viewInvoice.student?.firstName} {viewInvoice.student?.lastName}</p>
+              <p className="font-bold text-slate-800">{viewInvoice.title || `School Fees — ${viewInvoice.invoiceNo}`}</p>
+              <p className="text-slate-500">Student: {viewInvoice.student?.firstName} {viewInvoice.student?.lastName} {viewInvoice.student?.admissionNumber ? `(${viewInvoice.student?.admissionNumber})` : ''}</p>
               <div className="border border-slate-200 rounded-xl overflow-hidden mt-3">
                 <table className="w-full">
                   <thead className="bg-slate-50 text-slate-500">
@@ -874,9 +922,9 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(viewInvoice.items || []).map((it: any, i: number) => (
-                      <tr key={i}><td className="px-3 py-2">{it.name}</td><td className="px-3 py-2 text-right font-mono font-bold">₦{it.amount.toLocaleString()}</td></tr>
+                      <tr key={i}><td className="px-3 py-2">{it.description || it.name || 'Fee Item'}</td><td className="px-3 py-2 text-right font-mono font-bold">₦{(it.subtotal || it.amount || 0).toLocaleString()}</td></tr>
                     ))}
-                    <tr className="bg-slate-50 font-black"><td className="px-3 py-2">TOTAL INVOICED</td><td className="px-3 py-2 text-right font-mono text-blue-700">₦{viewInvoice.total.toLocaleString()}</td></tr>
+                    <tr className="bg-slate-50 font-black"><td className="px-3 py-2">TOTAL INVOICED</td><td className="px-3 py-2 text-right font-mono text-blue-700">₦{(viewInvoice.total || 0).toLocaleString()}</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -888,75 +936,35 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
         </div>
       )}
 
-      {/* ─── MODAL 2: OFFICIAL PRINTABLE BURSARY RECEIPT ─────────────────────── */}
-      {receiptModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
-              <h3 className="font-black text-slate-900 text-sm">Official Bursary Payment Receipt</h3>
-              <button onClick={() => setReceiptModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
-            </div>
+      {/* ─── MODAL 2: OFFICIAL PRINTABLE BURSARY RECEIPT (RECEIPTVIEWER) ──────── */}
+      <ReceiptViewer
+        receipt={activeReceipt}
+        open={!!activeReceipt}
+        onClose={() => setActiveReceipt(null)}
+      />
 
-            <div id="printable-parent-receipt" className="p-6 border border-slate-200 rounded-xl bg-white text-xs font-sans text-slate-900 space-y-3">
-              <div className="text-center pb-3 border-b-2 border-slate-900">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <EduNestIcon size={28} />
-                  <h2 className="text-base font-black uppercase text-slate-900">{school.name}</h2>
-                </div>
-                <p className="text-[10px] text-slate-500 font-serif italic">Bursary Division • Verified School Fee Receipt</p>
-                <p className="text-[10px] font-mono text-slate-400 mt-0.5">Receipt No: {receiptModal.receiptNo} • Date: {formatDate(receiptModal.paymentDate)}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-[11px]">
-                <div>
-                  <p><span className="text-slate-400">Payer Name: </span><strong>{parent.firstName} {parent.lastName}</strong></p>
-                  <p className="mt-0.5"><span className="text-slate-400">Student: </span><strong>{receiptModal.student?.firstName} {receiptModal.student?.lastName}</strong></p>
-                </div>
-                <div>
-                  <p><span className="text-slate-400">Payment Status: </span><span className="badge-green text-[10px] font-bold">VERIFIED & CLEARED</span></p>
-                  <p className="mt-0.5"><span className="text-slate-400">Invoice Ref: </span><span className="font-mono">{receiptModal.invoiceNo}</span></p>
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
-                <span>AMOUNT RECEIVED</span>
-                <span className="text-lg font-black font-mono text-emerald-400">₦{(receiptModal.amountPaid || receiptModal.paid || receiptModal.total).toLocaleString()}</span>
-              </div>
-
-              <p className="text-[10px] text-slate-400 text-center italic">This is an authorized computer-generated institutional receipt valid for all bursary clearances.</p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setReceiptModal(null)} className="btn-secondary btn-sm">Close</button>
-              <button onClick={() => window.print()} className="btn-primary btn-sm gap-1"><Printer size={13} /> Print Receipt</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL 3: INSTANT ONLINE PAYMENT SIMULATOR ───────────────────────── */}
+      {/* ─── MODAL 3: SECURE SCHOOL FEE PAYMENT GATEWAY & INSTRUCTIONS ───────── */}
       {paymentModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-3 border-slate-100">
-              <h3 className="font-black text-slate-900 text-sm">Secure Online School Fee Payment</h3>
+              <h3 className="font-black text-slate-900 text-sm">School Fee Settlement</h3>
               <button onClick={() => setPaymentModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
 
             <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
-              <p className="text-slate-500">Invoice: <strong className="text-slate-900">{paymentModal.title}</strong></p>
+              <p className="text-slate-500">Invoice: <strong className="text-slate-900">{paymentModal.title || paymentModal.invoiceNo}</strong></p>
               <div className="flex justify-between items-center text-sm font-black pt-1">
                 <span>Amount to Settle:</span>
-                <span className="text-emerald-700 font-mono">₦{paymentModal.balance.toLocaleString()}</span>
+                <span className="text-emerald-700 font-mono">₦{(paymentModal.balance || 0).toLocaleString()}</span>
               </div>
             </div>
 
             {/* Payment Method Selector */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'card', label: 'Debit Card' },
-                { id: 'transfer', label: 'Bank Transfer' },
-                { id: 'ussd', label: 'Bank USSD' },
+                { id: 'card', label: 'Online Payment (Paystack)' },
+                { id: 'transfer', label: 'Direct Bank Transfer' },
               ].map(m => (
                 <button
                   key={m.id}
@@ -972,27 +980,48 @@ function ParentDashboardView({ token, parent }: { token: string; parent: any }) 
             </div>
 
             {paymentMethod === 'card' && (
-              <div className="space-y-3 text-xs">
-                <input type="text" placeholder="Card Number (4111 2222 3333 4444)" className="input py-2 text-xs w-full" defaultValue="5399 2012 3456 7890" />
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="text" placeholder="MM/YY" className="input py-2 text-xs" defaultValue="09/28" />
-                  <input type="password" placeholder="CVV" className="input py-2 text-xs" defaultValue="312" />
+              <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100 space-y-3 text-xs text-slate-700">
+                <div className="flex items-center gap-2 text-blue-800 font-bold">
+                  <ShieldCheck size={16} className="text-blue-600" />
+                  <span>Instant Paystack Online Clearing</span>
                 </div>
+                <p className="leading-relaxed text-slate-600">
+                  Pay securely using Debit Card (Mastercard, Visa, Verve), USSD, Bank Transfer, or QR via Paystack.
+                  Your invoice balance will update automatically and your official receipt will be generated immediately upon successful payment.
+                </p>
+                <button
+                  onClick={() => handleInitiateOnlinePayment(paymentModal)}
+                  disabled={isPayingOnline}
+                  className="btn-primary w-full py-2.5 text-xs font-bold gap-2 flex items-center justify-center"
+                >
+                  {isPayingOnline ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
+                  <span>Proceed to Paystack Checkout (₦{(paymentModal.balance || 0).toLocaleString()})</span>
+                </button>
               </div>
             )}
 
             {paymentMethod === 'transfer' && (
-              <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1 font-mono">
-                <p>Bank: <strong>PROVIDUS BANK</strong></p>
-                <p>Account No: <strong>9900123456</strong></p>
-                <p>Beneficiary: <strong>{school.name}</strong></p>
-                <p className="text-[10px] text-blue-700">Reference: {paymentModal.invoiceNo}</p>
+              <div className="space-y-3">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 space-y-1.5 font-mono">
+                  <p><span className="text-slate-400 font-sans">Bank: </span><strong>PROVIDUS BANK / ZENITH BANK</strong></p>
+                  <p><span className="text-slate-400 font-sans">Account No: </span><strong>9900123456</strong></p>
+                  <p><span className="text-slate-400 font-sans">Beneficiary: </span><strong>{school.name || 'EduNest School'}</strong></p>
+                  <p className="text-[11px] text-blue-700 font-bold font-sans">Payment Reference: {paymentModal.invoiceNo}</p>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  After initiating the transfer, present or forward your transaction receipt / reference to the School Bursary or Class Master for verification and official receipt issuance.
+                </p>
+                <button
+                  onClick={() => {
+                    toast.success('Transfer instructions noted. Please submit proof to the Bursary.');
+                    setPaymentModal(null);
+                  }}
+                  className="btn-secondary w-full py-2 text-xs font-bold"
+                >
+                  I Have Noted the Details
+                </button>
               </div>
             )}
-
-            <button onClick={handleSimulatedPayment} className="btn-primary w-full py-2.5 text-xs font-bold">
-              Confirm & Authorize ₦{paymentModal.balance.toLocaleString()}
-            </button>
           </div>
         </div>
       )}

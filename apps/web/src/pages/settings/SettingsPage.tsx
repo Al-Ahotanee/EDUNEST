@@ -6,6 +6,7 @@ import { Button, Input, Select, Card, Modal } from '../../components/ui';
 import { schoolsApi, authApi, usersApi } from '../../services/api';
 import toast from 'react-hot-toast';
 import { Settings, Building, Bell, Shield, User, Palette } from 'lucide-react';
+import { applyThemeColors } from '../../hooks/useTenantTheme';
 
 export default function SettingsPage() {
   const qc = useQueryClient();
@@ -49,6 +50,10 @@ export default function SettingsPage() {
       phone: '',
       address: '',
       website: '',
+      motto: '',
+      logo: '',
+      primaryColor: '#1a56db',
+      secondaryColor: '#7e3af2',
     },
   });
 
@@ -60,6 +65,10 @@ export default function SettingsPage() {
         phone: schoolData.phone || '',
         address: schoolData.address || '',
         website: schoolData.website || '',
+        motto: schoolData.motto || schoolData.tenant?.motto || '',
+        logo: schoolData.logo || schoolData.tenant?.logo || '',
+        primaryColor: schoolData.tenant?.primaryColor || '#1a56db',
+        secondaryColor: schoolData.tenant?.secondaryColor || '#7e3af2',
       });
     }
   }, [schoolData, schoolForm]);
@@ -77,11 +86,22 @@ export default function SettingsPage() {
 
   const updateSchoolMutation = useMutation({
     mutationFn: (data: any) => schoolsApi.updateCurrent(data),
-    onSuccess: (res) => {
+    onSuccess: (res, variables) => {
       qc.invalidateQueries({ queryKey: ['current-school'] });
-      toast.success('School profile updated successfully!');
+      toast.success('School profile and branding updated successfully!');
+      if (variables.primaryColor || variables.secondaryColor) {
+        applyThemeColors({
+          primaryColor: variables.primaryColor,
+          secondaryColor: variables.secondaryColor,
+          name: variables.name,
+          logo: variables.logo,
+        });
+      }
       if (res.data?.data && user?.school) {
-        updateUser({ school: { ...user.school, ...res.data.data } });
+        updateUser({
+          school: { ...user.school, ...res.data.data },
+          tenant: { ...user.tenant, ...res.data.data.tenant, primaryColor: variables.primaryColor, secondaryColor: variables.secondaryColor }
+        });
       }
     },
     onError: (err: any) => {
@@ -199,22 +219,36 @@ export default function SettingsPage() {
 
               {/* Branding */}
               <div className="pt-4 border-t border-slate-100">
-                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2"><Palette size={16} /> Branding</h3>
+                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2"><Palette size={16} /> School Branding & Identity</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="label">Primary Color</label>
+                    <label className="label">Primary Brand Color</label>
                     <div className="flex items-center gap-3">
-                      <input type="color" defaultValue="#2563eb" className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5" />
-                      <Input defaultValue="#2563eb" className="flex-1" />
+                      <input
+                        type="color"
+                        value={schoolForm.watch('primaryColor') || '#1a56db'}
+                        onChange={(e) => schoolForm.setValue('primaryColor', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5"
+                      />
+                      <Input {...schoolForm.register('primaryColor')} className="flex-1 font-mono" />
                     </div>
                   </div>
                   <div>
-                    <label className="label">Secondary Color</label>
+                    <label className="label">Secondary Brand Color</label>
                     <div className="flex items-center gap-3">
-                      <input type="color" defaultValue="#7e3af2" className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5" />
-                      <Input defaultValue="#7e3af2" className="flex-1" />
+                      <input
+                        type="color"
+                        value={schoolForm.watch('secondaryColor') || '#7e3af2'}
+                        onChange={(e) => schoolForm.setValue('secondaryColor', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5"
+                      />
+                      <Input {...schoolForm.register('secondaryColor')} className="flex-1 font-mono" />
                     </div>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <Input label="School Motto / Tagline" {...schoolForm.register('motto')} placeholder="e.g. Excellence, Integrity and Leadership" />
+                  <Input label="School Logo Image URL" {...schoolForm.register('logo')} placeholder="https://..." />
                 </div>
               </div>
 

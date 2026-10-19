@@ -16,6 +16,8 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SchoolLandingPage from './pages/school-portal/SchoolLandingPage';
 import AdmissionApplicationPage from './pages/school-portal/AdmissionApplicationPage';
+import AdmissionStatusCheckerPage from './pages/school-portal/AdmissionStatusCheckerPage';
+import WebsiteBuilderPage from './pages/settings/WebsiteBuilderPage';
 
 // Super Admin
 import SuperAdminLoginPage from './pages/super-admin/SuperAdminLoginPage';
@@ -125,9 +127,11 @@ export default function App() {
           {/* ── School Public Portals ── */}
           <Route path="/school/:slug" element={<SchoolLandingPage />} />
           <Route path="/school/:slug/apply" element={<AdmissionApplicationPage />} />
+          <Route path="/school/:slug/apply/status" element={<AdmissionStatusCheckerPage />} />
 
           {/* Legacy admission portal route */}
           <Route path="/admissions/:schoolSlug" element={<AdmissionApplicationPage />} />
+          <Route path="/admissions/:schoolSlug/status" element={<AdmissionStatusCheckerPage />} />
 
           {/* ── Super Admin (Platform) ── */}
           <Route path="/super-admin/login" element={<SuperAdminLoginPage />} />
@@ -190,10 +194,12 @@ export default function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="website-builder" element={<WebsiteBuilderPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           {/* Legacy / Direct shortcuts redirects to authenticated app */}
+          <Route path="/website-builder" element={<Navigate to="/app/website-builder" replace />} />
           <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
           <Route path="/students" element={<Navigate to="/app/students" replace />} />
           <Route path="/attendance" element={<Navigate to="/app/attendance" replace />} />

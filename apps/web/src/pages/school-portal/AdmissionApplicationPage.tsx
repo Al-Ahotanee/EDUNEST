@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../../services/api';
-import { CheckCircle, Upload, ArrowLeft, Printer } from 'lucide-react';
+import { CheckCircle, Upload, ArrowLeft, Printer, Search } from 'lucide-react';
+import { applyThemeColors } from '../../hooks/useTenantTheme';
 import toast from 'react-hot-toast';
 
 const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara'];
@@ -19,6 +19,17 @@ export default function AdmissionApplicationPage() {
     queryKey: ['school-public', slug],
     queryFn: () => api.get(`/saas/school/${slug}`).then(r => r.data.data),
   });
+
+  React.useEffect(() => {
+    if (school) {
+      applyThemeColors({
+        primaryColor: school.primaryColor,
+        secondaryColor: school.secondaryColor,
+        name: school.name,
+        logo: school.logo,
+      });
+    }
+  }, [school]);
 
   const [form, setForm] = useState({
     firstName: '', lastName: '', otherName: '', gender: '', dateOfBirth: '',
@@ -67,9 +78,12 @@ export default function AdmissionApplicationPage() {
           <p className="text-3xl font-black" style={{ color: primary }}>{submitted.applicationNo}</p>
         </div>
         <p className="text-sm text-gray-400 mb-8">The school will contact you regarding screening and further processes. Check your email for confirmation.</p>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button onClick={() => navigate(`/school/${slug}`)} className="flex-1 border-2 font-semibold py-3 rounded-xl transition-colors hover:bg-gray-50" style={{ borderColor: primary, color: primary }}>
             Back to School
+          </button>
+          <button onClick={() => navigate(`/school/${slug}/apply/status`)} className="flex-1 font-semibold py-3 rounded-xl transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center justify-center gap-2">
+            <Search size={16} /> Track Status
           </button>
           <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-2 text-white font-semibold py-3 rounded-xl" style={{ background: primary }}>
             <Printer size={16} /> Print Receipt
@@ -115,10 +129,18 @@ export default function AdmissionApplicationPage() {
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-5xl mx-auto">
-        {/* Back */}
-        <button onClick={() => navigate(`/school/${slug}`)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-6 transition-colors">
-          <ArrowLeft size={16} /> Back to School Portal
-        </button>
+        {/* Top Navigation */}
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={() => navigate(`/school/${slug}`)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <ArrowLeft size={16} /> Back to School Portal
+          </button>
+          <Link
+            to={`/school/${slug}/apply/status`}
+            className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1.5"
+          >
+            <Search size={14} /> Already applied? Check status here →
+          </Link>
+        </div>
 
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           {/* Official Header */}

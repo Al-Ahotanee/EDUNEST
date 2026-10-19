@@ -9,30 +9,26 @@ import {
 import {
   DataTable, Button, Modal, StatCard, Badge, PageLoader,
 } from '../../components/ui';
-import { api } from '../../services/api';
+import { api, schoolsApi, admissionsApi } from '../../services/api';
 import { formatDate, cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
-import { schoolsApi } from '../../services/api';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
-const admissionsApi = {
-  list: (params?: any) => api.get('/admissions', { params }),
-  getOne: (id: string) => api.get(`/admissions/${id}`),
-  stats: () => api.get('/admissions/stats'),
-  approve: (id: string, classId?: string) => api.patch(`/admissions/${id}/approve`, classId ? { classId } : {}),
-  reject: (id: string, reason?: string) => api.patch(`/admissions/${id}/reject`, { reason }),
-};
-
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, stage }: { status?: string; stage?: string }) {
+  const displayVal = stage || status || 'SUBMITTED';
   const map: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
-    PENDING:   { cls: 'badge-yellow', icon: <Clock size={11} />, label: 'Pending' },
-    SCREENING: { cls: 'badge-blue',   icon: <Eye size={11} />, label: 'Screening' },
-    APPROVED:  { cls: 'badge-green',  icon: <CheckCircle size={11} />, label: 'Approved' },
-    REJECTED:  { cls: 'badge-red',    icon: <XCircle size={11} />, label: 'Rejected' },
-    ENROLLED:  { cls: 'badge-purple', icon: <CheckCircle size={11} />, label: 'Enrolled' },
+    SUBMITTED:           { cls: 'badge-yellow', icon: <Clock size={11} />, label: 'Submitted' },
+    PENDING:             { cls: 'badge-yellow', icon: <Clock size={11} />, label: 'Pending' },
+    UNDER_REVIEW:        { cls: 'badge-blue',   icon: <Eye size={11} />, label: 'Under Review' },
+    SCREENING:           { cls: 'badge-blue',   icon: <Eye size={11} />, label: 'Under Review' },
+    EXAM_SCHEDULED:      { cls: 'badge-amber',  icon: <Calendar size={11} />, label: 'Exam Scheduled' },
+    INTERVIEW_SCHEDULED: { cls: 'badge-cyan',   icon: <Users size={11} />, label: 'Interview Scheduled' },
+    APPROVED:            { cls: 'badge-green',  icon: <CheckCircle size={11} />, label: 'Approved' },
+    REJECTED:            { cls: 'badge-red',    icon: <XCircle size={11} />, label: 'Rejected' },
+    ENROLLED:            { cls: 'badge-purple', icon: <GraduationCap size={11} />, label: 'Enrolled' },
   };
-  const cfg = map[status] || map.PENDING;
-  return <span className={`${cfg.cls} inline-flex items-center gap-1`}>{cfg.icon} {cfg.label}</span>;
+  const cfg = map[displayVal] || map.SUBMITTED;
+  return <span className={`${cfg.cls} inline-flex items-center gap-1 font-semibold`}>{cfg.icon} {cfg.label}</span>;
 }
 
 export default function AdmissionsPage() {
@@ -57,6 +53,29 @@ export default function AdmissionsPage() {
   const [admissionLetter, setAdmissionLetter] = useState<any>(null);
   const [rejectModal, setRejectModal] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [examDateInput, setExamDateInput] = useState('');
+  const [interviewDateInput, setInterviewDateInput] = useState('');
+  const [examScoreInput, setExamScoreInput] = useState('');
+
+  const updateStageMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => admissionsApi.updateStage(id, data),
+    onSuccess: (res) => {
+      toast.success('Application updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      queryClient.invalidateQueries({ queryKey: ['admission-stats'] });
+      if (selected) {
+        setSelected((prev: any) => ({ ...prev, ...(res.data?.data || res.data) }));
+      }
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update stage'),
+  });
+
+  const handleSelectApplication = (item: any) => {
+    setSelected(item);
+    setExamDateInput(item.examDate ? new Date(item.examDate).toISOString().slice(0, 16) : '');
+    setInterviewDateInput(item.interviewDate ? new Date(item.interviewDate).toISOString().slice(0, 16) : '');
+    setExamScoreInput(item.examScore !== undefined && item.examScore !== null ? String(item.examScore) : '');
+  };
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admissions', page, search, statusFilter],
@@ -154,12 +173,12 @@ export default function AdmissionsPage() {
       ),
     },
     { key: 'createdAt', header: 'Applied On', render: (r: any) => <span className="text-sm text-slate-500">{formatDate(r.createdAt)}</span> },
-    { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
+    { key: 'status', header: 'Status / Stage', render: (r: any) => <StatusBadge status={r.status} stage={r.stage} /> },
     {
       key: 'actions', header: 'Actions',
       render: (r: any) => (
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setSelected(r)} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-all" title="View Application">
+          <button onClick={() => handleSelectApplication(r)} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-all" title="View Application">
             <Eye size={15} />
           </button>
           {(r.status === 'APPROVED' || r.status === 'ENROLLED') && (
@@ -329,8 +348,107 @@ export default function AdmissionsPage() {
         {selected && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <StatusBadge status={selected.status} />
+              <StatusBadge status={selected.status} stage={selected.stage} />
               <span className="text-sm text-slate-400">Applied: {formatDate(selected.createdAt)}</span>
+            </div>
+
+            {/* Interactive Pipeline Stage Workflow */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Admission Stage Pipeline</h4>
+                  <p className="text-xs text-slate-500">Advance applicant through the evaluation lifecycle</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  Current: {selected.stage || selected.status || 'SUBMITTED'}
+                </span>
+              </div>
+
+              {/* Stage Progression Buttons */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {[
+                  { key: 'SUBMITTED', label: '1. Submitted' },
+                  { key: 'UNDER_REVIEW', label: '2. Under Review' },
+                  { key: 'EXAM_SCHEDULED', label: '3. Exam Sched.' },
+                  { key: 'INTERVIEW_SCHEDULED', label: '4. Interview' },
+                  { key: 'APPROVED', label: '5. Approved' },
+                ].map((st) => {
+                  const currentStage = selected.stage || selected.status || 'SUBMITTED';
+                  const isCurrent = currentStage === st.key;
+                  return (
+                    <button
+                      key={st.key}
+                      type="button"
+                      onClick={() => updateStageMutation.mutate({
+                        id: selected.id,
+                        data: { stage: st.key }
+                      })}
+                      disabled={updateStageMutation.isPending || selected.status === 'ENROLLED' || selected.status === 'REJECTED'}
+                      className={cn(
+                        'px-2 py-1.5 rounded-lg text-xs font-semibold text-center transition-all border',
+                        isCurrent
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-1 ring-blue-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 disabled:opacity-50'
+                      )}
+                    >
+                      {st.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Stage Scheduling / Assessment Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Exam Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={examDateInput}
+                    onChange={(e) => setExamDateInput(e.target.value)}
+                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Interview Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={interviewDateInput}
+                    onChange={(e) => setInterviewDateInput(e.target.value)}
+                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Exam Score (/100)</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={examScoreInput}
+                      onChange={(e) => setExamScoreInput(e.target.value)}
+                      placeholder="e.g. 85"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white"
+                    />
+                    <Button
+                      size="sm"
+                      loading={updateStageMutation.isPending}
+                      onClick={() => {
+                        updateStageMutation.mutate({
+                          id: selected.id,
+                          data: {
+                            stage: selected.stage || selected.status || 'SUBMITTED',
+                            examDate: examDateInput ? new Date(examDateInput).toISOString() : undefined,
+                            interviewDate: interviewDateInput ? new Date(interviewDateInput).toISOString() : undefined,
+                            examScore: examScoreInput ? Number(examScoreInput) : undefined,
+                          }
+                        });
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -457,7 +575,11 @@ export default function AdmissionsPage() {
             {/* Letterhead */}
             <div className="text-center pb-5 border-b-2 border-slate-900">
               <div className="flex items-center justify-center gap-3 mb-2">
-                <EduNestIcon size={38} />
+                {school?.logo ? (
+                  <img src={school.logo} alt={school?.name} className="h-12 w-12 object-contain rounded" />
+                ) : (
+                  <EduNestIcon size={38} />
+                )}
                 <h1 className="text-2xl font-black font-sans uppercase tracking-wider text-slate-900">
                   {school?.name || 'EduNest International College'}
                 </h1>

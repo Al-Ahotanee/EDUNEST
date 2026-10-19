@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import toast from 'react-hot-toast';
 import {
   Plus, DollarSign, AlertCircle, TrendingUp, CreditCard, Eye,
-  Download, Trash2, Printer, ShieldCheck, CheckCircle2, FileText
+  Download, Trash2, Printer, ShieldCheck, CheckCircle2, FileText, User
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, Avatar, PageLoader, Card,
@@ -20,17 +20,15 @@ export default function FinancePage() {
   const { user } = useAuthStore();
   const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
 
-  const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState<any>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [feeModal, setFeeModal] = useState(false);
   const [selectedClassForFees, setSelectedClassForFees] = useState('');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   // P5: receipt viewer state — when set, shows the ReceiptViewer modal
   const [receiptData, setReceiptData] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('');
-  const [tab, setTab] = useState<'overview' | 'invoices' | 'fees'>('overview');
+  const [tab, setTab] = useState<'overview' | 'invoices' | 'fees' | 'create-invoice' | 'create-fee'>('overview');
 
   const { data: dashStats, isLoading } = useQuery({
     queryKey: ['finance-dashboard'],
@@ -52,13 +50,13 @@ export default function FinancePage() {
   const { data: feesData } = useQuery({
     queryKey: ['fee-structures'],
     queryFn: () => financeApi.feeStructures().then((r) => r.data),
-    enabled: tab === 'fees',
+    enabled: tab === 'fees' || tab === 'create-invoice',
   });
 
   const { data: studentsData } = useQuery({
     queryKey: ['students-list'],
     queryFn: () => studentsApi.list({ limit: 100 }).then((r) => r.data.data),
-    enabled: invoiceModal,
+    enabled: tab === 'create-invoice' || tab === 'invoices',
   });
 
   // Invoice form
@@ -85,24 +83,61 @@ export default function FinancePage() {
   // Payment form
   const paymentForm = useForm({ defaultValues: { amount: 0, method: 'CASH', reference: '', notes: '' } });
   // Fee form
-  const feeForm = useForm({ defaultValues: { name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'DRAFT' } });
+  const feeForm = useForm({ defaultValues: { name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'PUBLISHED' } });
 
   // Fetch classes for fee structure dropdown
   const { data: classesData } = useQuery({
     queryKey: ['classes-for-fees'],
     queryFn: () => academicApi.classes().then((r) => r.data?.data || r.data || []),
-    enabled: tab === 'fees',
+    enabled: tab === 'fees' || tab === 'create-fee' || tab === 'create-invoice',
   });
   const classes = Array.isArray(classesData) ? classesData : [];
+
+  const selectedStudentId = invoiceForm.watch('studentId');
+  const selectedStudent = (studentsData || []).find((s: any) => s.id === selectedStudentId);
+  const studentClass = selectedStudent?.classEnrollments?.[0]?.class;
+  const watchedItems = invoiceForm.watch('items') || [];
+  const watchedDiscount = invoiceForm.watch('discount') || 0;
+  const subtotal = watchedItems.reduce((acc, it) => acc + (Number(it.amount || 0) * Number(it.quantity || 1)), 0);
+  const netTotal = Math.max(0, subtotal - Number(watchedDiscount || 0));
+
+  const handleLoadClassFees = async () => {
+    if (!studentClass?.id) {
+      toast.error('Selected student does not have an active class enrollment');
+      return;
+    }
+    try {
+      const res = await financeApi.getFeeStructuresByClass(studentClass.id);
+      const feeList = res.data?.data || res.data || [];
+      if (!feeList.length) {
+        toast.error(`No published fee items found for ${studentClass.name}`);
+        return;
+      }
+      invoiceForm.setValue('items', feeList.map((f: any) => ({
+        description: f.name,
+        amount: f.amount,
+        quantity: 1,
+      })));
+      toast.success(`Loaded ${feeList.length} fee item(s) for ${studentClass.name}`);
+    } catch {
+      toast.error('Failed to load class fee structures');
+    }
+  };
 
   const createInvoiceMutation = useMutation({
     mutationFn: (data: any) => financeApi.createInvoice(data),
     onSuccess: () => {
-      toast.success('Invoice created!');
+      toast.success('Invoice created and published successfully!');
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
-      setInvoiceModal(false);
-      invoiceForm.reset();
+      setTab('invoices');
+      invoiceForm.reset({
+        studentId: '',
+        dueDate: '',
+        discount: 0,
+        notes: '',
+        items: [{ description: '', amount: 0, quantity: 1 }],
+      });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
@@ -138,10 +173,10 @@ export default function FinancePage() {
   const createFeeMutation = useMutation({
     mutationFn: (data: any) => financeApi.createFeeStructure(data),
     onSuccess: () => {
-      toast.success('Fee structure created!');
+      toast.success('Fee structure created and published!');
       queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
-      setFeeModal(false);
-      feeForm.reset({ name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'DRAFT' });
+      setTab('fees');
+      feeForm.reset({ name: '', amount: 0, description: '', termBased: true, classId: '', feeType: 'TERM', status: 'PUBLISHED' });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
@@ -321,11 +356,19 @@ export default function FinancePage() {
           <Button variant="secondary" icon={<Download size={16} />} onClick={handleExportInvoices}>
             Export CSV
           </Button>
-          <Button variant="secondary" icon={<Plus size={16} />} onClick={() => setFeeModal(true)}>
-            Fee Structure
+          <Button
+            variant={tab === 'create-fee' ? 'primary' : 'secondary'}
+            icon={<Plus size={16} />}
+            onClick={() => setTab('create-fee')}
+          >
+            Fee Structure Builder
           </Button>
-          <Button icon={<Plus size={16} />} onClick={() => setInvoiceModal(true)}>
-            Create Invoice
+          <Button
+            variant={tab === 'create-invoice' ? 'primary' : 'default'}
+            icon={<Plus size={16} />}
+            onClick={() => setTab('create-invoice')}
+          >
+            Create Invoice Studio
           </Button>
         </div>
       </div>
@@ -339,11 +382,20 @@ export default function FinancePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['overview', 'invoices', 'fees'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            {t}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'invoices', label: 'Invoices' },
+          { id: 'fees', label: 'Fee Structures' },
+          ...(tab === 'create-invoice' ? [{ id: 'create-invoice', label: '⚡ New Invoice Studio' }] : []),
+          ...(tab === 'create-fee' ? [{ id: 'create-fee', label: '⚡ Fee Item Builder' }] : []),
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id as any)}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            {t.label}
           </button>
         ))}
       </div>
@@ -449,7 +501,7 @@ export default function FinancePage() {
                 ))}
               </select>
             </div>
-            <Button icon={<Plus size={15} />} onClick={() => setFeeModal(true)}>
+            <Button icon={<Plus size={15} />} onClick={() => setTab('create-fee')}>
               Add Fee Item
             </Button>
           </div>
@@ -576,76 +628,400 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* Create Invoice Modal */}
-      <Modal open={invoiceModal} onClose={() => setInvoiceModal(false)} title="Create Invoice" size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setInvoiceModal(false)}>Cancel</Button>
-            <Button loading={createInvoiceMutation.isPending}
-              onClick={invoiceForm.handleSubmit((d) => createInvoiceMutation.mutate(d))}>
-              Create Invoice
+      {/* ─── TAB: INVOICE CREATION STUDIO ─────────────────────────────────── */}
+      {tab === 'create-invoice' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">Student Fee Invoicing Studio</h2>
+              <p className="text-xs text-slate-500">Configure itemized tuition, levies, and auxiliary fees with live balance calculation.</p>
+            </div>
+            <Button variant="secondary" onClick={() => setTab('invoices')}>
+              Cancel & Return to Invoices
             </Button>
-          </>
-        }>
-        <div className="space-y-4">
-          <Select label="Student" {...invoiceForm.register('studentId')}
-            options={(studentsData || []).map((s: any) => ({ value: s.id, label: `${s.firstName} ${s.lastName} (${s.admissionNumber})` }))}
-            placeholder="Select student" />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Due Date" type="date" {...invoiceForm.register('dueDate')} />
-            <Input label="Discount (₦)" type="number" {...invoiceForm.register('discount', { valueAsNumber: true })} />
           </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="label mb-0">Fee Items</label>
-              <button
-                type="button"
-                onClick={() => appendFeeItem({ description: '', amount: 0, quantity: 1 })}
-                className="text-xs text-blue-600 font-semibold hover:underline flex items-center gap-1"
-              >
-                <Plus size={14} /> Add Item
-              </button>
-            </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {feeItems.map((item, i) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <input
-                    className="input flex-1"
-                    placeholder="Description (e.g. Tuition)"
-                    {...invoiceForm.register(`items.${i}.description` as const, { required: true })}
-                  />
-                  <input
-                    className="input w-28"
-                    placeholder="Amount (₦)"
-                    type="number"
-                    {...invoiceForm.register(`items.${i}.amount` as const, { valueAsNumber: true, required: true })}
-                  />
-                  <input
-                    className="input w-16"
-                    placeholder="Qty"
-                    type="number"
-                    min="1"
-                    {...invoiceForm.register(`items.${i}.quantity` as const, { valueAsNumber: true, required: true })}
-                  />
-                  {feeItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeFeeItem(i)}
-                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Remove Item"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <Input label="Notes (optional)" {...invoiceForm.register('notes')} placeholder="Additional notes" />
-        </div>
-      </Modal>
 
-      {/* Record Payment Modal */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Form Fields & Fee Items */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Student Selection & Class Card */}
+              <div className="card p-6 space-y-4">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <User size={16} className="text-blue-600" />
+                  Target Student & Class Assignment
+                </h3>
+
+                <div>
+                  <label className="label">Select Student *</label>
+                  <select
+                    className="input w-full"
+                    {...invoiceForm.register('studentId', { required: true })}
+                  >
+                    <option value="">-- Choose Student --</option>
+                    {(studentsData || []).map((s: any) => (
+                      <option key={s.id} value={s.id}>
+                        {s.firstName} {s.lastName} ({s.admissionNumber}) {s.classEnrollments?.[0]?.class?.name ? `— ${s.classEnrollments[0].class.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedStudent && (
+                  <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-sm">
+                        {selectedStudent.firstName?.[0]}{selectedStudent.lastName?.[0]}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm">{selectedStudent.firstName} {selectedStudent.lastName}</p>
+                        <p className="text-xs text-slate-500 font-mono">Admission No: {selectedStudent.admissionNumber}</p>
+                        <p className="text-xs text-blue-700 font-semibold">
+                          Assigned Class: {studentClass?.name || 'No Active Class Enrollment'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {studentClass?.id && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleLoadClassFees}
+                      >
+                        ⚡ Load Class Fee Template ({studentClass.name})
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="label">Due Date *</label>
+                    <input
+                      type="date"
+                      className="input w-full"
+                      {...invoiceForm.register('dueDate', { required: true })}
+                    />
+                    <div className="flex gap-2 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 14);
+                          invoiceForm.setValue('dueDate', d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] text-blue-600 hover:underline"
+                      >
+                        +14 Days
+                      </button>
+                      <span className="text-slate-300">•</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 30);
+                          invoiceForm.setValue('dueDate', d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] text-blue-600 hover:underline"
+                      >
+                        +30 Days
+                      </button>
+                      <span className="text-slate-300">•</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+                          invoiceForm.setValue('dueDate', d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] text-blue-600 hover:underline"
+                      >
+                        End of Month
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="label">Invoice Notes / Memo</label>
+                    <input
+                      type="text"
+                      className="input w-full"
+                      placeholder="e.g. First Term Tuition & Levies"
+                      {...invoiceForm.register('notes')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Line Items Studio Table */}
+              <div className="card p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <FileText size={16} className="text-blue-600" />
+                    Itemized Billing Breakdown
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => appendFeeItem({ description: '', amount: 0, quantity: 1 })}
+                    className="btn-secondary btn-sm gap-1"
+                  >
+                    <Plus size={14} /> Add Line Item
+                  </button>
+                </div>
+
+                <div className="table-container border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
+                        <th className="px-4 py-3 text-left">Fee Item Description</th>
+                        <th className="px-4 py-3 text-right w-36">Unit Amount (₦)</th>
+                        <th className="px-4 py-3 text-center w-24">Qty</th>
+                        <th className="px-4 py-3 text-right w-36">Line Total (₦)</th>
+                        <th className="px-3 py-3 text-center w-12"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {feeItems.map((item, i) => {
+                        const lineAmount = invoiceForm.watch(`items.${i}.amount`) || 0;
+                        const lineQty = invoiceForm.watch(`items.${i}.quantity`) || 1;
+                        const lineSubtotal = Number(lineAmount) * Number(lineQty);
+                        return (
+                          <tr key={item.id} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-2.5">
+                              <input
+                                className="input w-full py-1.5 text-xs"
+                                placeholder="Description (e.g. Tuition Fee, Books, Uniform)"
+                                {...invoiceForm.register(`items.${i}.description` as const, { required: true })}
+                              />
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <input
+                                className="input w-full py-1.5 text-xs text-right font-mono"
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                {...invoiceForm.register(`items.${i}.amount` as const, { valueAsNumber: true, required: true })}
+                              />
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <input
+                                className="input w-full py-1.5 text-xs text-center font-mono"
+                                type="number"
+                                min="1"
+                                {...invoiceForm.register(`items.${i}.quantity` as const, { valueAsNumber: true, required: true })}
+                              />
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-800">
+                              {formatCurrency(lineSubtotal)}
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              {feeItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeFeeItem(i)}
+                                  className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                  title="Delete item"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Col: Live Calculation & Issue Actions */}
+            <div className="space-y-6">
+              <div className="card p-6 space-y-5 sticky top-6">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <CreditCard size={16} className="text-emerald-600" />
+                  Live Financial Calculation
+                </h3>
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>Gross Subtotal:</span>
+                    <span className="font-mono font-bold text-slate-900">{formatCurrency(subtotal)}</span>
+                  </div>
+
+                  <div>
+                    <label className="label text-xs">Applicable Discount (₦)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="input w-full font-mono text-sm py-1.5"
+                      placeholder="0"
+                      {...invoiceForm.register('discount', { valueAsNumber: true })}
+                    />
+                  </div>
+
+                  <div className="border-t-2 border-slate-200 pt-3 flex justify-between items-center text-base font-black">
+                    <span className="text-slate-900">Net Invoiced:</span>
+                    <span className="font-mono text-blue-700 text-lg">{formatCurrency(netTotal)}</span>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
+                    <p className="font-semibold flex items-center gap-1">
+                      <AlertCircle size={13} /> Idempotent Invoicing Rules
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-amber-700">
+                      Once created, the invoice is published immediately to the Parent Portal and Student Financial Ledger. Initial balance will be {formatCurrency(netTotal)}.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <Button
+                    className="w-full justify-center"
+                    loading={createInvoiceMutation.isPending}
+                    onClick={invoiceForm.handleSubmit((d) => createInvoiceMutation.mutate(d))}
+                    disabled={!selectedStudentId || subtotal <= 0}
+                  >
+                    Issue & Publish Invoice ({formatCurrency(netTotal)})
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-center"
+                    onClick={() => setTab('invoices')}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TAB: FEE STRUCTURE BUILDER ───────────────────────────────────── */}
+      {tab === 'create-fee' && (
+        <div className="space-y-6 max-w-4xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">Fee Structure Builder</h2>
+              <p className="text-xs text-slate-500">Define school fee schedules, class-specific levies, and billing cycle frequencies.</p>
+            </div>
+            <Button variant="secondary" onClick={() => setTab('fees')}>
+              Cancel & Return to Fees
+            </Button>
+          </div>
+
+          <div className="card p-8 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="sm:col-span-2">
+                <label className="label">Fee Item Name *</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  placeholder="e.g. First Term Tuition Fee, ICT & STEM Levy, Science Lab Consumables"
+                  {...feeForm.register('name', { required: true })}
+                />
+              </div>
+
+              <div>
+                <label className="label">Base Amount (₦) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input w-full font-mono font-bold"
+                  placeholder="0"
+                  {...feeForm.register('amount', { valueAsNumber: true, required: true })}
+                />
+              </div>
+
+              <div>
+                <label className="label">Target Class Scope *</label>
+                <select className="input w-full" {...feeForm.register('classId')}>
+                  <option value="">All Classes (General Institutional Levy)</option>
+                  {classes.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  If set to "All Classes", every active student in the school will be charged this item upon bulk invoice generation.
+                </p>
+              </div>
+
+              <div className="sm:col-span-2 space-y-2">
+                <label className="label">Billing Frequency & Lifecycle</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      id: 'TERM',
+                      label: 'Per Term',
+                      desc: 'Billed every academic term (e.g. Tuition, Exam levy, Sports).',
+                    },
+                    {
+                      id: 'ONE_TIME',
+                      label: 'One-Time',
+                      desc: 'New entrants only upon admission (e.g. Registration, Uniform pack). Excluded for returning students.',
+                    },
+                    {
+                      id: 'ANNUAL',
+                      label: 'Annual',
+                      desc: 'Billed once per academic session (e.g. Development levy, Student insurance).',
+                    },
+                  ].map((freq) => {
+                    const currentType = feeForm.watch('feeType');
+                    const isSelected = currentType === freq.id;
+                    return (
+                      <div
+                        key={freq.id}
+                        onClick={() => feeForm.setValue('feeType', freq.id)}
+                        className={cn(
+                          'p-4 rounded-xl border cursor-pointer transition-all space-y-1',
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-600/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                        )}
+                      >
+                        <p className="font-bold text-sm">{freq.label}</p>
+                        <p className="text-xs text-slate-500 leading-normal">{freq.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="label">Publication Status</label>
+                <select className="input w-full" {...feeForm.register('status')}>
+                  <option value="PUBLISHED">Published (Active immediately for billing & visible to parents)</option>
+                  <option value="DRAFT">Draft (Save internally for review before billing)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="label">Description / Accounting Remarks (Optional)</label>
+                <textarea
+                  rows={3}
+                  className="input w-full resize-none text-xs"
+                  placeholder="Additional context, expenditure code, or fee justification..."
+                  {...feeForm.register('description')}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <Button variant="secondary" onClick={() => setTab('fees')}>
+                Cancel
+              </Button>
+              <Button
+                loading={createFeeMutation.isPending}
+                onClick={feeForm.handleSubmit((d) => createFeeMutation.mutate(d))}
+              >
+                Save & Register Fee Structure
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment Modal — Simple 3-field quick action */}
       <Modal open={!!paymentModal} onClose={() => setPaymentModal(null)} title={`Record Payment — ${paymentModal?.invoiceNo}`} size="sm"
         footer={
           <>
@@ -671,44 +1047,6 @@ export default function FinancePage() {
               { value: 'ONLINE', label: 'Online' },
             ]} />
           <Input label="Reference / Transaction ID" {...paymentForm.register('reference')} placeholder="Optional" />
-        </div>
-      </Modal>
-
-      {/* Fee Structure Modal — Enhanced with class scoping and fee type */}
-      <Modal open={feeModal} onClose={() => setFeeModal(false)} title="Add Fee Item" size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setFeeModal(false)}>Cancel</Button>
-            <Button loading={createFeeMutation.isPending}
-              onClick={feeForm.handleSubmit((d) => createFeeMutation.mutate(d))}>
-              Create Fee Item
-            </Button>
-          </>
-        }>
-        <div className="space-y-4">
-          <Input label="Fee Name" {...feeForm.register('name')} placeholder="e.g. Tuition, Uniform, Books" />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Amount (₦)" type="number" {...feeForm.register('amount', { valueAsNumber: true })} />
-            <div className="form-group">
-              <label className="label">Fee Type</label>
-              <select {...feeForm.register('feeType')} className="input">
-                <option value="TERM">Per Term</option>
-                <option value="ONE_TIME">One-Time</option>
-                <option value="ANNUAL">Annual</option>
-              </select>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="label">Applicable Class</label>
-            <select {...feeForm.register('classId')} className="input">
-              <option value="">All Classes (applies to every class)</option>
-              {classes.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-400 mt-1">If a specific class is selected, this fee only applies to students in that class.</p>
-          </div>
-          <Input label="Description" {...feeForm.register('description')} placeholder="Optional description" />
         </div>
       </Modal>
 

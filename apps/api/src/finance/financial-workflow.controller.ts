@@ -67,7 +67,7 @@ export class FinancialWorkflowController {
   // ─── PAYMENT APPROVAL ───────────────────────────────────────────────────────
 
   @Patch('payments/:id/approve')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Approve a pending payment (School Accountant only — cannot approve own submission)' })
   approvePayment(
     @Param('id') id: string,
@@ -82,7 +82,7 @@ export class FinancialWorkflowController {
   }
 
   @Patch('payments/:id/reject')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Reject a pending payment (requires reason)' })
   rejectPayment(
     @Param('id') id: string,
@@ -98,7 +98,7 @@ export class FinancialWorkflowController {
   }
 
   @Patch('payments/:id/reverse')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Reverse a posted payment (creates compensating entry, preserves audit trail)' })
   reversePayment(
     @Param('id') id: string,
@@ -116,7 +116,7 @@ export class FinancialWorkflowController {
   // ─── PENDING PAYMENTS QUEUE ─────────────────────────────────────────────────
 
   @Get('payments/pending')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'List pending payments awaiting Accountant approval' })
   listPendingPayments(
     @CurrentUser('schoolId') schoolId: string,
@@ -135,7 +135,10 @@ export class FinancialWorkflowController {
     @CurrentUser('schoolId') schoolId: string,
   ) {
     const receipt = await this.prisma.receipt.findFirst({
-      where: { id, schoolId },
+      where: {
+        OR: [{ id }, { receiptNo: id }, { paymentId: id }],
+        ...(schoolId ? { schoolId } : {}),
+      },
       include: { payment: { include: { invoice: { include: { student: true } } } } },
     });
     if (!receipt) return { data: null, message: 'Receipt not found' };
@@ -143,7 +146,7 @@ export class FinancialWorkflowController {
   }
 
   @Patch('receipts/:id/reprint')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Reprint a receipt (audited — increments reprint count)' })
   reprintReceipt(
     @Param('id') id: string,
@@ -160,7 +163,7 @@ export class FinancialWorkflowController {
   // ─── TENANT FINANCIAL POLICY ────────────────────────────────────────────────
 
   @Get('policy')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Get the tenant financial policy (auto-creates if missing)' })
   async getPolicy(
     @CurrentUser('tenantId') tenantId: string,
@@ -170,7 +173,7 @@ export class FinancialWorkflowController {
   }
 
   @Patch('policy')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin')
   @ApiOperation({ summary: 'Update tenant financial policy (School Admin only)' })
   updatePolicy(
     @Body() body: any,
@@ -188,7 +191,7 @@ export class FinancialWorkflowController {
   // ─── PARENT-STUDENT LINKS ───────────────────────────────────────────────────
 
   @Post('parent-links')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Link a parent User account to a Student (admin operation)' })
   createParentStudentLink(
     @Body() body: { userId: string; studentId: string; relationship?: string },
@@ -249,7 +252,7 @@ export class FinancialReportsController {
   // ─── DASHBOARDS ─────────────────────────────────────────────────────────────
 
   @Get('accountant-dashboard')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'School Accountant dashboard — pending approvals, collections, exceptions' })
   getAccountantDashboard(
     @CurrentUser('schoolId') schoolId: string,
@@ -285,7 +288,7 @@ export class FinancialReportsController {
   // ─── REPORTS ─────────────────────────────────────────────────────────────────
 
   @Get('outstanding-fees')
-  @Roles('Super Admin', 'Accountant', 'Principal')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant', 'Principal')
   @ApiOperation({ summary: 'Outstanding fees / debtor report' })
   getOutstandingFeesReport(
     @CurrentUser('schoolId') schoolId: string,
@@ -300,7 +303,7 @@ export class FinancialReportsController {
   }
 
   @Get('daily-collection')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Daily collection report — POSTED payments only' })
   getDailyCollectionReport(
     @CurrentUser('schoolId') schoolId: string,
@@ -310,8 +313,9 @@ export class FinancialReportsController {
   }
 
   @Get('collection-by-user')
-  @Roles('Super Admin', 'Accountant', 'Principal')
-  @ApiOperation({ summary: 'Collection-by-user report — which staff member collected what' })
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant', 'Principal')
+  @ApiOperation({ summary: 'Collection-by-user report — which staff member collected what'
+  })
   getCollectionByUserReport(
     @CurrentUser('schoolId') schoolId: string,
     @Query('startDate') startDate: string,
@@ -321,7 +325,7 @@ export class FinancialReportsController {
   }
 
   @Get('audit-log')
-  @Roles('Super Admin', 'Principal')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Financial audit log (read-only)' })
   getAuditLog(
     @CurrentUser('schoolId') schoolId: string,
