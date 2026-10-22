@@ -47,7 +47,7 @@ import { PingController } from './health.controller';
       {
         name: 'auth',
         ttl: Number(process.env.THROTTLE_AUTH_TTL_MS) || 60000,
-        limit: Number(process.env.THROTTLE_AUTH_LIMIT) || 30,
+        limit: Number(process.env.THROTTLE_AUTH_LIMIT) || 5,
       },
     ]),
     PrismaModule, AuthModule, StudentsModule, AcademicModule,

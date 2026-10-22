@@ -14,7 +14,7 @@ import { formatDate, cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
-type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' | 'HALF_DAY';
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' | 'HALF_DAY' | 'UNMARKED';
 type AttendanceScope = 'daily' | 'subject' | 'staff';
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string; short: string; color: string; badgeCls: string }[] = [
@@ -131,7 +131,7 @@ export default function AttendancePage() {
       const initial: Record<string, AttendanceStatus> = {};
       const initialRemarks: Record<string, string> = {};
       studentsInClass.forEach((s: any) => {
-        initial[s.id] = studentAttendance[s.id] || 'PRESENT';
+        initial[s.id] = studentAttendance[s.id] || 'UNMARKED';
         initialRemarks[s.id] = studentRemarks[s.id] || '';
       });
       setStudentAttendance(initial);
@@ -145,7 +145,7 @@ export default function AttendancePage() {
       const initial: Record<string, AttendanceStatus> = {};
       const initialRemarks: Record<string, string> = {};
       staffList.forEach((st: any) => {
-        initial[st.id] = staffAttendance[st.id] || 'PRESENT';
+        initial[st.id] = staffAttendance[st.id] || 'UNMARKED';
         initialRemarks[st.id] = staffRemarks[st.id] || '';
       });
       setStaffAttendance(initial);
@@ -226,14 +226,16 @@ export default function AttendancePage() {
     const targetMap = isStaff ? staffAttendance : studentAttendance;
     const targetRemarks = isStaff ? staffRemarks : studentRemarks;
 
-    return Object.entries(targetMap).map(([id, status]) => ({
-      studentId: isStaff ? undefined : id,
-      staffId: isStaff ? id : undefined,
-      status,
-      remarks: targetRemarks[id] || (scope === 'subject' ? `Subject: ${selectedSubject || 'General'}` : undefined),
-      termId: selectedTerm || currentTerm?.id,
-      date,
-    }));
+    return Object.entries(targetMap)
+      .filter(([_, status]) => status && status !== 'UNMARKED')
+      .map(([id, status]) => ({
+        studentId: isStaff ? undefined : id,
+        staffId: isStaff ? id : undefined,
+        status: status as any,
+        remarks: targetRemarks[id] || (scope === 'subject' ? `Subject: ${selectedSubject || 'General'}` : undefined),
+        termId: selectedTerm || currentTerm?.id,
+        date,
+      }));
   };
 
   const handleSave = () => {
@@ -243,7 +245,7 @@ export default function AttendancePage() {
     }
     const records = buildRecordsPayload();
     if (!records.length) {
-      toast.error('No attendees on register');
+      toast.error('No attendees have been marked on the register. Mark individual students or click "Mark All Present".');
       return;
     }
     bulkMarkMutation.mutate({ records });

@@ -77,30 +77,27 @@ export default function DashboardPage() {
           subtitle={`${studentStats?.active || 0} active`}
           icon={<GraduationCap size={22} />}
           color="blue"
-          trend={{ value: 8, label: 'this term' }}
         />
         <StatCard
           title="Revenue Collected"
-          value={formatCurrency(financeStats?.totalCollected || 0)}
-          subtitle={`${financeStats?.collectionRate || 0}% collection rate`}
+          value={formatCurrency(Math.max(0, financeStats?.totalCollected || 0))}
+          subtitle={`${Math.min(100, Math.max(0, financeStats?.collectionRate || 0))}% collection rate`}
           icon={<DollarSign size={22} />}
           color="green"
-          trend={{ value: 12, label: 'vs last month' }}
         />
         <StatCard
           title="Outstanding Balance"
-          value={formatCurrency(financeStats?.totalBalance || 0)}
+          value={formatCurrency(Math.max(0, financeStats?.totalBalance || 0))}
           subtitle={`${financeStats?.unpaidCount || 0} unpaid invoices`}
           icon={<AlertCircle size={22} />}
           color="red"
         />
         <StatCard
           title="Monthly Collection"
-          value={formatCurrency(financeStats?.monthlyCollected || 0)}
+          value={formatCurrency(Math.max(0, financeStats?.monthlyCollected || 0))}
           subtitle="This month"
           icon={<TrendingUp size={22} />}
           color="purple"
-          trend={{ value: 5, label: 'vs last month' }}
         />
       </div>
 

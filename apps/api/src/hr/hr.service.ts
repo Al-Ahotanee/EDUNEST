@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 const STAFF_WRITABLE_FIELDS = new Set([
   'staffId', 'firstName', 'lastName', 'gender', 'dateOfBirth', 'phone', 'email',
   'address', 'photo', 'departmentId', 'designation', 'employmentType', 'employmentDate',
-  'salary', 'bankName', 'accountNumber', 'qualification', 'trcnLicense', 'isActive',
+  'salary', 'bankName', 'accountNumber', 'qualification', 'trcnLicense', 'trcnNumber', 'isActive',
 ]);
 
 const LEAVE_WRITABLE_FIELDS = new Set([
@@ -116,6 +116,11 @@ export class HrService {
     }
 
     const cleanData = pickAllowed(data, STAFF_WRITABLE_FIELDS);
+    if (cleanData.trcnNumber && !cleanData.trcnLicense) {
+      cleanData.trcnLicense = cleanData.trcnNumber;
+    }
+    delete cleanData.trcnNumber;
+
     const staff = await this.prisma.staff.create({
       data: {
         ...cleanData,
@@ -125,7 +130,7 @@ export class HrService {
         dateOfBirth: cleanData.dateOfBirth ? new Date(cleanData.dateOfBirth) : null,
         employmentDate: cleanData.employmentDate ? new Date(cleanData.employmentDate) : null,
       } as any,
-      include: { department: true },
+      include: { department: true, documents: true },
     });
     return successResponse(staff, 'Staff created' + (linkedUserId ? ' (linked User account auto-created with default password "password123")' : ''));
   }
@@ -151,7 +156,7 @@ export class HrService {
       this.prisma.staff.findMany({
         where, skip: safeSkip(query), take: safeTake(query),
         orderBy: sortBy ? { [sortBy]: sortOrder || 'asc' } : { createdAt: 'desc' },
-        include: { department: true },
+        include: { department: true, documents: true },
       }),
       this.prisma.staff.count({ where }),
     ]);
@@ -162,7 +167,12 @@ export class HrService {
   async getOneStaff(id: string, schoolId: string) {
     const staff = await this.prisma.staff.findFirst({
       where: { id, schoolId, deletedAt: null },
-      include: { department: true, leaves: { orderBy: { createdAt: 'desc' }, take: 5 }, appraisals: true },
+      include: {
+        department: true,
+        leaves: { orderBy: { createdAt: 'desc' }, take: 5 },
+        appraisals: true,
+        documents: { orderBy: { uploadedAt: 'desc' } },
+      },
     });
     if (!staff) throw new NotFoundException('Staff not found');
     return successResponse(staff);
@@ -171,6 +181,10 @@ export class HrService {
   async updateStaff(id: string, schoolId: string, data: any) {
     await this.getOneStaff(id, schoolId);
     const cleanData = pickAllowed(data, STAFF_WRITABLE_FIELDS);
+    if (cleanData.trcnNumber && !cleanData.trcnLicense) {
+      cleanData.trcnLicense = cleanData.trcnNumber;
+    }
+    delete cleanData.trcnNumber;
     // Never allow staffId or schoolId to change
     delete cleanData.staffId;
     const updated = await this.prisma.staff.update({
@@ -181,7 +195,7 @@ export class HrService {
         dateOfBirth: cleanData.dateOfBirth ? new Date(cleanData.dateOfBirth) : undefined,
         employmentDate: cleanData.employmentDate ? new Date(cleanData.employmentDate) : undefined,
       },
-      include: { department: true },
+      include: { department: true, documents: true },
     });
     return successResponse(updated, 'Staff updated');
   }
@@ -190,6 +204,47 @@ export class HrService {
     await this.getOneStaff(id, schoolId);
     await this.prisma.staff.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
     return successResponse(null, 'Staff removed');
+  }
+
+  // ─── STAFF DOCUMENTS ─────────────────────────────────────────────────────────
+
+  async getStaffDocuments(staffId: string, schoolId: string) {
+    await this.getOneStaff(staffId, schoolId);
+    const docs = await this.prisma.staffDocument.findMany({
+      where: { staffId },
+      orderBy: { uploadedAt: 'desc' },
+    });
+    return successResponse(docs);
+  }
+
+  async addStaffDocument(staffId: string, schoolId: string, data: any) {
+    await this.getOneStaff(staffId, schoolId);
+    if (!data?.title?.trim() || !data?.fileUrl) {
+      throw new BadRequestException('title and fileUrl are required');
+    }
+    const doc = await this.prisma.staffDocument.create({
+      data: {
+        staffId,
+        title: data.title.trim(),
+        category: data.category || 'OTHER',
+        fileUrl: data.fileUrl,
+        mimeType: data.fileType || data.mimeType || null,
+        fileSize: data.fileSize ? Number(data.fileSize) : null,
+      },
+    });
+    return successResponse(doc, 'Staff document uploaded');
+  }
+
+  async deleteStaffDocument(staffId: string, docId: string, schoolId: string) {
+    await this.getOneStaff(staffId, schoolId);
+    const doc = await this.prisma.staffDocument.findFirst({
+      where: { id: docId, staffId },
+    });
+    if (!doc) throw new NotFoundException('Document not found');
+    await this.prisma.staffDocument.delete({
+      where: { id: docId },
+    });
+    return successResponse(null, 'Staff document removed');
   }
 
   // ─── DEPARTMENTS ─────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Headers, Ip, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Headers, Ip, BadRequestException, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SaasService } from './saas.service';
 import { Public } from '../common/decorators/public.decorator';
@@ -48,7 +48,12 @@ export class SaasController {
 
   @Public()
   @Post('webhook/paystack')
-  paystackWebhook(@Body() body: any, @Headers('x-paystack-signature') signature?: string) {
-    return this.saasService.handlePaystackWebhook(body, signature);
+  paystackWebhook(
+    @Body() body: any,
+    @Headers('x-paystack-signature') signature?: string,
+    @Req() req?: any,
+  ) {
+    const rawBody = req?.rawBody;
+    return this.saasService.handlePaystackWebhook(body, signature, rawBody);
   }
 }

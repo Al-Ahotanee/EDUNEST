@@ -300,13 +300,26 @@ export class SchoolWebsiteService {
       orderBy: { createdAt: 'asc' },
     });
 
+    const content = JSON.parse(JSON.stringify(config.publishedContent || DEFAULT_WEBSITE_SECTIONS));
+    if (content?.contact) {
+      if (branding.address && (!content.contact.address || content.contact.address.includes('EduNest Boulevard'))) {
+        content.contact.address = branding.address;
+      }
+      if (branding.phone && (!content.contact.phone || content.contact.phone.includes('EDUNEST'))) {
+        content.contact.phone = branding.phone;
+      }
+      if (branding.email && (!content.contact.email || content.contact.email.includes('edunest.edu.ng'))) {
+        content.contact.email = branding.email;
+      }
+    }
+
     return successResponse({
       id: config.id,
       schoolId: school.id,
       template: config.template,
       isPublished: config.isPublished,
       publishedAt: config.publishedAt,
-      content: config.publishedContent || DEFAULT_WEBSITE_SECTIONS,
+      content,
       metaTitle: config.metaTitle,
       metaDescription: config.metaDescription,
       ogImage: config.ogImage,

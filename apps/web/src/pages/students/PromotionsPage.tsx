@@ -40,6 +40,7 @@ export default function PromotionsPage() {
   const [classFilter, setClassFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [decisionModal, setDecisionModal] = useState<{ student: any; action: PromoStatus } | null>(null);
+  const [selectedTargetClass, setSelectedTargetClass] = useState<string>('');
 
   // Fetch classes (used for filter + promotion target)
   const { data: classesData } = useQuery({
@@ -113,17 +114,17 @@ export default function PromotionsPage() {
 
   const promotionMutation = useMutation({
     mutationFn: async (vars: { studentId: string; action: PromoStatus; targetClassId?: string }) => {
-      return studentsApi.update(vars.studentId, {
-        status: vars.action === 'GRADUATED' ? 'GRADUATED' : 'ACTIVE',
-        promotionStatus: vars.action,
+      return studentsApi.promote(vars.studentId, {
+        action: vars.action,
         targetClassId: vars.targetClassId,
-      } as any);
+      });
     },
     onSuccess: (_d, vars) => {
       const verb = vars.action === 'PROMOTED' ? 'promoted' : vars.action === 'REPEATED' ? 'held back' : 'graduated';
       toast.success(`Student ${verb} successfully`);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       setDecisionModal(null);
+      setSelectedTargetClass('');
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Promotion action failed'),
   });
@@ -270,8 +271,25 @@ export default function PromotionsPage() {
               <div><span className="font-semibold">Avg Score:</span> {decisionModal.student.averageScore || '—'}</div>
               <div><span className="font-semibold">Decision:</span> {decisionModal.action}</div>
             </div>
+            {decisionModal.action === 'PROMOTED' && (
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Target Class (Optional — defaults to next academic level)
+                </label>
+                <select
+                  value={selectedTargetClass}
+                  onChange={(e) => setSelectedTargetClass(e.target.value)}
+                  className="input w-full py-2 text-sm"
+                >
+                  <option value="">Auto-select Next Class</option>
+                  {classes.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setDecisionModal(null)}>Cancel</Button>
+              <Button variant="secondary" onClick={() => { setDecisionModal(null); setSelectedTargetClass(''); }}>Cancel</Button>
               <Button
                 variant={decisionModal.action === 'PROMOTED' ? 'primary' : decisionModal.action === 'GRADUATED' ? 'primary' : 'danger'}
                 icon={
@@ -283,6 +301,7 @@ export default function PromotionsPage() {
                 onClick={() => promotionMutation.mutate({
                   studentId: decisionModal.student.id,
                   action: decisionModal.action,
+                  targetClassId: selectedTargetClass || undefined,
                 })}
               >
                 Confirm {decisionModal.action.charAt(0) + decisionModal.action.slice(1).toLowerCase()}

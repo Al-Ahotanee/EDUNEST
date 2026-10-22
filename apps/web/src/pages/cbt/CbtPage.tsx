@@ -71,6 +71,10 @@ export default function CbtPage() {
   };
 
   const submitQ = (d: any) => {
+    if (!d.subjectId) {
+      toast.error('Please select a subject for this question');
+      return;
+    }
     const payload: any = { ...d, marks: Number(d.marks) };
     if (d.type === 'MULTIPLE_CHOICE') payload.options = JSON.stringify(d.options);
     else delete payload.options;

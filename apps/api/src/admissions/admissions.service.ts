@@ -187,15 +187,25 @@ export class AdmissionsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Validate classId if provided in the approval request
-    const targetClassId = body?.classId || admission.applyingForClass;
-    if (targetClassId) {
-      const cls = await this.prisma.class.findFirst({ where: { id: targetClassId, schoolId } });
-      if (!cls) {
-        // Don't fail the approval — just skip enrollment, flag for manual placement
-        console.warn(`Class ${targetClassId} not found for student ${admissionNumber}. Student will need manual class placement.`);
+    // Resolve classId (handling UUID or Class Name e.g. "JSS 1")
+    const rawClass = body?.classId || admission.applyingForClass;
+    let targetClass: any = null;
+    if (rawClass) {
+      targetClass = await this.prisma.class.findFirst({
+        where: {
+          schoolId,
+          OR: [{ id: rawClass }, { name: rawClass }],
+        },
+      });
+      if (!targetClass) {
+        const allClasses = await this.prisma.class.findMany({ where: { schoolId } });
+        const cleanRaw = rawClass.toLowerCase().replace(/\s+/g, '');
+        targetClass = allClasses.find(
+          c => c.name.toLowerCase().replace(/\s+/g, '') === cleanRaw
+        ) || null;
       }
     }
+    const targetClassId = targetClass?.id || null;
 
     // Transactional: create student + guardian + class enrollment
     const student = await this.prisma.$transaction(async (tx) => {
@@ -227,7 +237,7 @@ export class AdmissionsService {
         include: { guardians: true },
       });
 
-      // Auto-enroll in class if classId is available
+      // Auto-enroll in class if resolved
       if (targetClassId && currentSession) {
         try {
           await tx.classEnrollment.create({
@@ -238,8 +248,7 @@ export class AdmissionsService {
             },
           });
         } catch (e) {
-          // Class enrollment failed — student is still created, just without class
-          console.warn(`Failed to enroll student ${admissionNumber} in class ${targetClassId}: ${e}`);
+          console.warn(`Failed to enroll student ${admissionNumber} in class ${targetClassId}:`, e);
         }
       }
 
@@ -252,11 +261,54 @@ export class AdmissionsService {
       data: { status: 'APPROVED', stage: 'APPROVED', studentId: student.id, admittedAt: new Date() },
     });
 
-    // ─── Phase 2+3: Auto-link parent user to student for parent portal ────────
+    // ─── Auto-link or auto-create parent user for parent portal (R3-N20) ───────
     if (admission.email) {
-      const parentUser = await this.prisma.user.findFirst({
-        where: { email: admission.email, schoolId },
+      const parentEmail = admission.email.toLowerCase().trim();
+      let parentUser = await this.prisma.user.findFirst({
+        where: { email: parentEmail },
       });
+
+      if (!parentUser) {
+        const schoolObj = await this.prisma.school.findUnique({
+          where: { id: schoolId },
+          select: { tenantId: true },
+        });
+
+        if (schoolObj?.tenantId) {
+          let parentRole = await this.prisma.role.findFirst({
+            where: { tenantId: schoolObj.tenantId, name: 'Parent' },
+          });
+
+          if (!parentRole) {
+            parentRole = await this.prisma.role.create({
+              data: {
+                tenantId: schoolObj.tenantId,
+                name: 'Parent',
+                description: 'Parent / Guardian portal access',
+              },
+            });
+          }
+
+          const defaultPassword = await bcrypt.hash('parent123', 12);
+          const nameParts = (admission.parentName || 'Parent Guardian').trim().split(' ');
+          parentUser = await this.prisma.user.create({
+            data: {
+              tenantId: schoolObj.tenantId,
+              schoolId,
+              email: parentEmail,
+              password: defaultPassword,
+              firstName: nameParts[0] || 'Parent',
+              lastName: nameParts.slice(1).join(' ') || 'Guardian',
+              phone: admission.parentPhone || null,
+              isActive: true,
+              userRoles: {
+                create: { roleId: parentRole.id },
+              },
+            },
+          });
+        }
+      }
+
       if (parentUser) {
         await this.prisma.parentStudentLink.upsert({
           where: { userId_studentId: { userId: parentUser.id, studentId: student.id } },
@@ -268,6 +320,7 @@ export class AdmissionsService {
 
     // ─── Auto-generate initial invoice from published class fee schedule ───
     let initialInvoice: any = null;
+    let invoiceWarning: string | null = null;
     if (targetClassId) {
       try {
         const invRes = await this.financeService.generateInvoiceForStudent(student.id, schoolId, {
@@ -279,7 +332,20 @@ export class AdmissionsService {
         initialInvoice = invRes.data || invRes;
       } catch (err: any) {
         console.warn(`Initial invoice auto-generation skipped for student ${student.admissionNumber}:`, err?.message || err);
+        invoiceWarning = err?.message;
       }
+    }
+
+    const details: string[] = ['Application approved', 'Student record created'];
+    if (targetClass) {
+      details.push(`enrolled in ${targetClass.name}`);
+    } else {
+      details.push('pending manual class placement');
+    }
+    if (initialInvoice) {
+      details.push('initial invoice generated');
+    } else if (invoiceWarning) {
+      details.push(`invoice pending (${invoiceWarning})`);
     }
 
     return successResponse(
@@ -288,7 +354,7 @@ export class AdmissionsService {
         student,
         invoice: initialInvoice,
       },
-      'Application approved! Student record created, enrolled in class, and initial invoice generated.'
+      details.join(', ') + '.'
     );
   }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Patch, Delete } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { FinanceService } from './finance.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -81,6 +81,20 @@ export class FinanceController {
   @ApiOperation({ summary: 'Publish a fee structure — makes it visible to parents' })
   publishFeeStructure(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.publishFeeStructure(id, schoolId);
+  }
+
+  @Patch('fee-structures/:id/unpublish')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
+  @ApiOperation({ summary: 'Unpublish a fee structure — reverts to draft' })
+  unpublishFeeStructure(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.financeService.unpublishFeeStructure(id, schoolId);
+  }
+
+  @Delete('fee-structures/:id')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
+  @ApiOperation({ summary: 'Delete a fee structure' })
+  deleteFeeStructure(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.financeService.deleteFeeStructure(id, schoolId);
   }
 
   @Get('fee-structures/by-class/:classId')

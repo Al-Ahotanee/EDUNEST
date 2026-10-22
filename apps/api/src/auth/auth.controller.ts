@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Req, UseGuards, Patch } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -12,12 +13,14 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post('login')
   login(@Body() body: any, @Req() req: Request) {
     return this.authService.login(body, req.ip, req.headers['user-agent']);
   }
 
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post('register')
   register(@Body() body: any) {
     return this.authService.register(body);
@@ -30,6 +33,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request a password reset link (always returns success to prevent email enumeration)' })
   forgotPassword(@Body() body: { email: string }) {
@@ -37,6 +41,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password using a token from /auth/forgot-password' })
   resetPassword(@Body() body: { token: string; newPassword: string }) {

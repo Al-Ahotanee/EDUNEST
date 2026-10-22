@@ -22,10 +22,23 @@ export default function LoginPage() {
   const detectSubdomain = () => {
     if (typeof window === 'undefined') return '';
     const host = window.location.hostname.toLowerCase();
+    // Exclude cloud hosting domains, IP addresses, and reserved hostnames
+    if (
+      host.endsWith('.onrender.com') ||
+      host.endsWith('.vercel.app') ||
+      host.endsWith('.netlify.app') ||
+      host.endsWith('.railway.app') ||
+      host.endsWith('.pages.dev') ||
+      host.endsWith('.herokuapp.com') ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
+    ) {
+      return '';
+    }
     const parts = host.split('.');
     if (parts.length >= 2) {
       const firstPart = parts[0];
-      if (!['www', 'api', 'app', 'localhost', '127.0.0.1'].includes(firstPart)) {
+      if (!['www', 'api', 'app', 'localhost', '127.0.0.1', 'admin'].includes(firstPart)) {
         if (host.includes('localhost') && parts.length === 2) return firstPart;
         if (parts.length >= 3) return firstPart;
       }
@@ -79,7 +92,7 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', {
         ...form,
-        ...(activeSlug && { tenantSlug: activeSlug }),
+        ...(hasSchoolBranding && school?.slug ? { tenantSlug: school.slug } : {}),
       });
       const { user, accessToken, refreshToken } = res.data;
       setAuth(user, accessToken, refreshToken);
@@ -162,13 +175,6 @@ export default function LoginPage() {
           <span className="font-bold text-slate-900 text-sm">{schoolName}</span>
         </Link>
         <div className="flex items-center gap-3 text-xs">
-          {!hasSchoolBranding && (
-            <button type="button" onClick={() => setShowApiModal(true)} className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[11px] transition-colors">
-              <Server size={12} className="text-slate-500" />
-              <span className="max-w-[130px] truncate">{apiEndpoint}</span>
-              <Settings size={11} className="text-slate-400" />
-            </button>
-          )}
           <Link to="/saas/register" className="font-semibold text-slate-900 hover:text-blue-600 transition-colors">
             Register Institution
           </Link>

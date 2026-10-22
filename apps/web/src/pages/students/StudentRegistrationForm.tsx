@@ -103,10 +103,13 @@ export default function StudentRegistrationForm({ onBack, onSuccess, initialData
   const immunizationInputRef = useRef<HTMLInputElement>(null);
   const reportCardInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-populate admission number when generated
+  // Auto-populate admission number when generated (R3-N05)
   useEffect(() => {
-    if (admNoData?.admissionNumber && !form.admissionNumber && !initialData) {
-      setForm((f) => ({ ...f, admissionNumber: admNoData.admissionNumber }));
+    const raw = typeof admNoData === 'string'
+      ? admNoData
+      : admNoData?.admissionNumber || admNoData?.data?.admissionNumber || admNoData?.data;
+    if (raw && typeof raw === 'string' && !form.admissionNumber && !initialData) {
+      setForm((f) => ({ ...f, admissionNumber: raw }));
     }
   }, [admNoData, initialData]);
 

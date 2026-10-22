@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ParentService } from './parent.service';
 import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -11,6 +12,7 @@ export class ParentController {
   constructor(private service: ParentService) {}
 
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post('auth/login')
   login(@Body() body: { email: string; password: string; tenantSlug?: string }) {
     return this.service.login(body.email, body.password, body.tenantSlug);

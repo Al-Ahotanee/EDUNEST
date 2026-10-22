@@ -835,7 +835,10 @@ export default function TimetablePage() {
       refetchClassTimetable();
       refetchSchoolTimetable();
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to save slot')
+    onError: (e: any) => {
+      toast.error(e.response?.data?.message || 'Failed to save slot');
+      saveSlotMutation.reset();
+    }
   });
 
   const clearSlotMutation = useMutation({
@@ -1175,6 +1178,7 @@ export default function TimetablePage() {
       periodKey: `${period.start}-${period.end}`,
     });
 
+    saveSlotMutation.reset();
     setSlotEditModal(true);
   };
 
@@ -3105,7 +3109,7 @@ export default function TimetablePage() {
         <Modal
           title={`Assign Timetable Period — ${activeSlotTarget.dayName} (${activeSlotTarget.startTime} - ${activeSlotTarget.endTime})`}
           open={slotEditModal}
-          onClose={() => setSlotEditModal(false)}
+          onClose={() => { saveSlotMutation.reset(); setSlotEditModal(false); }}
           className="max-w-md"
         >
           <form
@@ -3220,7 +3224,7 @@ export default function TimetablePage() {
               ) : <div />}
 
               <div className="flex items-center gap-2">
-                <Button variant="secondary" onClick={() => setSlotEditModal(false)}>
+                <Button variant="secondary" onClick={() => { saveSlotMutation.reset(); setSlotEditModal(false); }}>
                   Cancel
                 </Button>
                 <Button

@@ -44,9 +44,23 @@ interface ReceiptViewerProps {
  */
 export function ReceiptViewer({ receipt, open, onClose }: ReceiptViewerProps) {
   const { user } = useAuthStore();
-  const schoolName = user?.tenant?.name || user?.school?.name || 'School';
-  const schoolLogo = user?.tenant?.logo || user?.school?.logo;
-  const primaryColor = user?.tenant?.primaryColor || '#1a56db';
+  const schoolName =
+    receipt?.schoolName ||
+    receipt?.school?.name ||
+    receipt?.school?.tenant?.name ||
+    user?.tenant?.name ||
+    user?.school?.name ||
+    'School';
+  const schoolLogo =
+    receipt?.schoolLogo ||
+    receipt?.school?.logo ||
+    receipt?.school?.tenant?.logo ||
+    user?.tenant?.logo ||
+    user?.school?.logo;
+  const primaryColor =
+    receipt?.school?.tenant?.primaryColor ||
+    user?.tenant?.primaryColor ||
+    '#1a56db';
 
   if (!receipt) return null;
 

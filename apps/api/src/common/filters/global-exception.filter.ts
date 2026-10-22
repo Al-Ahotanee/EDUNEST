@@ -38,6 +38,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       } else if (exception.code === 'P2025') {
         status = HttpStatus.NOT_FOUND;
         message = 'Record not found';
+      } else if (exception.code === 'P2003') {
+        status = HttpStatus.BAD_REQUEST;
+        message = 'Referenced entity does not exist or has an invalid relationship';
       } else {
         message = `Database operation failed: ${exception.code} - ${exception.message}`;
       }

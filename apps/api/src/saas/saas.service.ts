@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
@@ -241,14 +241,22 @@ export class SaasService {
     return successResponse({ applicationNo: admission.applicationNo, id: admission.id }, 'Application submitted successfully');
   }
 
-  async handlePaystackWebhook(payload: any, signature?: string) {
+  async handlePaystackWebhook(payload: any, signature?: string, rawBody?: Buffer | string) {
     const secret = process.env.PAYSTACK_SECRET_KEY;
-    if (secret && signature) {
-      const crypto = await import('crypto');
-      const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(payload)).digest('hex');
-      if (hash !== signature) {
-        throw new BadRequestException('Invalid webhook signature');
-      }
+    if (!signature) {
+      throw new UnauthorizedException('Missing x-paystack-signature header');
+    }
+    if (!secret) {
+      throw new UnauthorizedException('Paystack secret key is not configured on server');
+    }
+
+    const crypto = await import('crypto');
+    const contentToHash = rawBody
+      ? (Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody))
+      : Buffer.from(JSON.stringify(payload));
+    const hash = crypto.createHmac('sha512', secret).update(contentToHash).digest('hex');
+    if (hash !== signature) {
+      throw new UnauthorizedException('Invalid webhook signature');
     }
 
     const event = payload?.event;

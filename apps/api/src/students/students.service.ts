@@ -492,16 +492,40 @@ export class StudentsService {
       return successResponse(updated, 'Student graduated successfully');
     }
 
-    if (data.action === 'PROMOTED' && data.targetClassId) {
+    if (data.action === 'PROMOTED') {
+      let targetClassId = data.targetClassId;
+      const currentEnrollment = student.data?.classEnrollments?.[0];
+
+      if (!targetClassId && currentEnrollment?.class) {
+        const currentLevel = currentEnrollment.class.level;
+        const nextClass = await this.prisma.class.findFirst({
+          where: { schoolId, level: { gt: currentLevel } },
+          orderBy: { level: 'asc' },
+        });
+        if (nextClass) {
+          targetClassId = nextClass.id;
+        } else {
+          // If no higher class, student has reached completion
+          const updated = await this.prisma.student.update({
+            where: { id: studentId },
+            data: { status: 'GRADUATED' },
+          });
+          return successResponse(updated, 'Student reached final grade level and graduated successfully');
+        }
+      }
+
+      if (!targetClassId) {
+        throw new BadRequestException('Target class must be specified to promote student');
+      }
+
       // Verify target class belongs to same school
       const targetClass = await this.prisma.class.findFirst({
-        where: { id: data.targetClassId, schoolId },
+        where: { id: targetClassId, schoolId },
       });
       if (!targetClass) {
         throw new NotFoundException('Target class not found in this school');
       }
       // Close current enrollment and create new one for target class
-      const currentEnrollment = student.data?.classEnrollments?.[0];
       if (currentEnrollment) {
         await this.prisma.classEnrollment.update({
           where: { id: currentEnrollment.id },
@@ -509,6 +533,8 @@ export class StudentsService {
         });
       }
       const latestSession = await this.prisma.academicSession.findFirst({
+        where: { schoolId, isCurrent: true },
+      }) || await this.prisma.academicSession.findFirst({
         where: { schoolId },
         orderBy: { createdAt: 'desc' },
       });
@@ -519,16 +545,20 @@ export class StudentsService {
       const enrollment = await this.prisma.classEnrollment.create({
         data: {
           studentId,
-          classId: data.targetClassId,
+          classId: targetClassId,
           sessionId,
         },
         include: { class: true },
       });
-      return successResponse(enrollment, 'Student promoted to next class');
+      await this.prisma.student.update({
+        where: { id: studentId },
+        data: { status: 'ACTIVE' },
+      });
+      return successResponse(enrollment, `Student promoted to ${targetClass.name}`);
     }
 
     if (data.action === 'REPEATED') {
-      return successResponse(student.data, 'Student held back in current class');
+      return successResponse(student.data, 'Student retained in current class');
     }
 
     return successResponse(student.data, 'No action taken');

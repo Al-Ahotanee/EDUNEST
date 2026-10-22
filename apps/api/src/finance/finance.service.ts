@@ -34,6 +34,14 @@ export class FinanceService {
   }
 
   async createFeeStructure(data: any, schoolId: string) {
+    if (!data?.name?.trim()) {
+      throw new BadRequestException('Fee structure name is required');
+    }
+    const amount = Number(data.amount);
+    if (isNaN(amount) || amount <= 0) {
+      throw new BadRequestException('Fee amount must be a positive number greater than 0');
+    }
+
     // Validate classId if provided
     if (data.classId) {
       const cls = await this.prisma.class.findFirst({ where: { id: data.classId, schoolId } });
@@ -42,8 +50,8 @@ export class FinanceService {
 
     const fee = await this.prisma.feeStructure.create({
       data: {
-        name: data.name,
-        amount: Number(data.amount) || 0,
+        name: data.name.trim(),
+        amount,
         description: data.description || null,
         termBased: data.termBased !== undefined ? Boolean(data.termBased) : true,
         schoolId,
@@ -110,7 +118,8 @@ export class FinanceService {
 
     // Save or update each item
     for (const item of (data.items || [])) {
-      if (!item.name || Number(item.amount) < 0) continue;
+      const amt = Number(item.amount);
+      if (!item.name?.trim() || isNaN(amt) || amt <= 0) continue;
 
       if (item.id) {
         // Update existing item
@@ -221,6 +230,24 @@ export class FinanceService {
       include: { class: { select: { id: true, name: true } } },
     });
     return successResponse(updated, 'Fee structure published — now visible to parents');
+  }
+
+  async unpublishFeeStructure(id: string, schoolId: string) {
+    const existing = await this.prisma.feeStructure.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Fee structure not found');
+    const updated = await this.prisma.feeStructure.update({
+      where: { id },
+      data: { status: 'DRAFT' },
+      include: { class: { select: { id: true, name: true } } },
+    });
+    return successResponse(updated, 'Fee structure unpublished');
+  }
+
+  async deleteFeeStructure(id: string, schoolId: string) {
+    const existing = await this.prisma.feeStructure.findFirst({ where: { id, schoolId } });
+    if (!existing) throw new NotFoundException('Fee structure not found');
+    await this.prisma.feeStructure.delete({ where: { id } });
+    return successResponse(null, 'Fee structure deleted');
   }
 
   async getFeeStructuresByClass(classId: string, schoolId: string) {
@@ -870,7 +897,15 @@ export class FinanceService {
       this.prisma.invoice.count({ where }),
     ]);
 
-    return paginate(data, total, query);
+    const mappedData = data.map((inv) => ({
+      ...inv,
+      items: (inv.items || []).map((item) => ({
+        ...item,
+        name: item.description || 'Fee Item',
+      })),
+    }));
+
+    return paginate(mappedData, total, query);
   }
 
   async getInvoice(id: string, schoolId: string) {
@@ -883,7 +918,16 @@ export class FinanceService {
       },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    return successResponse(invoice);
+
+    const mappedInvoice = {
+      ...invoice,
+      items: (invoice.items || []).map((item) => ({
+        ...item,
+        name: item.feeStructure?.name || item.description || 'Fee Item',
+      })),
+    };
+
+    return successResponse(mappedInvoice);
   }
 
   async recordPayment(invoiceId: string, data: any, schoolId: string) {
@@ -986,14 +1030,16 @@ export class FinanceService {
       }),
     ]);
 
-    const collectionRate = totalInvoiced._sum.total
-      ? ((totalCollected._sum.amountPaid || 0) / totalInvoiced._sum.total) * 100
-      : 0;
+    const totalInvoicedAmt = Math.max(0, totalInvoiced._sum.total || 0);
+    const totalCollectedAmt = Math.max(0, totalCollected._sum.amountPaid || 0);
+    const totalBalance = Math.max(0, totalInvoicedAmt - totalCollectedAmt);
+    const rawRate = totalInvoicedAmt > 0 ? (totalCollectedAmt / totalInvoicedAmt) * 100 : 0;
+    const collectionRate = Math.min(100, Math.max(0, rawRate));
 
     return successResponse({
-      totalInvoiced: totalInvoiced._sum.total || 0,
-      totalCollected: totalCollected._sum.amountPaid || 0,
-      totalBalance: (totalInvoiced._sum.total || 0) - (totalCollected._sum.amountPaid || 0),
+      totalInvoiced: totalInvoicedAmt,
+      totalCollected: totalCollectedAmt,
+      totalBalance,
       monthlyCollected: monthlyCollected._sum.amount || 0,
       yearlyCollected: yearlyCollected._sum.amount || 0,
       collectionRate: Math.round(collectionRate * 100) / 100,

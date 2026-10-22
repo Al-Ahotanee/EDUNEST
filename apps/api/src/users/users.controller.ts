@@ -2,12 +2,15 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } fro
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('Super Admin', 'Admin')
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
@@ -35,8 +38,9 @@ export class UsersController {
     @Body() body: any,
     @CurrentUser('schoolId') schoolId: string,
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser() caller: any,
   ) {
-    return this.usersService.createUser(body, schoolId, tenantId);
+    return this.usersService.createUser(body, schoolId, tenantId, caller);
   }
 
   @Put(':id')
@@ -44,12 +48,17 @@ export class UsersController {
     @Param('id') id: string,
     @CurrentUser('schoolId') schoolId: string,
     @Body() body: any,
+    @CurrentUser() caller: any,
   ) {
-    return this.usersService.updateUser(id, schoolId, body);
+    return this.usersService.updateUser(id, schoolId, body, caller);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
-    return this.usersService.deleteUser(id, schoolId);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser('schoolId') schoolId: string,
+    @CurrentUser() caller: any,
+  ) {
+    return this.usersService.deleteUser(id, schoolId, caller);
   }
 }

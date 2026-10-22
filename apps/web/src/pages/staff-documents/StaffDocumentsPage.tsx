@@ -68,31 +68,14 @@ export default function StaffDocumentsPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Upload document metadata + file to staff profile
-      // Since there's no dedicated documents table, we store the document info as part of staff update
       const staffId = data.staffId;
-      const docEntry = {
-        id: `doc-${Date.now()}`,
-        category: data.category,
+      const fileUrl = filePreview?.data || 'data:application/pdf;base64,placeholder';
+      return hrApi.addDocument(staffId, {
         title: data.title,
-        referenceNumber: data.referenceNumber,
-        issueDate: data.issueDate,
-        expiryDate: data.expiryDate,
-        fileName: filePreview?.name,
-        fileType: filePreview?.type,
-        fileSize: filePreview?.size,
-        fileData: filePreview?.data,
-        uploadedAt: new Date().toISOString(),
-      };
-      
-      // Get current staff record
-      const staffRes = await hrApi.get(staffId);
-      const staff = staffRes.data?.data || staffRes.data;
-      const existingDocs = staff.documents ? (typeof staff.documents === 'string' ? JSON.parse(staff.documents) : staff.documents) : [];
-      existingDocs.push(docEntry);
-      
-      // Update staff with new documents array
-      return hrApi.update(staffId, { documents: JSON.stringify(existingDocs) });
+        fileUrl,
+        fileType: filePreview?.type || 'application/pdf',
+        fileSize: filePreview?.size || 0,
+      });
     },
     onSuccess: () => {
       toast.success('Document uploaded successfully!');
@@ -101,30 +84,31 @@ export default function StaffDocumentsPage() {
       uploadForm.reset();
       setFilePreview(null);
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to upload'),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to upload document'),
   });
 
   const deleteDocMutation = useMutation({
     mutationFn: async ({ staffId, docId }: { staffId: string; docId: string }) => {
-      const staffRes = await hrApi.get(staffId);
-      const staff = staffRes.data?.data || staffRes.data;
-      let docs = staff.documents ? (typeof staff.documents === 'string' ? JSON.parse(staff.documents) : staff.documents) : [];
-      docs = docs.filter((d: any) => d.id !== docId);
-      return hrApi.update(staffId, { documents: JSON.stringify(docs) });
+      return hrApi.deleteDocument(staffId, docId);
     },
     onSuccess: () => {
       toast.success('Document removed');
       queryClient.invalidateQueries({ queryKey: ['staff-for-docs'] });
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to delete document'),
   });
 
   // Flatten all documents from all staff for the table
   const allDocuments: any[] = [];
   (staffData?.data || []).forEach((staff: any) => {
-    const docs = staff.documents ? (typeof staff.documents === 'string' ? JSON.parse(staff.documents) : staff.documents) : [];
+    const docs = Array.isArray(staff.documents) ? staff.documents : [];
     docs.forEach((doc: any) => {
-      allDocuments.push({ ...doc, staffName: `${staff.firstName} ${staff.lastName}`, staffId: staff.id, staffIdNumber: staff.staffId });
+      allDocuments.push({
+        ...doc,
+        staffName: `${staff.firstName} ${staff.lastName}`,
+        staffId: staff.id,
+        staffIdNumber: staff.staffId,
+      });
     });
   });
 

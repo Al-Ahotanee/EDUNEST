@@ -5,13 +5,9 @@ import * as express from 'express';
 import * as fs from 'fs';
 import { join } from 'path';
 
-// Resilient Cloud MySQL connection URL fallback for Aiven (Base64 protected against push scanner)
-const AIVEN_FALLBACK_PASS = Buffer.from('QVZOU19SVDVHLVBNM2VMRFlTcEN4c1ZR', 'base64').toString('utf8');
-const DEFAULT_DATABASE_URL = `mysql://avnadmin:${AIVEN_FALLBACK_PASS}@edunest-sgwazeer2023-fa75.b.aivencloud.com:20371/defaultdb?ssl-mode=REQUIRED`;
-
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = DEFAULT_DATABASE_URL;
-  console.log('ℹ️ DATABASE_URL not set in environment; defaulted to Aiven Cloud MySQL');
+  console.error('❌ FATAL: DATABASE_URL environment variable is not defined.');
+  process.exit(1);
 }
 
 import { AppModule } from './app.module';
@@ -20,8 +16,15 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Increase payload limit for base64 image/document uploads
-  app.use(express.json({ limit: '50mb' }));
+  // Increase payload limit and preserve rawBody for webhook HMAC verification
+  app.use(
+    express.json({
+      limit: '50mb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Global prefix
@@ -55,8 +58,11 @@ async function bootstrap() {
         /^https?:\/\/localhost(:\d+)?$/.test(requestOrigin) ||
         /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(requestOrigin);
 
-      // Reflect origin so preflight and credentials pass flawlessly
-      return callback(null, true);
+      if (isKnown) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin '${requestOrigin}' not allowed by CORS`));
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],

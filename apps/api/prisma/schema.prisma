@@ -1172,6 +1172,8 @@ model Staff {
   salary         Float?
   bankName       String?
   accountNumber  String?
+  qualification  String?
+  trcnLicense    String?
   isActive       Boolean        @default(true)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -1185,9 +1187,25 @@ model Staff {
   timetableSlots     TimetableSlot[]
   reliefAsAbsent     ReliefAssignment[] @relation("AbsentStaffRelief")
   reliefAsSubstitute ReliefAssignment[] @relation("ReliefStaffRelief")
+  documents          StaffDocument[]
 
   @@unique([schoolId, staffId])
   @@index([schoolId])
+}
+
+model StaffDocument {
+  id         String   @id @default(uuid())
+  staffId    String
+  title      String
+  category   String   @default("OTHER")
+  fileUrl    String   @db.LongText
+  fileSize   Int?
+  mimeType   String?
+  uploadedAt DateTime @default(now())
+
+  staff      Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
 }
 
 model Leave {

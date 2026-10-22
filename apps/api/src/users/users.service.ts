@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { successResponse, paginate, PaginationDto, safeSkip, safeTake } from '../common/dto/pagination.dto';
@@ -90,11 +90,28 @@ export class UsersService {
     });
   }
 
-  async createUser(data: any, schoolId: string, tenantId: string) {
+  async createUser(data: any, schoolId: string, tenantId: string, caller?: any) {
     const { email, password, firstName, lastName, phone, roleIds = [] } = data;
 
     if (!email || !password || !firstName || !lastName) {
       throw new BadRequestException('Email, password, first name, and last name are required');
+    }
+
+    // Role privilege escalation guard (R3-N08):
+    if (roleIds.length > 0) {
+      const rolesToAssign = await this.prisma.role.findMany({
+        where: { id: { in: roleIds } },
+        select: { id: true, name: true },
+      });
+      const hasSuperAdminRole = rolesToAssign.some(r => r.name === 'Super Admin');
+      const hasAdminRole = rolesToAssign.some(r => r.name === 'Admin' || r.name === 'School Admin');
+
+      if (hasSuperAdminRole && !caller?.isSuperAdmin) {
+        throw new ForbiddenException('Only a Super Admin can assign the Super Admin role');
+      }
+      if (hasAdminRole && !caller?.isSuperAdmin && !caller?.roles?.some((r: any) => r.name === 'Super Admin' || r.name === 'Admin')) {
+        throw new ForbiddenException('Only Administrators can assign Admin roles');
+      }
     }
 
     const existing = await this.prisma.user.findFirst({ where: { email } });
@@ -140,11 +157,24 @@ export class UsersService {
     }, 'User created successfully');
   }
 
-  async updateUser(id: string, schoolId: string, data: any) {
+  async updateUser(id: string, schoolId: string, data: any, caller?: any) {
     const existing = await this.prisma.user.findFirst({ where: { id, schoolId } });
     if (!existing) throw new NotFoundException('User not found');
 
     const { firstName, lastName, phone, isActive, password, roleIds } = data;
+
+    if (roleIds && caller && !caller.isSuperAdmin) {
+      const callerRoles = (caller.roles || []).map((r: string) => r.toLowerCase());
+      const isCallerSuper = callerRoles.includes('super admin');
+      if (!isCallerSuper) {
+        const adminRoles = await this.prisma.role.findMany({
+          where: { id: { in: roleIds }, name: { in: ['Super Admin', 'Admin'] } },
+        });
+        if (adminRoles.length > 0) {
+          throw new BadRequestException('Only Super Admin can assign administrative roles');
+        }
+      }
+    }
 
     let hashedPassword: string | undefined;
     if (password) {
@@ -182,9 +212,24 @@ export class UsersService {
     return successResponse(updated, 'User updated successfully');
   }
 
-  async deleteUser(id: string, schoolId: string) {
-    const existing = await this.prisma.user.findFirst({ where: { id, schoolId } });
+  async deleteUser(id: string, schoolId: string, caller?: any) {
+    const existing = await this.prisma.user.findFirst({
+      where: { id, schoolId },
+      include: { userRoles: { include: { role: true } } },
+    });
     if (!existing) throw new NotFoundException('User not found');
+
+    if (caller && caller.id === id) {
+      throw new BadRequestException('You cannot deactivate your own account');
+    }
+
+    const targetIsAdmin =
+      existing.isSuperAdmin ||
+      existing.userRoles?.some((ur: any) => ur.role.name === 'Super Admin' || ur.role.name === 'Admin');
+
+    if (targetIsAdmin && !caller?.isSuperAdmin) {
+      throw new ForbiddenException('Only a Super Admin can deactivate an administrative account');
+    }
 
     await this.prisma.user.update({
       where: { id },

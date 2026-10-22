@@ -139,7 +139,10 @@ export class FinancialWorkflowController {
         OR: [{ id }, { receiptNo: id }, { paymentId: id }],
         ...(schoolId ? { schoolId } : {}),
       },
-      include: { payment: { include: { invoice: { include: { student: true } } } } },
+      include: {
+        school: { include: { tenant: true } },
+        payment: { include: { invoice: { include: { student: true } } } },
+      },
     });
     if (!receipt) return { data: null, message: 'Receipt not found' };
     return { data: receipt };

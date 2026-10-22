@@ -60,28 +60,73 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response interceptor - handle 401 / refresh
+// Response interceptor - handle 401 / queue-based refresh (R3-N16)
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token!);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    const isAuthRoute =
+      original?.url?.includes('/auth/login') ||
+      original?.url?.includes('/auth/register') ||
+      original?.url?.includes('/auth/refresh') ||
+      original?.url?.includes('/parent/auth/login');
+
+    if (error.response?.status === 401 && !original._retry && !isAuthRoute) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            original.headers.Authorization = `Bearer ${token}`;
+            return api(original);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
       original._retry = true;
+      isRefreshing = true;
       const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
-          localStorage.setItem('accessToken', data.accessToken);
-          localStorage.setItem('refreshToken', data.refreshToken);
-          original.headers.Authorization = `Bearer ${data.accessToken}`;
-          return api(original);
-        } catch {
-          localStorage.clear();
-          window.location.href = '/login';
-        }
-      } else {
+
+      if (!refreshToken) {
+        isRefreshing = false;
         localStorage.clear();
         window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      try {
+        const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
+        const newAccessToken = data.accessToken;
+        const newRefreshToken = data.refreshToken;
+        localStorage.setItem('accessToken', newAccessToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
+        original.headers.Authorization = `Bearer ${newAccessToken}`;
+        processQueue(null, newAccessToken);
+        return api(original);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+        localStorage.clear();
+        window.location.href = '/login';
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
     return Promise.reject(error);
@@ -138,6 +183,8 @@ export const financeApi = {
   getClassFeeSchedulePreview: (classId: string, params?: any) => api.get(`/finance/fee-structures/class/${classId}/preview`, { params }),
   createFeeStructure: (data: any) => api.post('/finance/fee-structures', data),
   publishFeeStructure: (id: string) => api.patch(`/finance/fee-structures/${id}/publish`),
+  unpublishFeeStructure: (id: string) => api.patch(`/finance/fee-structures/${id}/unpublish`),
+  deleteFeeStructure: (id: string) => api.delete(`/finance/fee-structures/${id}`),
   getFeeStructuresByClass: (classId: string) => api.get(`/finance/fee-structures/by-class/${classId}`),
   generateInvoicesFromClass: (classId: string, data?: any) => api.post(`/finance/fee-structures/generate-invoices/${classId}`, data),
   getPublicFeeSchedules: (idOrSlug: string) => api.get(`/schools/${idOrSlug}/fee-schedules`),
@@ -254,6 +301,9 @@ export const hrApi = {
   delete: (id: string) => api.delete(`/hr/staff/${id}`),
   departments: () => api.get('/hr/departments'),
   createDepartment: (data: any) => api.post('/hr/departments', data),
+  getDocuments: (staffId: string) => api.get(`/hr/staff/${staffId}/documents`),
+  addDocument: (staffId: string, data: any) => api.post(`/hr/staff/${staffId}/documents`, data),
+  deleteDocument: (staffId: string, docId: string) => api.delete(`/hr/staff/${staffId}/documents/${docId}`),
   leaves: (params?: any) => api.get('/hr/leaves', { params }),
   applyLeave: (data: any) => api.post('/hr/leaves', data),
   approveLeave: (id: string) => api.patch(`/hr/leaves/${id}/approve`),

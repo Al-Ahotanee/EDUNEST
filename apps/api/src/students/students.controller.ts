@@ -4,7 +4,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { CreateStudentDto, UpdateStudentDto, CreateGuardianDto } from './students.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginationDto, successResponse } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -47,22 +47,23 @@ export class StudentsController {
   }
 
   @Get('generate-admission-number')
-  @Roles('Super Admin', 'Admin', 'Teacher', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'Teacher', 'Accountant', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Generate next admission number' })
-  generateAdmissionNumber(@CurrentUser('schoolId') schoolId: string) {
-    return this.studentsService.generateAdmissionNumber(schoolId);
+  async generateAdmissionNumber(@CurrentUser('schoolId') schoolId: string) {
+    const num = await this.studentsService.generateAdmissionNumber(schoolId);
+    return successResponse({ admissionNumber: num }, 'Admission number generated');
   }
 
   // ─── EDN-014 fix: surface unassigned students ──────────────────────────────
   @Get('unassigned')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'List students with no class enrollment in the current session (EDN-014)' })
   listUnassigned(@CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.findUnassigned(schoolId);
   }
 
   @Post('bulk-assign')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Bulk-assign multiple students to a class for the current session (EDN-014)' })
   bulkAssign(
     @CurrentUser('schoolId') schoolId: string,
@@ -78,7 +79,7 @@ export class StudentsController {
   }
 
   @Post(':id/promote')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Promote, hold back, or graduate a student' })
   promote(
     @Param('id') id: string,
@@ -89,7 +90,7 @@ export class StudentsController {
   }
 
   @Put(':id')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Update student' })
   update(
     @Param('id') id: string,
@@ -100,14 +101,14 @@ export class StudentsController {
   }
 
   @Delete(':id')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Remove student' })
   remove(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.studentsService.softDelete(id, schoolId);
   }
 
   @Post(':id/guardians')
-  @Roles('Super Admin')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal')
   @ApiOperation({ summary: 'Add guardian to student' })
   addGuardian(
     @Param('id') studentId: string,

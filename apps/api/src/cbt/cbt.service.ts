@@ -158,6 +158,16 @@ export class CbtService {
   async addQuestion(examId: string, schoolId: string, data: any) {
     await this.verifyExam(examId, schoolId);
 
+    if (!data?.subjectId) {
+      throw new BadRequestException('Subject is required for examination question');
+    }
+    const subject = await this.prisma.subject.findFirst({
+      where: { id: data.subjectId, schoolId },
+    });
+    if (!subject) {
+      throw new BadRequestException('Selected subject does not exist in this school');
+    }
+
     const q = await this.prisma.question.create({
       data: {
         examinationId: examId,

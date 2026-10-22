@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse, PaginationDto, paginate } from '../common/dto/pagination.dto';
 
@@ -69,18 +69,47 @@ export class AcademicService {
   // ─── CLASSES ─────────────────────────────────────────────────────────────────
 
   async createClass(data: any, schoolId: string) {
+    const name = data.name?.trim();
+    if (!name) throw new BadRequestException('Class name is required');
+    const section = data.section?.trim() || null;
+
+    const existing = await this.prisma.class.findFirst({
+      where: { schoolId, name, section },
+    });
+    if (existing) {
+      throw new ConflictException(`Class '${name}'${section ? ` (${section})` : ''} already exists in this school`);
+    }
+
     const cls = await this.prisma.class.create({
-      data: { ...data, schoolId, level: Number(data.level), capacity: Number(data.capacity || 40) },
+      data: {
+        ...data,
+        name,
+        section,
+        schoolId,
+        level: Number(data.level),
+        capacity: Number(data.capacity || 40),
+      },
     });
     return successResponse(cls, 'Class created');
   }
 
   async getClasses(schoolId: string, query?: PaginationDto) {
+    const currentSession = await this.prisma.academicSession.findFirst({
+      where: { schoolId, isCurrent: true },
+    }) || await this.prisma.academicSession.findFirst({
+      where: { schoolId },
+      orderBy: { createdAt: 'desc' },
+    });
+
     const classes = await this.prisma.class.findMany({
       where: { schoolId, ...(query?.search && { name: { contains: query.search } }) },
       orderBy: [{ level: 'asc' }, { name: 'asc' }],
       include: {
-        _count: { select: { classEnrollments: true } },
+        _count: {
+          select: {
+            classEnrollments: currentSession ? { where: { sessionId: currentSession.id } } : true,
+          },
+        },
       },
     });
     return successResponse(classes);
@@ -89,6 +118,23 @@ export class AcademicService {
   async updateClass(id: string, schoolId: string, data: any) {
     const cls = await this.prisma.class.findFirst({ where: { id, schoolId } });
     if (!cls) throw new NotFoundException('Class not found');
+
+    if (data.name !== undefined || data.section !== undefined) {
+      const name = data.name !== undefined ? data.name.trim() : cls.name;
+      const section = data.section !== undefined ? (data.section?.trim() || null) : cls.section;
+      const existing = await this.prisma.class.findFirst({
+        where: {
+          schoolId,
+          name,
+          section,
+          id: { not: id },
+        },
+      });
+      if (existing) {
+        throw new ConflictException(`Class '${name}'${section ? ` (${section})` : ''} already exists in this school`);
+      }
+    }
+
     const updated = await this.prisma.class.update({ where: { id }, data });
     return successResponse(updated, 'Class updated');
   }
