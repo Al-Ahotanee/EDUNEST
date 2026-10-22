@@ -37,7 +37,7 @@ export class FinanceController {
   }
 
   @Post('fee-structures')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Create fee structure (supports classId, feeType, status)' })
   createFeeStructure(@Body() body: any, @CurrentUser('schoolId') schoolId: string) {
     return this.financeService.createFeeStructure(body, schoolId);
@@ -67,7 +67,7 @@ export class FinanceController {
   }
 
   @Get('fee-structures')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   @ApiOperation({ summary: 'Get all fee structures (supports classId and status filters)' })
   getFeeStructures(
     @CurrentUser('schoolId') schoolId: string,

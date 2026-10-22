@@ -85,16 +85,22 @@ export default function AccountantDashboardPage() {
   const pending = d.pending || {};
   const exceptions = d.exceptions || {};
 
+  const isAccountant = user?.roles?.some((r) => r.name === 'Accountant') && !user?.isSuperAdmin && !user?.roles?.some((r) => r.name === 'Super Admin' || r.name === 'Admin' || r.name === 'Principal');
+  const pageTitle = isAccountant ? 'School Accountant Dashboard' : 'Payment Approvals & Collections';
+  const pageSubtitle = isAccountant
+    ? 'Pending approvals, verified collections, and financial exceptions'
+    : 'Review pending payment submissions, verify collections, and manage exceptions';
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title flex items-center gap-2">
-            <DollarSign size={24} /> School Accountant Dashboard
+            <DollarSign size={24} /> {pageTitle}
           </h1>
           <p className="page-subtitle">
-            Pending approvals, verified collections, and financial exceptions
+            {pageSubtitle}
           </p>
         </div>
         <Button variant="secondary" icon={<RefreshCw size={15} />} onClick={() => { refetch(); refetchPending(); }}>

@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation, useNavigate, NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import {
   Plus, DollarSign, AlertCircle, TrendingUp, CreditCard, Eye,
-  Download, Trash2, Printer, ShieldCheck, CheckCircle2, FileText, User
+  Download, Trash2, Printer, ShieldCheck, CheckCircle2, FileText, User,
+  Layers, Sparkles, Copy, Save, RefreshCw, ArrowRight, Send, Calendar, Settings,
+  Check, X
 } from 'lucide-react';
 import {
   DataTable, Button, Modal, Input, Select, StatCard, Badge, Avatar, PageLoader, Card,
@@ -18,6 +21,8 @@ import { useAuthStore } from '../../store/authStore';
 
 export default function FinancePage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const school = user?.tenant || user?.school || { name: user?.school?.name || 'School' };
 
@@ -29,7 +34,27 @@ export default function FinancePage() {
   // P5: receipt viewer state — when set, shows the ReceiptViewer modal
   const [receiptData, setReceiptData] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('');
-  const [tab, setTab] = useState<'overview' | 'invoices' | 'fees' | 'create-invoice' | 'create-fee'>('overview');
+
+  // Sync tab state directly with URL route to prevent dead links
+  const tab = useMemo<'overview' | 'invoices' | 'fees' | 'fee-builder' | 'create-invoice'>(() => {
+    const p = location.pathname;
+    if (p.endsWith('/invoices')) return 'invoices';
+    if (p.endsWith('/fees')) return 'fees';
+    if (p.endsWith('/fee-builder') || p.endsWith('/create-fee')) return 'fee-builder';
+    if (p.endsWith('/create-invoice')) return 'create-invoice';
+    return 'overview';
+  }, [location.pathname]);
+
+  const setTab = (newTab: 'overview' | 'invoices' | 'fees' | 'fee-builder' | 'create-invoice') => {
+    switch (newTab) {
+      case 'overview': navigate('/app/finance'); break;
+      case 'invoices': navigate('/app/finance/invoices'); break;
+      case 'fees': navigate('/app/finance/fees'); break;
+      case 'fee-builder': navigate('/app/finance/fee-builder'); break;
+      case 'create-invoice': navigate('/app/finance/create-invoice'); break;
+      default: navigate('/app/finance');
+    }
+  };
 
   const { data: dashStats, isLoading } = useQuery({
     queryKey: ['finance-dashboard'],
@@ -50,8 +75,8 @@ export default function FinancePage() {
 
   const { data: feesData } = useQuery({
     queryKey: ['fee-structures'],
-    queryFn: () => financeApi.feeStructures().then((r) => r.data),
-    enabled: tab === 'fees' || tab === 'create-invoice',
+    queryFn: () => financeApi.feeStructures({ limit: 100 }).then((r) => r.data),
+    enabled: tab === 'fees' || tab === 'fee-builder' || tab === 'create-invoice',
   });
 
   const { data: studentsData } = useQuery({
@@ -103,7 +128,7 @@ export default function FinancePage() {
   const { data: classesData } = useQuery({
     queryKey: ['classes-for-fees'],
     queryFn: () => academicApi.classes().then((r) => r.data?.data || r.data || []),
-    enabled: tab === 'fees' || tab === 'create-fee' || tab === 'create-invoice',
+    enabled: tab === 'fees' || tab === 'fee-builder' || tab === 'create-invoice',
   });
   const classes = Array.isArray(classesData) ? classesData : [];
 
@@ -111,9 +136,53 @@ export default function FinancePage() {
   const { data: catalogueData } = useQuery({
     queryKey: ['fee-catalogue'],
     queryFn: () => financeApi.getFeeCatalogue().then((r) => r.data?.data || r.data || []),
-    enabled: tab === 'create-fee' || tab === 'fees',
+    enabled: tab === 'fee-builder' || tab === 'fees',
   });
   const catalogue: any[] = Array.isArray(catalogueData) ? catalogueData : [];
+
+  // ─── Batch Class Fee Schedule Builder State ──────────────────────────────
+  const [builderClassId, setBuilderClassId] = useState('');
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [copyTargetClassIds, setCopyTargetClassIds] = useState<string[]>([]);
+  const [builderItems, setBuilderItems] = useState<Array<{
+    id?: string;
+    name: string;
+    category: string;
+    feeType: 'TERM' | 'ONE_TIME' | 'ANNUAL';
+    applicableTo: 'ALL' | 'NEW_STUDENT' | 'RETURNING_STUDENT';
+    amount: number;
+    isCompulsory: boolean;
+    description: string;
+  }>>([]);
+
+  // Auto-select first class when classes are loaded if none selected
+  useEffect(() => {
+    if (!builderClassId && classes.length > 0) {
+      setBuilderClassId(selectedClassForFees || classes[0].id);
+    }
+  }, [classes, builderClassId, selectedClassForFees]);
+
+  // Load existing fee schedule whenever builderClassId changes or feesData updates
+  useEffect(() => {
+    if (!builderClassId) return;
+    const existing = (feesData?.data || []).filter((f: any) => f.classId === builderClassId);
+    if (existing.length > 0) {
+      setBuilderItems(
+        existing.map((f: any) => ({
+          id: f.id,
+          name: f.name || '',
+          category: f.category || 'TUITION',
+          feeType: (f.feeType || 'TERM') as any,
+          applicableTo: (f.applicableTo || 'ALL') as any,
+          amount: Number(f.amount) || 0,
+          isCompulsory: f.isCompulsory !== false,
+          description: f.description || '',
+        }))
+      );
+    } else {
+      setBuilderItems([]);
+    }
+  }, [builderClassId, feesData]);
 
   const [generationCategory, setGenerationCategory] = useState<'ALL' | 'NEW_STUDENT' | 'RETURNING_STUDENT'>('ALL');
 
@@ -221,6 +290,112 @@ export default function FinancePage() {
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to generate invoices'),
   });
+
+  const saveClassScheduleMutation = useMutation({
+    mutationFn: ({ classId, items }: { classId: string; items: any[] }) =>
+      financeApi.saveClassFeeSchedule(classId, {
+        items,
+        status: 'PUBLISHED',
+        deleteRemoved: true,
+      }),
+    onSuccess: () => {
+      toast.success('Class fee schedule successfully saved and published!');
+      queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
+      queryClient.invalidateQueries({ queryKey: ['classes-for-fees'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to save class fee schedule'),
+  });
+
+  const copyScheduleMutation = useMutation({
+    mutationFn: async ({ targetClassIds, items }: { targetClassIds: string[]; items: any[] }) => {
+      const sanitized = items.map(({ id, ...rest }) => rest);
+      await Promise.all(
+        targetClassIds.map((targetId) =>
+          financeApi.saveClassFeeSchedule(targetId, {
+            items: sanitized,
+            status: 'PUBLISHED',
+            deleteRemoved: true,
+          })
+        )
+      );
+    },
+    onSuccess: (_, vars) => {
+      toast.success(`Fee schedule copied successfully to ${vars.targetClassIds.length} class(es)!`);
+      queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
+      setCopyModalOpen(false);
+      setCopyTargetClassIds([]);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to copy fee schedule'),
+  });
+
+  const handleAddBlankRow = () => {
+    setBuilderItems((prev) => [
+      ...prev,
+      {
+        name: '',
+        category: 'TUITION',
+        feeType: 'TERM',
+        applicableTo: 'ALL',
+        amount: 0,
+        isCompulsory: true,
+        description: '',
+      },
+    ]);
+  };
+
+  const handleAddPresetItem = (catPreset: any) => {
+    setBuilderItems((prev) => [
+      ...prev,
+      {
+        name: catPreset.name,
+        category: catPreset.category,
+        feeType: catPreset.defaultFrequency || 'TERM',
+        applicableTo: catPreset.applicableTo || 'ALL',
+        amount: 0,
+        isCompulsory: true,
+        description: catPreset.description || '',
+      },
+    ]);
+  };
+
+  const handlePrepopulateTemplate = () => {
+    setBuilderItems([
+      { name: 'First Term Tuition Fee', category: 'TUITION', feeType: 'TERM', applicableTo: 'ALL', amount: 50000, isCompulsory: true, description: 'Core instructional fee' },
+      { name: 'Admission & Registration Fee', category: 'ADMISSION', feeType: 'ONE_TIME', applicableTo: 'NEW_STUDENT', amount: 15000, isCompulsory: true, description: 'One-time entrant registration' },
+      { name: 'Complete School Uniform Pack', category: 'UNIFORM', feeType: 'ONE_TIME', applicableTo: 'NEW_STUDENT', amount: 20000, isCompulsory: true, description: 'Day wear uniform set and tie' },
+      { name: 'Sportswear & PE Kit', category: 'SPORTSWEAR', feeType: 'ONE_TIME', applicableTo: 'NEW_STUDENT', amount: 8000, isCompulsory: true, description: 'Inter-house sportswear and PE kit' },
+      { name: 'Textbooks & Learning Materials', category: 'BOOKS', feeType: 'TERM', applicableTo: 'ALL', amount: 15000, isCompulsory: true, description: 'Curriculum textbooks and exercise books' },
+      { name: 'Science & STEM Lab Levy', category: 'LAB', feeType: 'TERM', applicableTo: 'ALL', amount: 5000, isCompulsory: true, description: 'Practical laboratory consumables' },
+      { name: 'Examination & Assessment Fee', category: 'EXAM', feeType: 'TERM', applicableTo: 'ALL', amount: 5000, isCompulsory: true, description: 'Continuous assessment and termly examination materials' },
+      { name: 'PTA Statutory Contribution', category: 'PTA', feeType: 'TERM', applicableTo: 'ALL', amount: 3000, isCompulsory: true, description: 'Parents-Teachers Association statutory contribution' },
+      { name: 'School Development Levy', category: 'DEVELOPMENT', feeType: 'ANNUAL', applicableTo: 'ALL', amount: 5000, isCompulsory: true, description: 'Campus development and maintenance' },
+    ]);
+    toast.success('Loaded standard 9-item fee schedule template');
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setBuilderItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateRow = (index: number, field: string, value: any) => {
+    setBuilderItems((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const builderNewStudentTotal = useMemo(() => {
+    return builderItems
+      .filter((it) => it.applicableTo === 'ALL' || it.applicableTo === 'NEW_STUDENT')
+      .reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+  }, [builderItems]);
+
+  const builderReturningStudentTotal = useMemo(() => {
+    return builderItems
+      .filter((it) => (it.applicableTo === 'ALL' || it.applicableTo === 'RETURNING_STUDENT') && it.feeType !== 'ONE_TIME')
+      .reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+  }, [builderItems]);
 
   const handleExportInvoices = () => {
     const list = invoicesData?.data || [];
@@ -375,22 +550,36 @@ export default function FinancePage() {
           <p className="page-subtitle">Itemized school fee invoices, official bursary receipts, and financial analytics</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="secondary" icon={<Download size={16} />} onClick={handleExportInvoices}>
+          <Button variant="secondary" icon={<Download size={15} />} onClick={handleExportInvoices}>
             Export CSV
           </Button>
-          <Button
-            variant={tab === 'create-fee' ? 'primary' : 'secondary'}
-            icon={<Plus size={16} />}
-            onClick={() => setTab('create-fee')}
+          <NavLink
+            to="/app/finance/approvals"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
           >
-            Fee Structure Builder
+            <ShieldCheck size={14} className="text-blue-600" />
+            <span>Payment Approvals</span>
+          </NavLink>
+          <NavLink
+            to="/app/finance/outstanding-fees"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+          >
+            <AlertCircle size={14} className="text-amber-600" />
+            <span>Outstanding Fees</span>
+          </NavLink>
+          <Button
+            variant={tab === 'fee-builder' ? 'primary' : 'secondary'}
+            icon={<Layers size={15} />}
+            onClick={() => setTab('fee-builder')}
+          >
+            Fee Schedule Builder
           </Button>
           <Button
             variant={tab === 'create-invoice' ? 'primary' : 'default'}
-            icon={<Plus size={16} />}
+            icon={<Plus size={15} />}
             onClick={() => setTab('create-invoice')}
           >
-            Create Invoice Studio
+            New Invoice Studio
           </Button>
         </div>
       </div>
@@ -403,21 +592,24 @@ export default function FinancePage() {
         <StatCard title="This Month" value={formatCurrency(dashStats?.monthlyCollected || 0)} icon={<CreditCard size={20} />} color="purple" />
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — Fully Synchronized with URL Routes */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
         {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'invoices', label: 'Invoices' },
-          { id: 'fees', label: 'Fee Structures' },
-          ...(tab === 'create-invoice' ? [{ id: 'create-invoice', label: '⚡ New Invoice Studio' }] : []),
-          ...(tab === 'create-fee' ? [{ id: 'create-fee', label: '⚡ Fee Item Builder' }] : []),
+          { id: 'overview', label: 'Overview', icon: <BarChart3 size={15} /> },
+          { id: 'invoices', label: 'Invoices', icon: <FileText size={15} /> },
+          { id: 'fees', label: 'Class Fee Schedules', icon: <DollarSign size={15} /> },
+          { id: 'fee-builder', label: 'Fee Schedule Builder', icon: <Layers size={15} /> },
+          { id: 'create-invoice', label: 'Invoice Studio', icon: <Plus size={15} /> },
         ].map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id as any)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              tab === t.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            {t.label}
+            {t.icon}
+            <span>{t.label}</span>
           </button>
         ))}
       </div>
@@ -509,12 +701,15 @@ export default function FinancePage() {
       {/* Fee Structures Tab — Comprehensive Class-Based Fee Management */}
       {tab === 'fees' && (
         <div className="space-y-4">
-          {/* Class filter + Add button */}
+          {/* Class filter + Builder button */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
               <select
                 value={selectedClassForFees}
-                onChange={(e) => setSelectedClassForFees(e.target.value)}
+                onChange={(e) => {
+                  setSelectedClassForFees(e.target.value);
+                  if (e.target.value) setBuilderClassId(e.target.value);
+                }}
                 className="input w-56 py-2 text-sm"
               >
                 <option value="">All Classes</option>
@@ -523,9 +718,18 @@ export default function FinancePage() {
                 ))}
               </select>
             </div>
-            <Button icon={<Plus size={15} />} onClick={() => setTab('create-fee')}>
-              Add Fee Item
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                icon={<Layers size={15} />}
+                onClick={() => {
+                  if (selectedClassForFees) setBuilderClassId(selectedClassForFees);
+                  setTab('fee-builder');
+                }}
+              >
+                Open Class Schedule Builder
+              </Button>
+            </div>
           </div>
 
           {/* Fee Items Table */}
@@ -647,7 +851,10 @@ export default function FinancePage() {
                 {/* Invoice Generation Trigger */}
                 <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm">⚡ Class-Wide Automated Invoicing</h4>
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                      <Sparkles size={16} className="text-blue-600" />
+                      Class-Wide Automated Invoicing
+                    </h4>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Generate itemized invoices for all active enrolled students in this class. Existing invoices for the current term will not be duplicated.
                     </p>
@@ -670,13 +877,14 @@ export default function FinancePage() {
                     <div className="pt-5">
                       <Button
                         variant="primary"
+                        icon={<Send size={15} />}
                         loading={generateInvoicesMutation.isPending}
                         onClick={() => generateInvoicesMutation.mutate({
                           classId: selectedClassForFees,
                           studentCategory: generationCategory,
                         })}
                       >
-                        ⚡ Generate Invoices for {classes.find((c: any) => c.id === selectedClassForFees)?.name || 'Class'}
+                        Generate Invoices for {classes.find((c: any) => c.id === selectedClassForFees)?.name || 'Class'}
                       </Button>
                     </div>
                   </div>
@@ -745,9 +953,10 @@ export default function FinancePage() {
                         type="button"
                         size="sm"
                         variant="secondary"
+                        icon={<Sparkles size={14} className="text-blue-600" />}
                         onClick={handleLoadClassFees}
                       >
-                        ⚡ Load Class Fee Template ({studentClass.name})
+                        Load Class Fee Template ({studentClass.name})
                       </Button>
                     )}
                   </div>
@@ -956,185 +1165,422 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* ─── TAB: FEE STRUCTURE BUILDER ───────────────────────────────────── */}
-      {tab === 'create-fee' && (
-        <div className="space-y-6 max-w-4xl mx-auto">
-          <div className="flex items-center justify-between">
+      {/* ─── TAB: BATCH CLASS FEE SCHEDULE BUILDER ─────────────────────────── */}
+      {(tab === 'fee-builder' || (tab as any) === 'create-fee') && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Header & Primary Actions */}
+          <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-200 pb-4">
             <div>
-              <h2 className="text-xl font-black text-slate-900">Fee Structure Builder</h2>
-              <p className="text-xs text-slate-500">Define school fee schedules, class-specific levies, and billing cycle frequencies.</p>
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Layers size={22} className="text-blue-600" />
+                Batch Class Fee Schedule Builder
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Configure, itemize, and publish the complete fee breakdown for an entire class all at once.
+              </p>
             </div>
-            <Button variant="secondary" onClick={() => setTab('fees')}>
-              Cancel & Return to Fees
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="secondary" onClick={() => setTab('fees')}>
+                Back to Fee Schedules
+              </Button>
+              {builderItems.length > 0 && (
+                <Button
+                  variant="secondary"
+                  icon={<Copy size={15} />}
+                  onClick={() => setCopyModalOpen(true)}
+                >
+                  Copy to Another Class...
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                icon={<Save size={15} />}
+                loading={saveClassScheduleMutation.isPending}
+                disabled={!builderClassId || builderItems.length === 0}
+                onClick={() => {
+                  if (!builderClassId) {
+                    toast.error('Please select a target class first');
+                    return;
+                  }
+                  const validItems = builderItems.filter((i) => i.name.trim() && Number(i.amount) > 0);
+                  if (validItems.length === 0) {
+                    toast.error('Please add at least one valid fee item with a positive amount');
+                    return;
+                  }
+                  saveClassScheduleMutation.mutate({
+                    classId: builderClassId,
+                    items: validItems,
+                  });
+                }}
+              >
+                Save & Publish Class Schedule
+              </Button>
+            </div>
           </div>
 
-          <div className="card p-8 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Standard Catalogue Preset Dropdown */}
-              {catalogue.length > 0 && (
-                <div className="sm:col-span-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                  <label className="label text-xs font-bold text-slate-700">⚡ Autofill from Standard School Fee Catalogue</label>
-                  <select
-                    className="input w-full text-xs"
-                    onChange={(e) => {
-                      const item = catalogue.find(c => c.name === e.target.value);
-                      if (item) {
-                        feeForm.setValue('name', item.name);
-                        feeForm.setValue('category', item.category);
-                        feeForm.setValue('feeType', item.defaultFrequency || 'TERM');
-                        feeForm.setValue('applicableTo', item.applicableTo || 'ALL');
-                        if (item.description) feeForm.setValue('description', item.description);
-                      }
-                    }}
-                  >
-                    <option value="">-- Choose Catalogue Preset (e.g. Tuition, Uniform, Books, Lab, PE Kit) --</option>
-                    {catalogue.map((cat: any) => (
-                      <option key={cat.category} value={cat.name}>
-                        {cat.name} ({cat.applicableTo === 'NEW_STUDENT' ? 'New Students Only' : 'All Students'}, {cat.defaultFrequency})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="sm:col-span-2">
-                <label className="label">Fee Item Name *</label>
-                <input
-                  type="text"
-                  className="input w-full"
-                  placeholder="e.g. First Term Tuition Fee, ICT & STEM Levy, Science Lab Consumables"
-                  {...feeForm.register('name', { required: true })}
-                />
-              </div>
-
+          {/* Class Selector Bar & Real-time Cohort Totals */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+            {/* Class Selector Card */}
+            <div className="lg:col-span-4 card p-5 bg-gradient-to-br from-slate-50 to-white border border-slate-200/80 flex flex-col justify-between space-y-4">
               <div>
-                <label className="label">Base Amount (₦) *</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input w-full font-mono font-bold"
-                  placeholder="0"
-                  {...feeForm.register('amount', { valueAsNumber: true, required: true })}
-                />
-              </div>
-
-              <div>
-                <label className="label">Target Class Scope *</label>
-                <select className="input w-full" {...feeForm.register('classId')}>
-                  <option value="">All Classes (General Institutional Levy)</option>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Target Academic Class
+                </label>
+                <select
+                  value={builderClassId}
+                  onChange={(e) => setBuilderClassId(e.target.value)}
+                  className="input w-full font-bold text-slate-900 text-sm"
+                >
+                  <option value="">-- Choose Class to Configure --</option>
                   {classes.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.code ? `(${c.code})` : ''}
+                    </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  If set to "All Classes", every active student in the school will be charged this item upon bulk invoice generation.
+                <p className="text-xs text-slate-400 mt-2">
+                  Selecting a class loads its current schedule. All changes are saved together in one batch.
                 </p>
               </div>
 
-              <div className="sm:col-span-2 space-y-2">
-                <label className="label">Student Cohort Applicability *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { id: 'ALL', label: 'All Students', desc: 'Applies to both newly admitted and returning students.' },
-                    { id: 'NEW_STUDENT', label: 'New Students Only', desc: 'Charged strictly on initial admission/enrollment (e.g. Uniform, Registration).' },
-                    { id: 'RETURNING_STUDENT', label: 'Returning Only', desc: 'Charged strictly to continuing/promoted students.' },
-                  ].map((cohort) => {
-                    const currentCohort = feeForm.watch('applicableTo');
-                    const isSelected = currentCohort === cohort.id;
-                    return (
-                      <div
-                        key={cohort.id}
-                        onClick={() => feeForm.setValue('applicableTo', cohort.id)}
-                        className={cn(
-                          'p-4 rounded-xl border cursor-pointer transition-all space-y-1',
-                          isSelected
-                            ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-600/20'
-                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                        )}
-                      >
-                        <p className="font-bold text-sm">{cohort.label}</p>
-                        <p className="text-xs text-slate-500 leading-normal">{cohort.desc}</p>
-                      </div>
-                    );
-                  })}
+              {builderClassId && (
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Selected Class:</span>
+                  <span className="badge badge-blue font-bold">
+                    {classes.find((c: any) => c.id === builderClassId)?.name || 'Active Class'}
+                  </span>
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="sm:col-span-2 space-y-2">
-                <label className="label">Billing Frequency & Lifecycle</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    {
-                      id: 'TERM',
-                      label: 'Per Term',
-                      desc: 'Billed every academic term (e.g. Tuition, Exam levy, Sports).',
-                    },
-                    {
-                      id: 'ONE_TIME',
-                      label: 'One-Time',
-                      desc: 'New entrants only upon admission (e.g. Registration, Uniform pack). Excluded for returning students.',
-                    },
-                    {
-                      id: 'ANNUAL',
-                      label: 'Annual',
-                      desc: 'Billed once per academic session (e.g. Development levy, Student insurance).',
-                    },
-                  ].map((freq) => {
-                    const currentType = feeForm.watch('feeType');
-                    const isSelected = currentType === freq.id;
-                    return (
-                      <div
-                        key={freq.id}
-                        onClick={() => feeForm.setValue('feeType', freq.id)}
-                        className={cn(
-                          'p-4 rounded-xl border cursor-pointer transition-all space-y-1',
-                          isSelected
-                            ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-600/20'
-                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                        )}
-                      >
-                        <p className="font-bold text-sm">{freq.label}</p>
-                        <p className="text-xs text-slate-500 leading-normal">{freq.desc}</p>
-                      </div>
-                    );
-                  })}
+            {/* Calculated Breakdown: New Students */}
+            <div className="lg:col-span-4 p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 flex flex-col justify-between shadow-xs">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                    New Students (Term 1)
+                  </span>
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">
+                    {builderItems.filter((i) => i.applicableTo === 'ALL' || i.applicableTo === 'NEW_STUDENT').length} Items
+                  </span>
                 </div>
+                <p className="text-3xl font-black text-amber-950 mt-2">
+                  {formatCurrency(builderNewStudentTotal)}
+                </p>
               </div>
+              <p className="text-xs text-amber-800/80 mt-3 leading-relaxed">
+                Includes recurring tuition and one-time admission/uniform charges.
+              </p>
+            </div>
 
-              <div className="sm:col-span-2">
-                <label className="label">Publication Status</label>
-                <select className="input w-full" {...feeForm.register('status')}>
-                  <option value="PUBLISHED">Published (Active immediately for billing & visible to parents)</option>
-                  <option value="DRAFT">Draft (Save internally for review before billing)</option>
-                </select>
+            {/* Calculated Breakdown: Returning Students */}
+            <div className="lg:col-span-4 p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 flex flex-col justify-between shadow-xs">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-800">
+                    Returning Students (Per Term)
+                  </span>
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                    {builderItems.filter((i) => (i.applicableTo === 'ALL' || i.applicableTo === 'RETURNING_STUDENT') && i.feeType !== 'ONE_TIME').length} Items
+                  </span>
+                </div>
+                <p className="text-3xl font-black text-blue-950 mt-2">
+                  {formatCurrency(builderReturningStudentTotal)}
+                </p>
               </div>
+              <p className="text-xs text-blue-800/80 mt-3 leading-relaxed">
+                Excludes one-time admission and uniforms; only recurring tuition and termly levies.
+              </p>
+            </div>
+          </div>
 
-              <div className="sm:col-span-2">
-                <label className="label">Description / Accounting Remarks (Optional)</label>
-                <textarea
-                  rows={3}
-                  className="input w-full resize-none text-xs"
-                  placeholder="Additional context, expenditure code, or fee justification..."
-                  {...feeForm.register('description')}
-                />
+          {/* Presets & Quick Add Bar */}
+          <div className="card p-4 bg-slate-50 border border-slate-200/90 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wide">
+                <Sparkles size={14} className="text-blue-600" />
+                Quick-Add Standard Catalogue Presets
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Sparkles size={13} />}
+                  onClick={handlePrepopulateTemplate}
+                >
+                  Pre-populate Standard 9-Item Curriculum Package
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Plus size={13} />}
+                  onClick={handleAddBlankRow}
+                >
+                  Add Blank Custom Row
+                </Button>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-              <Button variant="secondary" onClick={() => setTab('fees')}>
-                Cancel
-              </Button>
-              <Button
-                loading={createFeeMutation.isPending}
-                onClick={feeForm.handleSubmit((d) => createFeeMutation.mutate(d))}
-              >
-                Save & Register Fee Structure
-              </Button>
+            {/* Preset Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {catalogue.slice(0, 10).map((cat: any) => (
+                <button
+                  key={cat.category}
+                  type="button"
+                  onClick={() => handleAddPresetItem(cat)}
+                  className="px-2.5 py-1 text-xs font-medium rounded-lg bg-white border border-slate-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all shadow-2xs"
+                >
+                  + {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Itemized Table */}
+          <div className="card overflow-hidden border border-slate-200 shadow-xs">
+            <div className="table-container">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
+                    <th className="px-3 py-3 w-10 text-center">#</th>
+                    <th className="px-3 py-3 min-w-[220px]">Fee Item Name & Details</th>
+                    <th className="px-3 py-3 w-40">Category</th>
+                    <th className="px-3 py-3 w-36">Frequency</th>
+                    <th className="px-3 py-3 w-44">Target Cohort</th>
+                    <th className="px-3 py-3 w-36 text-right">Amount (₦)</th>
+                    <th className="px-3 py-3 w-12 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {builderItems.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-3 py-3 text-center text-xs font-mono text-slate-400">
+                        {idx + 1}
+                      </td>
+                      <td className="px-3 py-3 space-y-1">
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => handleUpdateRow(idx, 'name', e.target.value)}
+                          placeholder="e.g. First Term Tuition Fee"
+                          className="input w-full py-1.5 px-2.5 text-xs font-semibold text-slate-900"
+                        />
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => handleUpdateRow(idx, 'description', e.target.value)}
+                          placeholder="Optional accounting remarks or description"
+                          className="input w-full py-1 px-2.5 text-[11px] text-slate-500 bg-slate-50/60"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <select
+                          value={item.category}
+                          onChange={(e) => handleUpdateRow(idx, 'category', e.target.value)}
+                          className="input w-full py-1.5 px-2 text-xs"
+                        >
+                          <option value="TUITION">Tuition</option>
+                          <option value="ADMISSION">Admission / Registration</option>
+                          <option value="UNIFORM">Uniform</option>
+                          <option value="SPORTSWEAR">Sportswear / PE</option>
+                          <option value="BOOKS">Textbooks & Books</option>
+                          <option value="LAB">Science / STEM Lab</option>
+                          <option value="EXAM">Examination</option>
+                          <option value="PTA">PTA Levy</option>
+                          <option value="DEVELOPMENT">Development Levy</option>
+                          <option value="FACILITY">Facility Maintenance</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-3">
+                        <select
+                          value={item.feeType}
+                          onChange={(e) => handleUpdateRow(idx, 'feeType', e.target.value)}
+                          className="input w-full py-1.5 px-2 text-xs"
+                        >
+                          <option value="TERM">Per Term</option>
+                          <option value="ONE_TIME">One-Time</option>
+                          <option value="ANNUAL">Annual</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-3">
+                        <select
+                          value={item.applicableTo}
+                          onChange={(e) => handleUpdateRow(idx, 'applicableTo', e.target.value)}
+                          className="input w-full py-1.5 px-2 text-xs font-medium"
+                        >
+                          <option value="ALL">All Students</option>
+                          <option value="NEW_STUDENT">New Students Only</option>
+                          <option value="RETURNING_STUDENT">Returning Only</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          step="100"
+                          value={item.amount || ''}
+                          onChange={(e) => handleUpdateRow(idx, 'amount', Number(e.target.value))}
+                          placeholder="0"
+                          className="input w-full py-1.5 px-2.5 text-right font-mono font-bold text-xs text-blue-600"
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRow(idx)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Remove Fee Row"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {builderItems.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-12 text-center text-slate-400 text-sm">
+                        <p className="font-semibold text-slate-600">No fee items in this class schedule yet.</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Click "Pre-populate Standard 9-Item Curriculum Package" or use the quick-add buttons above to add items all at once.
+                        </p>
+                        <div className="mt-4 flex items-center justify-center gap-2">
+                          <Button size="sm" variant="secondary" icon={<Sparkles size={13} />} onClick={handlePrepopulateTemplate}>
+                            Pre-populate Standard Package
+                          </Button>
+                          <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={handleAddBlankRow}>
+                            Add Blank Row
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer Summary & Save Bar */}
+            <div className="p-4 bg-slate-50/80 border-t border-slate-200 flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
+                <span>{builderItems.length} Fee Items Configured</span>
+                <span>•</span>
+                <span>New Student Gross: <strong className="text-amber-800">{formatCurrency(builderNewStudentTotal)}</strong></span>
+                <span>•</span>
+                <span>Returning Student Gross: <strong className="text-blue-800">{formatCurrency(builderReturningStudentTotal)}</strong></span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {builderItems.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setBuilderItems([])}
+                  >
+                    Clear All Rows
+                  </Button>
+                )}
+                <Button
+                  variant="primary"
+                  icon={<Save size={15} />}
+                  loading={saveClassScheduleMutation.isPending}
+                  disabled={!builderClassId || builderItems.length === 0}
+                  onClick={() => {
+                    if (!builderClassId) {
+                      toast.error('Please select a target class first');
+                      return;
+                    }
+                    const validItems = builderItems.filter((i) => i.name.trim() && Number(i.amount) > 0);
+                    if (validItems.length === 0) {
+                      toast.error('Please add at least one valid fee item with a positive amount');
+                      return;
+                    }
+                    saveClassScheduleMutation.mutate({
+                      classId: builderClassId,
+                      items: validItems,
+                    });
+                  }}
+                >
+                  Save & Publish Class Schedule
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ─── COPY SCHEDULE MODAL ────────────────────────────────────────── */}
+      <Modal
+        open={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        title="Copy Fee Schedule to Other Classes"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setCopyModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={copyScheduleMutation.isPending}
+              disabled={copyTargetClassIds.length === 0}
+              onClick={() => {
+                const validItems = builderItems.filter((i) => i.name.trim() && Number(i.amount) > 0);
+                copyScheduleMutation.mutate({
+                  targetClassIds: copyTargetClassIds,
+                  items: validItems,
+                });
+              }}
+            >
+              Copy Schedule to {copyTargetClassIds.length} Selected Class(es)
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600">
+            Select the destination classes to receive the exact fee schedule from{' '}
+            <strong className="text-slate-900">
+              {classes.find((c: any) => c.id === builderClassId)?.name || 'the current class'}
+            </strong>
+            . Any existing fee schedule in the destination class will be replaced with these {builderItems.length} items.
+          </p>
+
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+            {classes
+              .filter((c: any) => c.id !== builderClassId)
+              .map((c: any) => {
+                const isSelected = copyTargetClassIds.includes(c.id);
+                return (
+                  <label
+                    key={c.id}
+                    className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setCopyTargetClassIds((prev) => [...prev, c.id]);
+                        } else {
+                          setCopyTargetClassIds((prev) => prev.filter((id) => id !== c.id));
+                        }
+                      }}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800">{c.name}</p>
+                      {c.code && <p className="text-[11px] text-slate-400">{c.code}</p>}
+                    </div>
+                  </label>
+                );
+              })}
+            {classes.filter((c: any) => c.id !== builderClassId).length === 0 && (
+              <p className="p-4 text-center text-xs text-slate-400">No other classes available.</p>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       {/* Record Payment Modal — Simple 3-field quick action */}
       <Modal open={!!paymentModal} onClose={() => setPaymentModal(null)} title={`Record Payment — ${paymentModal?.invoiceNo}`} size="sm"

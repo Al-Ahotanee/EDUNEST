@@ -179,6 +179,9 @@ export default function App() {
             <Route path="finance" element={<FinancePage />} />
             <Route path="finance/invoices" element={<FinancePage />} />
             <Route path="finance/fees" element={<FinancePage />} />
+            <Route path="finance/fee-builder" element={<FinancePage />} />
+            <Route path="finance/create-invoice" element={<FinancePage />} />
+            <Route path="finance/approvals" element={<AccountantDashboardPage />} />
             <Route path="finance/accountant" element={<AccountantDashboardPage />} />
             <Route path="finance/class-master" element={<ClassMasterFinancePage />} />
             <Route path="finance/policy" element={<FinancialPolicyPage />} />

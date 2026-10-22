@@ -75,6 +75,7 @@ export class FinanceService {
     sessionId?: string;
     termId?: string;
     status?: string;
+    deleteRemoved?: boolean;
     items: Array<{
       id?: string;
       name: string;
@@ -160,6 +161,30 @@ export class FinanceService {
           },
         });
         createdItems.push(created);
+      }
+    }
+
+    // If requested, remove/archive any class items not in the saved list
+    if (data.deleteRemoved) {
+      const activeIds = createdItems.map((i) => i.id);
+      const toRemove = await this.prisma.feeStructure.findMany({
+        where: {
+          schoolId,
+          classId: data.classId,
+          id: { notIn: activeIds },
+        },
+        include: { _count: { select: { invoiceItems: true } } },
+      });
+
+      for (const item of toRemove) {
+        if (item._count.invoiceItems > 0) {
+          await this.prisma.feeStructure.update({
+            where: { id: item.id },
+            data: { status: 'ARCHIVED' },
+          });
+        } else {
+          await this.prisma.feeStructure.delete({ where: { id: item.id } });
+        }
       }
     }
 

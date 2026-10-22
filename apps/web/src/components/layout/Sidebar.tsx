@@ -7,7 +7,7 @@ import {
   DollarSign, UserCog, Monitor, Library, Bed, Heart, Package,
   Calendar, Bell, BarChart3, Settings, ChevronDown, ChevronRight,
   School, LogOut, ClipboardCheck, Award, FileText, Building2, X, Briefcase,
-  AlertTriangle, Globe,
+  AlertTriangle, Globe, ShieldCheck, Layers,
 } from 'lucide-react';
 
 // School-branded logo component — uses school name first letter when no logo.
@@ -79,14 +79,15 @@ const NAV_ITEMS: NavItemDef[] = [
   {
     label: 'Finance',
     icon: <DollarSign size={18} />,
-    adminOnly: true,
+    requiredPermission: { module: 'finance', action: 'read' },
     children: [
-      { label: 'Overview', path: '/app/finance', icon: <BarChart3 size={16} />, adminOnly: true },
-      { label: 'Invoices', path: '/app/finance/invoices', icon: <FileText size={16} />, adminOnly: true },
-      { label: 'Fee Structures', path: '/app/finance/fees', icon: <DollarSign size={16} />, adminOnly: true },
-      { label: 'Accountant Dashboard', path: '/app/finance/accountant', icon: <Briefcase size={16} />, adminOnly: true },
-      { label: 'Outstanding Fees', path: '/app/finance/outstanding-fees', icon: <AlertTriangle size={16} />, adminOnly: true },
-      { label: 'Daily Collection', path: '/app/finance/daily-collection', icon: <Calendar size={16} />, adminOnly: true },
+      { label: 'Overview', path: '/app/finance', icon: <BarChart3 size={16} /> },
+      { label: 'Invoices', path: '/app/finance/invoices', icon: <FileText size={16} /> },
+      { label: 'Fee Schedules', path: '/app/finance/fees', icon: <DollarSign size={16} /> },
+      { label: 'Fee Schedule Builder', path: '/app/finance/fee-builder', icon: <Layers size={16} /> },
+      { label: 'Payment Approvals', path: '/app/finance/approvals', icon: <ShieldCheck size={16} /> },
+      { label: 'Outstanding Fees', path: '/app/finance/outstanding-fees', icon: <AlertTriangle size={16} /> },
+      { label: 'Daily Collection', path: '/app/finance/daily-collection', icon: <Calendar size={16} /> },
       { label: 'Financial Policy', path: '/app/finance/policy', icon: <Settings size={16} />, adminOnly: true },
     ],
   },
@@ -202,10 +203,11 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
   // Filter nav items based on user role/permissions
   const visibleNavItems = useMemo(() => {
     if (!user) return [];
-    const isSuperAdmin = user.isSuperAdmin || user.roles?.some((r) => r.name === 'Super Admin');
+    const isSuperAdmin = user.isSuperAdmin || user.roles?.some((r) => r.name === 'Super Admin' || r.name === 'Admin' || r.name === 'Principal');
+    const isAccountant = user.roles?.some((r) => r.name === 'Accountant') && !isSuperAdmin;
 
     const filterItem = (item: NavItemDef): NavItemDef | null => {
-      // Admin-only items: visible to Super Admin only
+      // Admin-only items: visible to Super Admin / Admin only
       if (item.adminOnly && !isSuperAdmin) return null;
 
       // Items requiring a specific permission
@@ -219,7 +221,22 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
       // For items with children, filter the children too
       if (item.children) {
         const visibleChildren = item.children
-          .map((c) => filterItem(c))
+          .map((c) => {
+            const filtered = filterItem(c);
+            if (!filtered) return null;
+            // Dynamically label and icon the finance approvals console:
+            // Accountants see "Accountant Dashboard" (Briefcase)
+            // Admins, Super Admins, and Principals see "Payment Approvals" (ShieldCheck)
+            if (filtered.path === '/app/finance/approvals' || filtered.path === '/app/finance/accountant') {
+              return {
+                ...filtered,
+                path: '/app/finance/approvals',
+                label: isAccountant ? 'Accountant Dashboard' : 'Payment Approvals',
+                icon: isAccountant ? <Briefcase size={16} /> : <ShieldCheck size={16} />,
+              };
+            }
+            return filtered;
+          })
           .filter((c): c is NavItemDef => c !== null);
         if (visibleChildren.length === 0) return null;
         return { ...item, children: visibleChildren };
