@@ -10,11 +10,7 @@ services:
     plan: free
     region: frankfurt
     buildCommand: npm install --include=dev && npm run build:all
-    # Apply Prisma schema changes then start server.
-    startCommand: >
-      cd apps/api &&
-      npx prisma db push --accept-data-loss &&
-      node dist/main.js
+    startCommand: cd apps/api && node scripts/start.js
     healthCheckPath: /ping
     envVars:
       - key: NODE_ENV
