@@ -247,6 +247,7 @@ async function main() {
     { staffId: 'STF004', firstName: 'Zainab', lastName: 'Hassan', gender: Gender.FEMALE, designation: 'English Teacher', salary: 75000, departmentId: depts[1].id },
     { staffId: 'STF005', firstName: 'Umar', lastName: 'Bello', gender: Gender.MALE, designation: 'Physics Teacher', salary: 80000, departmentId: depts[0].id },
     { staffId: 'STF006', firstName: 'Amina', lastName: 'Garba', gender: Gender.FEMALE, designation: 'Accountant', salary: 85000, departmentId: depts[3].id },
+    { staffId: 'STF007', firstName: 'Aisha', lastName: 'Saleh', gender: Gender.FEMALE, designation: 'Senior Teacher & Class Master', salary: 80000, departmentId: depts[0].id, userId: teacherUser.id },
   ];
 
   for (const staff of staffData) {
@@ -413,6 +414,48 @@ async function main() {
         },
         update: {},
       }).catch(() => {});
+    }
+  }
+
+  // ─── Teacher Assignments for Aisha Saleh ─────────────────────────────────────
+  console.log('Assigning Aisha Saleh as Class Master and Subject Teacher...');
+  const aishaStaff = await prisma.staff.findFirst({ where: { schoolId: school.id, staffId: 'STF007' } });
+  const ss1Class = classes.find((c: any) => c.name === 'SS 1') || classes[0];
+  const ss2Class = classes.find((c: any) => c.name === 'SS 2') || classes[1];
+  const mathSubj = subjects.find((s: any) => s.code === 'MTH') || subjects[0];
+
+  if (ss1Class) {
+    await prisma.teacherAssignment.upsert({
+      where: { userId_classId_subjectId: { userId: teacherUser.id, classId: ss1Class.id, subjectId: null as any } },
+      create: { schoolId: school.id, userId: teacherUser.id, classId: ss1Class.id, roleType: 'CLASS_MASTER' },
+      update: { roleType: 'CLASS_MASTER' },
+    }).catch(() => {});
+
+    if (mathSubj) {
+      await prisma.teacherAssignment.upsert({
+        where: { userId_classId_subjectId: { userId: teacherUser.id, classId: ss1Class.id, subjectId: mathSubj.id } },
+        create: { schoolId: school.id, userId: teacherUser.id, classId: ss1Class.id, subjectId: mathSubj.id, roleType: 'SUBJECT_TEACHER' },
+        update: { roleType: 'SUBJECT_TEACHER' },
+      }).catch(() => {});
+    }
+  }
+
+  if (ss2Class && mathSubj) {
+    await prisma.teacherAssignment.upsert({
+      where: { userId_classId_subjectId: { userId: teacherUser.id, classId: ss2Class.id, subjectId: mathSubj.id } },
+      create: { schoolId: school.id, userId: teacherUser.id, classId: ss2Class.id, subjectId: mathSubj.id, roleType: 'SUBJECT_TEACHER' },
+      update: { roleType: 'SUBJECT_TEACHER' },
+    }).catch(() => {});
+  }
+
+  if (aishaStaff && ss1Class && mathSubj) {
+    const slots = [
+      { dayOfWeek: 1, startTime: '08:00', endTime: '08:50', room: 'Room 101', classId: ss1Class.id, subjectId: mathSubj.id, staffId: aishaStaff.id },
+      { dayOfWeek: 2, startTime: '10:00', endTime: '10:50', room: 'Room 101', classId: ss1Class.id, subjectId: mathSubj.id, staffId: aishaStaff.id },
+      { dayOfWeek: 4, startTime: '11:00', endTime: '11:50', room: 'Room 101', classId: ss1Class.id, subjectId: mathSubj.id, staffId: aishaStaff.id },
+    ];
+    for (const slot of slots) {
+      await prisma.timetableSlot.create({ data: slot }).catch(() => {});
     }
   }
 

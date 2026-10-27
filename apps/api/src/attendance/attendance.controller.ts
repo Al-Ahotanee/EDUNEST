@@ -15,12 +15,16 @@ export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
 
   @Post()
-  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal', 'Class Master')
-  mark(@Body() body: any, @CurrentUser('schoolId') schoolId: string) { return this.attendanceService.markAttendance(body, schoolId); }
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal', 'Class Master', 'Teacher')
+  mark(@Body() body: any, @CurrentUser('schoolId') schoolId: string, @CurrentUser() user: any) {
+    return this.attendanceService.markAttendance(body, schoolId, user);
+  }
 
   @Post('bulk')
-  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal', 'Class Master')
-  bulkMark(@Body() body: any, @CurrentUser('schoolId') schoolId: string) { return this.attendanceService.bulkMarkAttendance(body, schoolId); }
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Principal', 'Class Master', 'Teacher')
+  bulkMark(@Body() body: any, @CurrentUser('schoolId') schoolId: string, @CurrentUser() user: any) {
+    return this.attendanceService.bulkMarkAttendance(body, schoolId, user);
+  }
 
   @Get()
   list(@CurrentUser('schoolId') schoolId: string, @Query() query: PaginationDto & { classId?: string; termId?: string; date?: string; studentId?: string }) { return this.attendanceService.getAttendance(schoolId, query); }

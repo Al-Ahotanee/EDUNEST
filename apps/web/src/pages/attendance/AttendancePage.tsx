@@ -12,6 +12,7 @@ import { StatCard, Button, Select, PageLoader, Badge, Modal } from '../../compon
 import { attendanceApi, academicApi, studentsApi, hrApi, api } from '../../services/api';
 import { formatDate, cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
+import { useTeacherAssignments } from '../../hooks/useTeacherAssignments';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' | 'HALF_DAY' | 'UNMARKED';
@@ -28,12 +29,13 @@ const STATUS_OPTIONS: { value: AttendanceStatus; label: string; short: string; c
 export default function AttendancePage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { isTeacher, isClassMaster: isAssignedClassMaster, classMaster } = useTeacherAssignments();
   const school = user?.tenant || user?.school || { name: 'EduNest' };
 
   // RBAC permissions: Only Admins and Class Masters can record or edit attendance. Normal teachers only view.
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const isAdmin = Boolean(isSuperAdmin || user?.roles?.some(r => ['Super Admin', 'Admin', 'School Admin', 'Principal'].includes(r.name)));
-  const isClassMaster = Boolean(user?.roles?.some(r => r.name === 'Class Master'));
+  const isClassMaster = Boolean(isAssignedClassMaster || user?.roles?.some(r => r.name === 'Class Master'));
   const canRecordAttendance = isAdmin || isClassMaster;
 
   // Core navigation state
@@ -114,6 +116,13 @@ export default function AttendancePage() {
     enabled: !!currentSession?.id,
   });
   const currentTerm = termsData?.find((t: any) => t.isCurrent) || termsData?.[0];
+
+  // For Class Masters: automatically default to their assigned class
+  useEffect(() => {
+    if (isTeacher && isClassMaster && classMaster?.classId && !selectedClass) {
+      setSelectedClass(classMaster.classId);
+    }
+  }, [isTeacher, isClassMaster, classMaster, selectedClass]);
 
   // Students in selected class
   const { data: studentsInClass, isLoading: loadingStudents } = useQuery<any[]>({
@@ -524,6 +533,16 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Subject Teacher View-Only Notice */}
+      {isTeacher && !isClassMaster && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 text-amber-800 text-sm shadow-xs">
+          <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
+          <p>
+            <strong>Subject Teacher Notice:</strong> Daily attendance is recorded by the designated Class Master. Subject teachers have view-only access to attendance records.
+          </p>
+        </div>
+      )}
+
       {/* ─── PAGE HEADER & CONTROLS ────────────────────────────────────────── */}
       <div className="page-header">
         <div>
@@ -673,11 +692,16 @@ export default function AttendancePage() {
         <div className="flex items-center gap-2 flex-wrap">
           {scope !== 'staff' && (
             <Select
-              options={(classesData || []).map((c: any) => ({ value: c.id, label: c.name }))}
+              options={
+                isTeacher && isClassMaster && classMaster?.classId
+                  ? (classesData || []).filter((c: any) => c.id === classMaster.classId).map((c: any) => ({ value: c.id, label: c.name }))
+                  : (classesData || []).map((c: any) => ({ value: c.id, label: c.name }))
+              }
               placeholder="Select Class *"
               value={selectedClass}
               onChange={e => setSelectedClass(e.target.value)}
               className="w-48 py-1.5 text-xs"
+              disabled={isTeacher && isClassMaster && Boolean(classMaster?.classId)}
             />
           )}
 

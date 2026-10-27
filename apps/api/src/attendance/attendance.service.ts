@@ -1,17 +1,54 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { successResponse, PaginationDto, paginate, safeSkip, safeTake } from '../common/dto/pagination.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, TeacherRoleType } from '@prisma/client';
 
 @Injectable()
 export class AttendanceService {
   constructor(private prisma: PrismaService) {}
 
-  async markAttendance(data: any, schoolId: string) {
+  async verifyClassMasterAttendanceAccess(user: any, schoolId: string, studentId: string) {
+    if (!user) return;
+    if (user.isSuperAdmin) return;
+    const roleNames = (user.roles || []).map((r: any) => (r.name || '').toLowerCase());
+    const isPrivileged = roleNames.some((n: string) =>
+      ['admin', 'school admin', 'principal', 'proprietor'].some((t) => n.includes(t))
+    );
+    if (isPrivileged) return;
+
+    // Verify teacher has CLASS_MASTER role in teacher assignments
+    const assignments = await this.prisma.teacherAssignment.findMany({
+      where: { schoolId, userId: user.id, roleType: TeacherRoleType.CLASS_MASTER },
+    });
+
+    if (assignments.length === 0) {
+      throw new ForbiddenException(
+        'Subject teachers are not permitted to record daily class attendance; only designated Class Masters can record class attendance.'
+      );
+    }
+
+    const assignedClassIds = assignments.map((a) => a.classId);
+    const enrollment = await this.prisma.classEnrollment.findFirst({
+      where: {
+        studentId,
+        classId: { in: assignedClassIds },
+      },
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException('You are only authorized to record attendance for students in your assigned class.');
+    }
+  }
+
+  async markAttendance(data: any, schoolId: string, user?: any) {
     const { studentId, status, termId, date, remarks } = data;
 
     const student = await this.prisma.student.findFirst({ where: { id: studentId, schoolId } });
-    if (!student) throw new Error('Student not found');
+    if (!student) throw new NotFoundException('Student not found');
+
+    if (user) {
+      await this.verifyClassMasterAttendanceAccess(user, schoolId, studentId);
+    }
 
     const record = await this.prisma.attendance.upsert({
       where: { studentId_date: { studentId, date: new Date(date) } },
@@ -23,9 +60,9 @@ export class AttendanceService {
     return successResponse(record, 'Attendance marked');
   }
 
-  async bulkMarkAttendance(data: { records: any[] }, schoolId: string) {
+  async bulkMarkAttendance(data: { records: any[] }, schoolId: string, user?: any) {
     const results = await Promise.allSettled(
-      data.records.map((r) => this.markAttendance(r, schoolId)),
+      data.records.map((r) => this.markAttendance(r, schoolId, user)),
     );
     const success = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;

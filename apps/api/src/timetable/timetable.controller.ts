@@ -15,6 +15,10 @@ export class TimetableController {
   @Post('clear-class/:classId') clearClass(@Param('classId') classId: string, @CurrentUser('schoolId') schoolId: string) { return this.timetableService.clearClassSlots(classId, schoolId); }
   @Post('clear-school') clearSchool(@CurrentUser('schoolId') schoolId: string) { return this.timetableService.clearSchoolSlots(schoolId); }
   @Get('school') getSchool(@CurrentUser('schoolId') schoolId: string) { return this.timetableService.getSchoolTimetable(schoolId); }
+  @Get('my-schedule')
+  getMySchedule(@CurrentUser() user: any, @CurrentUser('schoolId') schoolId: string) {
+    return this.timetableService.getMySchedule(user, schoolId);
+  }
   @Get('class/:classId') getByClass(@Param('classId') classId: string) { return this.timetableService.getByClass(classId); }
   @Get('staff/:staffId') getByStaff(@Param('staffId') staffId: string) { return this.timetableService.getByStaff(staffId); }
 

@@ -392,5 +392,23 @@ export const uploadApi = {
   },
 };
 
+// ─── Timetable ────────────────────────────────────────────────────────────────
+export const timetableApi = {
+  mySchedule: () => api.get('/timetable/my-schedule'),
+  byClass: (classId: string) => api.get(`/timetable/class/${classId}`),
+  byStaff: (staffId: string) => api.get(`/timetable/staff/${staffId}`),
+  school: () => api.get('/timetable/school'),
+  create: (data: any) => api.post('/timetable', data),
+  createBatch: (data: any) => api.post('/timetable/batch', data),
+  delete: (id: string) => api.delete(`/timetable/${id}`),
+};
+
+// ─── Teacher Portal ───────────────────────────────────────────────────────────
+export const teacherApi = {
+  getDashboard: () => api.get('/teacher/dashboard'),
+  getMyClass: (classId?: string) => api.get('/teacher/my-class', { params: { classId } }),
+  getMySchedule: () => api.get('/teacher/my-schedule'),
+};
+
 
 

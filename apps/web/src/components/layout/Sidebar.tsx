@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
+import { useTeacherAssignments } from '../../hooks/useTeacherAssignments';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   DollarSign, UserCog, Monitor, Library, Bed, Heart, Package,
@@ -198,6 +199,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const { user, logout } = useAuthStore();
+  const { isTeacher, isClassMaster, isSubjectTeacher, hasDualRole, classMaster } = useTeacherAssignments();
   const isCollapsed = collapsed && !mobileOpen;
 
   // Filter nav items based on user role/permissions
@@ -205,6 +207,46 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
     if (!user) return [];
     const isSuperAdmin = user.isSuperAdmin || user.roles?.some((r) => r.name === 'Super Admin' || r.name === 'Admin' || r.name === 'Principal');
     const isAccountant = user.roles?.some((r) => r.name === 'Accountant') && !isSuperAdmin;
+
+    // Dedicated Teacher Navigation Menu
+    if (isTeacher) {
+      const teacherItems: NavItemDef[] = [
+        { label: 'Dashboard', path: '/app/dashboard', icon: <LayoutDashboard size={18} /> },
+      ];
+
+      if (isClassMaster) {
+        teacherItems.push({
+          label: 'My Class',
+          path: '/app/my-class',
+          icon: <School size={18} />,
+        });
+      }
+
+      if (isSubjectTeacher) {
+        teacherItems.push({
+          label: 'My Teaching',
+          path: '/app/teaching',
+          icon: <Calendar size={18} />,
+        });
+      }
+
+      teacherItems.push(
+        { label: 'Attendance', path: '/app/attendance', icon: <ClipboardCheck size={18} /> },
+        { label: 'Results & Gradebook', path: '/app/results', icon: <Award size={18} /> },
+        { label: 'CBT Exams', path: '/app/cbt', icon: <Monitor size={18} /> },
+        { label: 'Notifications', path: '/app/notifications', icon: <Bell size={18} /> },
+      );
+
+      if (classMaster?.allowCashCollection) {
+        teacherItems.push({
+          label: 'Class Fees',
+          path: '/app/finance/class-master',
+          icon: <DollarSign size={18} />,
+        });
+      }
+
+      return teacherItems;
+    }
 
     const filterItem = (item: NavItemDef): NavItemDef | null => {
       // Admin-only items: visible to Super Admin / Admin only
@@ -248,22 +290,19 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
     return NAV_ITEMS
       .map((item) => filterItem(item))
       .filter((item): item is NavItemDef => item !== null);
-  }, [user]);
+  }, [user, isTeacher, isClassMaster, isSubjectTeacher, classMaster]);
 
-  // P3-15 fix: previously `user.isSuperAdmin` (the platform-level flag) was
-  // checked first and labeled 'School Administrator' — but for actual school
-  // admins (admin@demo.com), isSuperAdmin is false and their role.name is
-  // 'Super Admin' (the tenant-level role). The label fell through to
-  // 'Staff Member', which is misleading. Now we resolve the role label
-  // properly using the role name + a few special-case overrides.
   const displayRole = (() => {
     if (user?.isSuperAdmin) return 'Platform Administrator';
     const roleName = user?.roles?.[0]?.name || '';
     if (roleName === 'Super Admin') return 'School Administrator';
     if (roleName === 'Accountant') return 'Bursar';
     if (roleName === 'Parent') return 'Parent / Guardian';
-    if (roleName === 'Teacher') return 'Subject Teacher';
-    if (roleName === 'Class Master') return 'Class Teacher';
+    if (roleName === 'Teacher') {
+      if (hasDualRole) return 'Class Master & Teacher';
+      if (isClassMaster) return 'Class Master';
+      return 'Subject Teacher';
+    }
     return roleName || 'Staff Member';
   })();
 

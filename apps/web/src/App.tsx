@@ -64,6 +64,8 @@ import HostelPage from './pages/hostel/HostelPage';
 import HealthPage from './pages/health/HealthPage';
 import InventoryPage from './pages/inventory/InventoryPage';
 import TimetablePage from './pages/timetable/TimetablePage';
+import MyClassPage from './pages/academic/MyClassPage';
+import MyTeachingPage from './pages/timetable/MyTeachingPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import PlaceholderPage from './pages/shared/PlaceholderPage';
 
@@ -173,6 +175,8 @@ export default function App() {
             <Route path="academic/classes" element={<AcademicPage />} />
             <Route path="academic/subjects" element={<AcademicPage />} />
             <Route path="attendance" element={<AttendancePage />} />
+            <Route path="my-class" element={<MyClassPage />} />
+            <Route path="teaching" element={<MyTeachingPage />} />
             <Route path="results" element={<ResultsPage />} />
             <Route path="cbt" element={<CbtPage />} />
             <Route path="timetable" element={<TimetablePage />} />

@@ -28,6 +28,7 @@ import {
 import { StatCard, Button, Modal, Select, PageLoader, Card } from '../../components/ui';
 import { resultsApi, academicApi, studentsApi } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { useTeacherAssignments } from '../../hooks/useTeacherAssignments';
 import { ScoreEntrySpreadsheet } from '../../components/results/ScoreEntrySpreadsheet';
 import { ClassBroadsheet } from '../../components/results/ClassBroadsheet';
 import { ApprovalPipelineTab } from '../../components/results/ApprovalPipelineTab';
@@ -55,6 +56,7 @@ const GRADE_COLORS: Record<string, string> = {
 export default function ResultsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { isClassMaster } = useTeacherAssignments();
 
   const isSuperAdmin = user?.isSuperAdmin;
   const userRoles = (user?.roles || []).map((r) => r.name.toLowerCase());
@@ -439,7 +441,7 @@ export default function ResultsPage() {
           ) : (
             <OfficialReportSheet
               data={reportCardData}
-              canEndorse={isSchoolAdmin}
+              canEndorse={isSchoolAdmin || isClassMaster}
               onEndorse={handleOpenEndorse}
             />
           )}

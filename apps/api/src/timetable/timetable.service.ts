@@ -108,6 +108,56 @@ export class TimetableService {
     return successResponse(slots);
   }
 
+  async getMySchedule(user: any, schoolId: string) {
+    const staffMatch = await this.prisma.staff.findFirst({
+      where: { schoolId, OR: [{ userId: user.id }, { email: user.email }] },
+      select: { id: true, firstName: true, lastName: true },
+    });
+
+    const assignments = await this.prisma.teacherAssignment.findMany({
+      where: { schoolId, userId: user.id },
+      select: { classId: true, subjectId: true },
+    });
+
+    const orConditions: any[] = [];
+    if (staffMatch) {
+      orConditions.push({ staffId: staffMatch.id });
+    }
+    assignments.forEach((a) => {
+      if (a.subjectId) {
+        orConditions.push({ classId: a.classId, subjectId: a.subjectId });
+      }
+    });
+
+    let slots: any[] = [];
+    if (orConditions.length > 0) {
+      slots = await this.prisma.timetableSlot.findMany({
+        where: {
+          class: { schoolId },
+          OR: orConditions,
+        },
+        include: {
+          class: { select: { id: true, name: true, section: true } },
+          subject: { select: { id: true, name: true, code: true } },
+          staff: { select: { firstName: true, lastName: true } },
+        },
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      });
+    }
+
+    const grouped = DAYS.reduce((acc, day, i) => {
+      acc[day] = slots.filter((s) => s.dayOfWeek === i + 1);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    return successResponse({
+      schedule: grouped,
+      slots,
+      totalSlots: slots.length,
+      staff: staffMatch ? `${staffMatch.firstName} ${staffMatch.lastName}` : null,
+    });
+  }
+
   async deleteSlot(id: string, schoolId: string) {
     const slot = await this.prisma.timetableSlot.findFirst({
       where: { id, class: { schoolId } },

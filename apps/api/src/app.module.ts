@@ -28,6 +28,7 @@ import { SchoolsModule } from './schools/schools.module';
 import { UsersModule } from './users/users.module';
 import { SchoolWebsiteModule } from './school-website/school-website.module';
 import { UploadModule } from './upload/upload.module';
+import { TeacherModule } from './teacher/teacher.module';
 import { PingController } from './health.controller';
 
 @Module({
@@ -57,6 +58,7 @@ import { PingController } from './health.controller';
     CbtModule, LibraryModule, HostelModule, HealthModule,
     InventoryModule, TimetableModule, NotificationsModule,
     SchoolsModule, UsersModule, SchoolWebsiteModule, UploadModule,
+    TeacherModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
