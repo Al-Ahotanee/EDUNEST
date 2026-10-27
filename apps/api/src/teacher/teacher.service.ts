@@ -335,8 +335,18 @@ export class TeacherService {
         student: {
           include: {
             guardians: {
-              where: { isPrimary: true },
-              select: { firstName: true, lastName: true, phone: true, relationship: true },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                email: true,
+                relationship: true,
+                occupation: true,
+                address: true,
+                isPrimary: true,
+                isEmergency: true,
+              },
             },
           },
         },
@@ -362,7 +372,7 @@ export class TeacherService {
     const students = enrollments.map((e) => {
       const s = e.student;
       const att = attendanceMap.get(s.id);
-      const primaryGuardian = s.guardians[0] || null;
+      const primaryGuardian = s.guardians.find((g: any) => g.isPrimary) || s.guardians[0] || null;
 
       return {
         id: s.id,
@@ -373,9 +383,23 @@ export class TeacherService {
         otherName: s.otherName,
         fullName: `${s.lastName}, ${s.firstName} ${s.otherName || ''}`.trim(),
         gender: s.gender,
+        dateOfBirth: s.dateOfBirth,
+        admissionDate: s.admissionDate || (s as any).createdAt,
+        bloodGroup: s.bloodGroup,
+        genotype: s.genotype,
+        stateOfOrigin: s.stateOfOrigin,
+        lga: s.lga,
+        nationality: s.nationality,
+        religion: s.religion,
+        address: s.address,
+        previousSchool: s.previousSchool,
+        medicalCondition: s.medicalCondition,
+        status: s.status,
         photo: s.photo,
+        guardians: s.guardians,
         guardianName: primaryGuardian ? `${primaryGuardian.firstName} ${primaryGuardian.lastName}` : null,
         guardianPhone: primaryGuardian?.phone || null,
+        guardianEmail: primaryGuardian?.email || null,
         guardianRelationship: primaryGuardian?.relationship || null,
         todayAttendance: att
           ? { id: att.id, status: att.status, remarks: att.remarks }

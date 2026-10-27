@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   Calendar, BookOpen, Clock, Users, Award, ChevronRight,
   School, CheckCircle2, AlertCircle, FileSpreadsheet, Eye,
-  Layers, MapPin, Sparkles, Filter,
+  MapPin, Filter, ArrowUpRight,
 } from 'lucide-react';
 import { Button, Badge, Card, PageLoader } from '../../components/ui';
 import { teacherApi } from '../../services/api';
@@ -38,266 +38,273 @@ export default function MyTeachingPage() {
   if (isLoading) return <PageLoader />;
 
   const teaching = dashboardData?.teaching || {};
-  const classes = teaching.classes || [];
-  const weeklySchedule = scheduleData?.weekly || {};
+  const classes: any[] = teaching.classes || [];
+  const weeklySchedule: any = scheduleData?.weekly || {};
   const academicState = dashboardData?.academicState || {};
+  const daySlots = weeklySchedule[selectedDay] || [];
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      {/* School / Subject Teacher Hero Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-md">
+    <div className="space-y-5 animate-fade-in pb-12">
+      {/* Enterprise Header */}
+      <div className="bg-slate-900 rounded-xl p-6 text-white border border-slate-800 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 uppercase tracking-wider">
-                Subject Teacher Portal
-              </span>
-              <span className="text-xs text-slate-400">
-                {academicState.sessionName} &bull; {academicState.termName}
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              <span>Subject Teacher Operations</span>
+              <span>&bull;</span>
+              <span>{academicState.sessionName || '2026/2027'}</span>
+              <span>&bull;</span>
+              <span className="text-blue-400">{academicState.termName || 'Current Term'}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-black tracking-tight text-white">
+                Faculty Schedule & Gradebook
+              </h1>
+              <span className="text-xs text-slate-400 font-medium">
+                Instructor: <strong className="text-white">{user?.firstName} {user?.lastName}</strong>
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-              Teaching Assignments & Schedule
-            </h1>
-            <p className="text-sm text-slate-300 mt-1">
-              Instructor: <span className="font-semibold text-white">{user?.firstName} {user?.lastName}</span>
-            </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link to="/app/results">
               <Button
                 variant="secondary"
                 size="sm"
-                icon={<Award size={16} />}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                icon={<Award size={15} />}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs"
               >
-                Score Entry Matrix
+                Gradebook & Results
               </Button>
             </Link>
           </div>
         </div>
 
-        {/* Quick KPI Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10">
+        {/* High-density Data KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-white/10">
           <div>
-            <p className="text-xs text-slate-400">Assigned Classes</p>
-            <p className="text-xl font-bold text-white">{classes.length}</p>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              Teaching Assignments
+            </span>
+            <p className="text-lg font-bold text-white">{classes.length}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400">Weekly Lessons</p>
-            <p className="text-xl font-bold text-indigo-400">{scheduleData?.totalWeeklySlots || 0}</p>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              Weekly Lessons
+            </span>
+            <p className="text-lg font-bold text-blue-400">{scheduleData?.totalWeeklySlots || 0}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400">Today's Periods</p>
-            <p className="text-xl font-bold text-emerald-400">{teaching.todayLessons?.length || 0}</p>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              Today's Periods
+            </span>
+            <p className="text-lg font-bold text-emerald-400">{teaching.todayLessons?.length || 0}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400">Total Enrolled Scholars</p>
-            <p className="text-xl font-bold text-white">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              Total Enrolled Scholars
+            </span>
+            <p className="text-lg font-bold text-white">
               {classes.reduce((sum: number, c: any) => sum + (c.studentCount || 0), 0)}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      {/* Navigation Tabs Bar */}
+      <div className="flex items-center gap-1 border-b border-slate-200">
         <button
           onClick={() => setActiveTab('classes')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-lg border-b-2 transition-all',
+            'flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition-all whitespace-nowrap',
             activeTab === 'classes'
-              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
           )}
         >
-          <BookOpen size={16} />
-          My Assigned Classes & Gradebook ({classes.length})
+          <BookOpen size={15} />
+          Assigned Classes & Gradebook ({classes.length})
         </button>
 
         <button
           onClick={() => setActiveTab('schedule')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-lg border-b-2 transition-all',
+            'flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition-all whitespace-nowrap',
             activeTab === 'schedule'
-              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/50'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
           )}
         >
-          <Calendar size={16} />
-          Weekly Teaching Timetable ({scheduleData?.totalWeeklySlots || 0} periods)
+          <Calendar size={15} />
+          Weekly Schedule Grid
         </button>
       </div>
 
-      {/* ─── TAB 1: CLASSES & GRADEBOOK ────────────────────────────────────── */}
+      {/* ─── TAB 1: ASSIGNED CLASSES & GRADEBOOK ────────────────────────────── */}
       {activeTab === 'classes' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classes.map((cls: any) => {
-              const statusColor =
-                cls.resultStatus === 'PUBLISHED'
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                  : cls.resultStatus === 'APPROVED'
-                  ? 'bg-blue-100 text-blue-800 border-blue-200'
-                  : cls.resultStatus === 'SUBMITTED'
-                  ? 'bg-amber-100 text-amber-800 border-amber-200'
-                  : 'bg-slate-100 text-slate-700 border-slate-200';
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-2.5 px-4">Subject</th>
+                    <th className="py-2.5 px-4">Class</th>
+                    <th className="py-2.5 px-3">Enrolled Scholars</th>
+                    <th className="py-2.5 px-4">Score Entry Status</th>
+                    <th className="py-2.5 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {classes.map((c: any) => (
+                    <tr key={c.assignmentId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-bold text-slate-900">
+                        {c.subjectName}
+                        <span className="ml-1 text-[11px] text-slate-400 font-normal">
+                          ({c.subjectCode})
+                        </span>
+                      </td>
 
-              return (
-                <div
-                  key={cls.assignmentId}
-                  className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                        {cls.subjectCode || 'SUBJ'}
-                      </span>
-                      <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-semibold border', statusColor)}>
-                        {cls.resultStatus || 'DRAFT'}
-                      </span>
-                    </div>
+                      <td className="py-3 px-4 font-semibold text-slate-700">
+                        {c.className} {c.section ? `(${c.section})` : ''}
+                      </td>
 
-                    <h3 className="text-lg font-bold text-slate-800">
-                      {cls.subjectName}
-                    </h3>
+                      <td className="py-3 px-3 font-mono font-bold text-slate-700">
+                        {c.studentCount}
+                      </td>
 
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <School size={16} className="text-slate-400" />
-                      <span className="font-semibold text-slate-800">
-                        {cls.className} {cls.section ? `(${cls.section})` : ''}
-                      </span>
-                    </div>
-                  </div>
+                      <td className="py-3 px-4">
+                        <span
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                            c.resultStatus === 'PUBLISHED' && 'bg-emerald-100 text-emerald-800',
+                            c.resultStatus === 'APPROVED' && 'bg-blue-100 text-blue-800',
+                            c.resultStatus === 'SUBMITTED' && 'bg-amber-100 text-amber-800',
+                            c.resultStatus === 'DRAFT' && 'bg-slate-100 text-slate-700'
+                          )}
+                        >
+                          {c.resultStatus || 'DRAFT'}
+                        </span>
+                      </td>
 
-                  <div className="pt-3 border-t border-slate-100 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Enrolled Students:</span>
-                      <span className="font-bold text-slate-800">{cls.studentCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Entered Scores:</span>
-                      <span className="font-bold text-slate-800">{cls.recordedCount} / {cls.studentCount}</span>
-                    </div>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/app/results?classId=${c.classId}&tab=broadsheet`}
+                            className="text-slate-600 hover:text-slate-900 font-semibold text-xs"
+                          >
+                            Broadsheet
+                          </Link>
+                          <Link
+                            to={`/app/results?classId=${c.classId}&subjectId=${c.subjectId}`}
+                          >
+                            <Button
+                              variant="primary"
+                              size="xs"
+                              icon={<ArrowUpRight size={13} />}
+                            >
+                              Enter Scores
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
 
-                    <Link
-                      to={`/app/results?classId=${cls.classId}&subjectId=${cls.subjectId}`}
-                      className="block"
-                    >
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="w-full justify-center bg-indigo-600 hover:bg-indigo-700"
-                        icon={<FileSpreadsheet size={15} />}
-                      >
-                        Open Gradebook Matrix
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-
-            {classes.length === 0 && (
-              <div className="col-span-full bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 italic">
-                No teaching assignments found. Please contact your school administrator to allocate subjects and classes.
-              </div>
-            )}
+                  {classes.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-10 text-center text-slate-400 italic">
+                        No subject assignments found for your account in the current term.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ─── TAB 2: WEEKLY TIMETABLE ───────────────────────────────────────── */}
+      {/* ─── TAB 2: WEEKLY SCHEDULE ────────────────────────────────────────── */}
       {activeTab === 'schedule' && (
         <div className="space-y-4">
           {/* Day Selector Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-slate-200">
             {DAYS.map((day) => {
-              const daySlots = weeklySchedule[day] || [];
+              const count = (weeklySchedule[day] || []).length;
               const isSelected = selectedDay === day;
               return (
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day)}
                   className={cn(
-                    'px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border',
+                    'flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all',
                     isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   )}
                 >
-                  <span>{day}</span>
+                  {day}
                   <span
                     className={cn(
-                      'text-xs px-1.5 py-0.2 rounded-full font-mono',
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                      'text-[10px] px-1.5 py-0.2 rounded-full font-mono',
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
                     )}
                   >
-                    {daySlots.length}
+                    {count}
                   </span>
                 </button>
               );
             })}
           </div>
 
-          {/* Schedule Table for Selected Day */}
+          {/* Day Schedule Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <Clock size={16} className="text-indigo-600" />
-                {selectedDay} Schedule
-              </h3>
-              <span className="text-xs text-slate-500">
-                {(weeklySchedule[selectedDay] || []).length} lessons scheduled
-              </span>
-            </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                    <th className="py-3 px-4">Period Time</th>
-                    <th className="py-3 px-4">Subject</th>
-                    <th className="py-3 px-4">Class</th>
-                    <th className="py-3 px-4">Room</th>
-                    <th className="py-3 px-4 text-right">Quick Action</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-2.5 px-4 w-40">Period Time</th>
+                    <th className="py-2.5 px-4">Subject</th>
+                    <th className="py-2.5 px-4">Class</th>
+                    <th className="py-2.5 px-3">Assigned Room</th>
+                    <th className="py-2.5 px-4 text-right">Quick Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {(weeklySchedule[selectedDay] || []).map((slot: any) => (
-                    <tr key={slot.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 font-mono text-xs font-bold text-indigo-700">
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {daySlots.map((slot: any) => (
+                    <tr key={slot.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-700">
                         {slot.startTime} - {slot.endTime}
                       </td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-800">
+                      <td className="py-3 px-4 font-bold text-slate-900">
                         {slot.subject?.name}
-                        <span className="ml-1.5 text-xs text-slate-400 font-normal">
+                        <span className="text-[11px] text-slate-400 font-normal ml-1">
                           ({slot.subject?.code})
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-medium text-slate-700">
-                        {slot.class?.name} {slot.class?.section ? `(${slot.class?.section})` : ''}
+                      <td className="py-3 px-4 font-semibold text-slate-700">
+                        {slot.class?.name} {slot.class?.section ? `(${slot.class.section})` : ''}
                       </td>
-                      <td className="py-3.5 px-4 text-xs text-slate-500 flex items-center gap-1 pt-4">
-                        <MapPin size={13} className="text-slate-400" />
-                        {slot.room || 'General Classroom'}
+                      <td className="py-3 px-3 text-slate-500 font-mono">
+                        {slot.room || 'Classroom'}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3 px-4 text-right">
                         <Link
-                          to={`/app/results?classId=${slot.classId}&subjectId=${slot.subjectId}`}
-                          className="inline-flex items-center text-xs text-indigo-600 hover:text-indigo-800 font-medium gap-1"
+                          to={`/app/results?classId=${slot.class?.id}&subjectId=${slot.subject?.id}`}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-800"
                         >
-                          Gradebook <ChevronRight size={14} />
+                          Scores &rarr;
                         </Link>
                       </td>
                     </tr>
                   ))}
 
-                  {(weeklySchedule[selectedDay] || []).length === 0 && (
+                  {daySlots.length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-10 text-center text-slate-400 italic">
-                        No lessons scheduled on {selectedDay}. Enjoy your prep period!
+                        No teaching periods scheduled on {selectedDay}.
                       </td>
                     </tr>
                   )}

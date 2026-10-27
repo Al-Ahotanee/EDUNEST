@@ -43,6 +43,7 @@ export function useTeacherAssignments() {
     hasDualRole,
     classMaster: teacherSummary?.classMaster || null,
     teaching: teacherSummary?.teaching || null,
+    teachingClasses: Array.isArray(teacherSummary?.teaching?.classes) ? teacherSummary.teaching.classes : [],
     academicState: teacherSummary?.academicState || null,
     teacherProfile: teacherSummary?.teacher || null,
     isLoading,

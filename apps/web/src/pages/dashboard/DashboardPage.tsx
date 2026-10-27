@@ -69,37 +69,38 @@ function TeacherDashboardView({ user }: { user: any }) {
   const teaching = dashData?.teaching || {};
   const roles = dashData?.roles || {};
   const academicState = dashData?.academicState || {};
-  const classes = teaching.classes || [];
-  const todayLessons = teaching.todayLessons || [];
+  const classes = Array.isArray(teaching.classes) ? teaching.classes : [];
+  const todayLessons = Array.isArray(teaching.todayLessons) ? teaching.todayLessons : [];
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      {/* School / Teacher Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-md">
+    <div className="space-y-5 animate-fade-in pb-12">
+      {/* Enterprise Faculty Header */}
+      <div className="bg-slate-900 rounded-xl p-6 text-white border border-slate-800 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              {roles.isClassMaster && (
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                  Class Master &bull; {classMaster?.className} {classMaster?.section ? `(${classMaster.section})` : ''}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              <span>Faculty Portal</span>
+              <span>&bull;</span>
+              <span>{academicState.sessionName || '2026/2027'}</span>
+              <span>&bull;</span>
+              <span className="text-blue-400">{academicState.termName || 'Current Term'}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-black tracking-tight text-white">
+                {user?.firstName} {user?.lastName}
+              </h1>
+              {roles.isClassMaster && classMaster && (
+                <span className="text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2.5 py-0.5 rounded">
+                  Class Master &bull; {classMaster.className} {classMaster.section ? `(${classMaster.section})` : ''}
                 </span>
               )}
               {roles.isSubjectTeacher && (
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                  Subject Teacher &bull; {teaching.assignmentsCount || classes.length} Teaching Assignment{classes.length === 1 ? '' : 's'}
+                <span className="text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-2.5 py-0.5 rounded">
+                  Subject Teacher &bull; {classes.length} Class{classes.length === 1 ? '' : 'es'}
                 </span>
               )}
-              <span className="text-xs text-slate-400 ml-1">
-                {academicState.sessionName} &bull; {academicState.termName}
-              </span>
             </div>
-
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Good {getGreeting()}, {user?.firstName} {user?.lastName}
-            </h1>
-            <p className="text-sm text-slate-300 mt-1">
-              Welcome to your faculty dashboard at {user?.school?.name || 'EduNest School Portal'}.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -108,10 +109,10 @@ function TeacherDashboardView({ user }: { user: any }) {
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<School size={16} />}
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                  icon={<School size={15} />}
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs"
                 >
-                  My Class Hub
+                  My Class
                 </Button>
               </Link>
             )}
@@ -120,8 +121,8 @@ function TeacherDashboardView({ user }: { user: any }) {
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<Calendar size={16} />}
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                  icon={<Calendar size={15} />}
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs"
                 >
                   My Schedule
                 </Button>
@@ -129,90 +130,89 @@ function TeacherDashboardView({ user }: { user: any }) {
             )}
           </div>
         </div>
-      </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {roles.isClassMaster && classMaster && (
-          <>
-            <StatCard
-              title="Class Enrolled"
-              value={(classMaster.enrolledCount || 0).toLocaleString()}
-              subtitle={`${classMaster.className} ${classMaster.section ? `(${classMaster.section})` : ''}`}
-              icon={<GraduationCap size={22} />}
-              color="blue"
-            />
-            <StatCard
-              title="Today's Attendance"
-              value={`${classMaster.todayAttendance?.attendanceRate || 0}%`}
-              subtitle={`${classMaster.todayAttendance?.present || 0} Present / ${classMaster.todayAttendance?.absent || 0} Absent`}
-              icon={<ClipboardCheck size={22} />}
-              color="green"
-            />
-          </>
-        )}
-
-        {roles.isSubjectTeacher && (
-          <>
-            <StatCard
-              title="Assigned Classes"
-              value={classes.length.toString()}
-              subtitle="Active teaching classes"
-              icon={<BookOpen size={22} />}
-              color="purple"
-            />
-            <StatCard
-              title="Today's Lessons"
-              value={todayLessons.length.toString()}
-              subtitle="Scheduled periods today"
-              icon={<Clock size={22} />}
-              color="indigo"
-            />
-          </>
-        )}
-      </div>
-
-      {/* ─── SECTION 1: CLASS MASTER HUB (If assigned) ────────────────────── */}
-      {roles.isClassMaster && classMaster && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                  <School size={18} />
+        {/* High-density Data KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-white/10">
+          {roles.isClassMaster && classMaster && (
+            <>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Enrolled in {classMaster.className}
                 </span>
-                <h2 className="text-lg font-bold text-slate-800">
-                  Class Master Workspace &bull; {classMaster.className} {classMaster.section ? `(${classMaster.section})` : ''}
-                </h2>
+                <p className="text-lg font-bold text-white">
+                  {(classMaster.enrolledCount || 0).toLocaleString()} scholars
+                </p>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Oversee daily attendance, holistic report card endorsements, broadsheet, and student records.
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Attendance Today
+                </span>
+                <p className="text-lg font-bold text-emerald-400">
+                  {classMaster.todayAttendance?.attendanceRate || 0}%{' '}
+                  <span className="text-xs font-normal text-slate-400">
+                    ({classMaster.todayAttendance?.present || 0} present)
+                  </span>
+                </p>
+              </div>
+            </>
+          )}
+
+          {roles.isSubjectTeacher && (
+            <>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Teaching Classes
+                </span>
+                <p className="text-lg font-bold text-white">{classes.length}</p>
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Today's Periods
+                </span>
+                <p className="text-lg font-bold text-blue-400">{todayLessons.length} lessons</p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ─── SECTION 1: CLASS MASTER WORKSPACE (If assigned) ────────────────── */}
+      {roles.isClassMaster && classMaster && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <School size={16} className="text-blue-600" />
+                Class Master Workspace &bull; {classMaster.className} {classMaster.section ? `(${classMaster.section})` : ''}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage student records, holistic report card endorsements, and daily attendance.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               <Link to="/app/my-class">
-                <Button variant="primary" size="sm" icon={<ClipboardCheck size={16} />}>
+                <Button variant="primary" size="xs" icon={<ClipboardCheck size={14} />}>
                   Take Today's Attendance
                 </Button>
               </Link>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Attendance Progress Snapshot */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Today's Attendance Status
-                </h3>
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Today's Attendance Rate
+                </span>
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                  {classMaster.todayAttendance?.attendanceRate || 0}% Present
+                  {classMaster.todayAttendance?.attendanceRate || 0}%
                 </span>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden flex">
+              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
                 <div
                   style={{ width: `${classMaster.enrolledCount ? (classMaster.todayAttendance.present / classMaster.enrolledCount) * 100 : 0}%` }}
                   className="bg-emerald-500 h-full"
@@ -233,141 +233,104 @@ function TeacherDashboardView({ user }: { user: any }) {
               <div className="grid grid-cols-4 text-center text-xs pt-1">
                 <div>
                   <p className="font-bold text-emerald-700">{classMaster.todayAttendance?.present || 0}</p>
-                  <p className="text-slate-500 text-[11px]">Present</p>
+                  <p className="text-slate-500 text-[10px]">Present</p>
                 </div>
                 <div>
                   <p className="font-bold text-amber-700">{classMaster.todayAttendance?.late || 0}</p>
-                  <p className="text-slate-500 text-[11px]">Late</p>
+                  <p className="text-slate-500 text-[10px]">Late</p>
                 </div>
                 <div>
                   <p className="font-bold text-rose-700">{classMaster.todayAttendance?.absent || 0}</p>
-                  <p className="text-slate-500 text-[11px]">Absent</p>
+                  <p className="text-slate-500 text-[10px]">Absent</p>
                 </div>
                 <div>
                   <p className="font-bold text-slate-600">{classMaster.todayAttendance?.unmarked || 0}</p>
-                  <p className="text-slate-500 text-[11px]">Unmarked</p>
+                  <p className="text-slate-500 text-[10px]">Unmarked</p>
                 </div>
               </div>
             </div>
 
-            {/* Quick Actions Shortcuts */}
-            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Quick Action Navigation */}
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Link
                 to="/app/my-class"
-                className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50/80 transition-all flex items-center justify-between group"
+                className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all flex flex-col justify-between group"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                    <Users size={18} />
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <Users size={16} />
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Class Roster</p>
-                    <p className="text-xs text-slate-500">{classMaster.enrolledCount} enrolled students</p>
-                  </div>
+                  <span className="text-xs font-bold text-slate-800">Student Roster</span>
                 </div>
-                <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-
-              <Link
-                to="/app/results"
-                className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50/80 transition-all flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                    <FileSpreadsheet size={18} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Class Broadsheet</p>
-                    <p className="text-xs text-slate-500">Monitor all subjects</p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                <p className="text-[11px] text-slate-500">{classMaster.enrolledCount} enrolled scholars</p>
               </Link>
 
               <Link
                 to="/app/my-class"
-                className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50/80 transition-all flex items-center justify-between group"
+                className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all flex flex-col justify-between group"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                    <Award size={18} />
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                    <FileSpreadsheet size={16} />
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Report Card Endorsement</p>
-                    <p className="text-xs text-slate-500">Remarks & behavioral ratings</p>
-                  </div>
+                  <span className="text-xs font-bold text-slate-800">Class Broadsheet</span>
                 </div>
-                <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                <p className="text-[11px] text-slate-500">Cumulative grades matrix</p>
               </Link>
 
-              {classMaster.allowCashCollection ? (
-                <Link
-                  to="/app/finance/class-master"
-                  className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50/80 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                      <DollarSign size={18} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">Class Cash Collection</p>
-                      <p className="text-xs text-slate-500">Authorized by school policy</p>
-                    </div>
+              <Link
+                to="/app/my-class"
+                className="p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all flex flex-col justify-between group"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                    <Award size={16} />
                   </div>
-                  <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              ) : (
-                <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50 text-slate-400 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center font-bold">
-                    <ShieldCheck size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-600">Cash Collection Disabled</p>
-                    <p className="text-[11px] text-slate-400">Strictly handled by School Accountant</p>
-                  </div>
+                  <span className="text-xs font-bold text-slate-800">Endorsements</span>
                 </div>
-              )}
+                <p className="text-[11px] text-slate-500">Report card evaluation</p>
+              </Link>
             </div>
           </div>
         </div>
       )}
 
-      {/* ─── SECTION 2: SUBJECT TEACHER HUB ───────────────────────────────── */}
+      {/* ─── SECTION 2: SUBJECT TEACHER WORKSPACE ───────────────────────────── */}
       {roles.isSubjectTeacher && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Today's Teaching Schedule */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <Clock size={16} className="text-indigo-600" />
-                Today's Teaching Schedule
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                <Clock size={15} className="text-blue-600" />
+                Today's Schedule
               </h3>
               <span className="text-xs text-slate-500 font-semibold">{todayLessons.length} lessons</span>
             </div>
 
-            <div className="space-y-3">
-              {todayLessons.map((lesson: any, i: number) => (
+            <div className="space-y-2">
+              {todayLessons.map((lesson: any) => (
                 <div
                   key={lesson.id}
-                  className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between hover:bg-slate-100/80 transition-colors"
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-indigo-600">
+                      <span className="font-mono text-xs font-bold text-blue-700">
                         {lesson.startTime} - {lesson.endTime}
                       </span>
-                      <span className="text-xs font-semibold text-slate-700 bg-slate-200/60 px-1.5 py-0.2 rounded">
+                      <span className="text-[11px] font-semibold text-slate-700 bg-slate-200/80 px-1.5 py-0.2 rounded">
                         {lesson.className}
                       </span>
                     </div>
-                    <p className="text-sm font-bold text-slate-800">{lesson.subjectName}</p>
-                    <p className="text-xs text-slate-400 flex items-center gap-1">
-                      <MapPin size={12} /> {lesson.room}
+                    <p className="text-xs font-bold text-slate-900">{lesson.subjectName}</p>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <MapPin size={11} /> {lesson.room || 'Classroom'}
                     </p>
                   </div>
                   <Link
                     to="/app/teaching"
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800"
                   >
                     View
                   </Link>
@@ -375,27 +338,27 @@ function TeacherDashboardView({ user }: { user: any }) {
               ))}
 
               {todayLessons.length === 0 && (
-                <div className="py-8 text-center text-slate-400 italic text-sm">
-                  No classes scheduled for you today.
+                <div className="py-8 text-center text-slate-400 italic text-xs">
+                  No teaching periods scheduled for you today.
                 </div>
               )}
             </div>
 
-            <Link to="/app/teaching" className="block pt-2">
-              <Button variant="secondary" size="sm" className="w-full justify-center">
-                View Full Weekly Timetable
+            <Link to="/app/teaching" className="block pt-1">
+              <Button variant="secondary" size="xs" className="w-full justify-center">
+                View Weekly Timetable
               </Button>
             </Link>
           </div>
 
           {/* Assigned Classes & Gradebook Matrix */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <BookOpen size={16} className="text-indigo-600" />
-                Assigned Classes & Gradebook Matrix
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                <BookOpen size={15} className="text-blue-600" />
+                Assigned Classes & Gradebook
               </h3>
-              <Link to="/app/results" className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">
+              <Link to="/app/results" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
                 Open Gradebook Hub &rarr;
               </Link>
             </div>
@@ -403,31 +366,31 @@ function TeacherDashboardView({ user }: { user: any }) {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider border-b border-slate-200">
-                    <th className="py-2.5 px-3">Subject</th>
-                    <th className="py-2.5 px-3">Class</th>
-                    <th className="py-2.5 px-3">Scholars</th>
-                    <th className="py-2.5 px-3">Score Entry Status</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
+                  <tr className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">
+                    <th className="py-2 px-3">Subject</th>
+                    <th className="py-2 px-3">Class</th>
+                    <th className="py-2 px-3">Scholars</th>
+                    <th className="py-2 px-3">Score Entry Status</th>
+                    <th className="py-2 px-3 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
+                <tbody className="divide-y divide-slate-100 text-xs">
                   {classes.map((c: any) => (
-                    <tr key={c.assignmentId} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-slate-800">
+                    <tr key={c.assignmentId} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
                         {c.subjectName}
-                        <span className="ml-1 text-xs text-slate-400 font-normal">({c.subjectCode})</span>
+                        <span className="ml-1 text-[11px] text-slate-400 font-normal">({c.subjectCode})</span>
                       </td>
-                      <td className="py-3 px-3 font-medium text-slate-700">
+                      <td className="py-2.5 px-3 font-semibold text-slate-700">
                         {c.className} {c.section ? `(${c.section})` : ''}
                       </td>
-                      <td className="py-3 px-3 text-slate-600 text-xs font-mono font-bold">
+                      <td className="py-2.5 px-3 text-slate-700 font-mono font-bold">
                         {c.studentCount}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-2.5 px-3">
                         <span
                           className={cn(
-                            'px-2 py-0.5 rounded-full text-xs font-semibold',
+                            'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
                             c.resultStatus === 'PUBLISHED' && 'bg-emerald-100 text-emerald-800',
                             c.resultStatus === 'APPROVED' && 'bg-blue-100 text-blue-800',
                             c.resultStatus === 'SUBMITTED' && 'bg-amber-100 text-amber-800',
@@ -437,10 +400,10 @@ function TeacherDashboardView({ user }: { user: any }) {
                           {c.resultStatus || 'DRAFT'}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className="py-2.5 px-3 text-right">
                         <Link
                           to={`/app/results?classId=${c.classId}&subjectId=${c.subjectId}`}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded transition-colors"
                         >
                           Enter Scores
                         </Link>
@@ -450,8 +413,8 @@ function TeacherDashboardView({ user }: { user: any }) {
 
                   {classes.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 italic">
-                        No subject assignments found for your account.
+                      <td colSpan={5} className="py-8 text-center text-slate-400 italic text-xs">
+                        No subject assignments found for your account in the active term.
                       </td>
                     </tr>
                   )}

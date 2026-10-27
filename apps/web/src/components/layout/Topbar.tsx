@@ -49,17 +49,23 @@ export function Topbar({
   onToggleSidebar: () => void;
   onToggleMobile?: () => void;
 }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Fetch REAL notifications (was previously hardcoded fake data — P1 fix)
+  // Fetch REAL notifications with auth guard to prevent 401 on expired/unready sessions
+  const hasToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('accessToken'));
   const { data: notifData } = useQuery({
     queryKey: ['topbar-notifications'],
-    queryFn: () => api.get('/notifications?limit=5').then((r) => r.data?.data || []),
+    queryFn: () =>
+      api
+        .get('/notifications?limit=5')
+        .then((r) => r.data?.data || [])
+        .catch(() => []),
     retry: false,
     refetchInterval: 60000,
+    enabled: Boolean(user && isAuthenticated && hasToken),
   });
   const notifications = Array.isArray(notifData) ? notifData : [];
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;

@@ -10,11 +10,22 @@ interface DocumentModalProps {
   onClose: () => void;
   student: any;
   school: any;
+  defaultDocType?: 'admission' | 'enrollment';
 }
 
-export const StudentDocumentModal: React.FC<DocumentModalProps> = ({ open, onClose, student, school }) => {
-  const [docType, setDocType] = React.useState<'admission' | 'enrollment'>('admission');
+export const StudentDocumentModal: React.FC<DocumentModalProps> = ({
+  open,
+  onClose,
+  student,
+  school,
+  defaultDocType = 'admission',
+}) => {
+  const [docType, setDocType] = React.useState<'admission' | 'enrollment'>(defaultDocType);
   const docRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (defaultDocType) setDocType(defaultDocType);
+  }, [defaultDocType]);
 
   if (!open || !student) return null;
 

@@ -216,9 +216,14 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
 
       if (isClassMaster) {
         teacherItems.push({
-          label: 'My Class',
+          label: classMaster?.className ? `My Class (${classMaster.className})` : 'My Class',
           path: '/app/my-class',
           icon: <School size={18} />,
+        });
+        teacherItems.push({
+          label: 'Daily Attendance',
+          path: '/app/attendance',
+          icon: <ClipboardCheck size={18} />,
         });
       }
 
@@ -231,7 +236,6 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
       }
 
       teacherItems.push(
-        { label: 'Attendance', path: '/app/attendance', icon: <ClipboardCheck size={18} /> },
         { label: 'Results & Gradebook', path: '/app/results', icon: <Award size={18} /> },
         { label: 'CBT Exams', path: '/app/cbt', icon: <Monitor size={18} /> },
         { label: 'Notifications', path: '/app/notifications', icon: <Bell size={18} /> },
@@ -345,7 +349,11 @@ export function Sidebar({ collapsed, mobileOpen = false, onCloseMobile }: Sideba
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {!isCollapsed && <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-1">School Operations</p>}
+        {!isCollapsed && (
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-1">
+            {isTeacher ? 'Faculty Workspace' : 'School Operations'}
+          </p>
+        )}
         {visibleNavItems.map(item => (
           <NavItemComponent
             key={item.label}

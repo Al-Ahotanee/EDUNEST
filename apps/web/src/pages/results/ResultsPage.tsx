@@ -144,7 +144,12 @@ export default function ResultsPage() {
     if (isSchoolAdmin || !isTeacher) return classesData;
     const allowedClassIds = new Set<string>();
     if (classMaster?.classId) allowedClassIds.add(classMaster.classId);
-    (teaching || []).forEach((t: any) => {
+    const classesList: any[] = Array.isArray(teaching)
+      ? teaching
+      : Array.isArray(teaching?.classes)
+      ? teaching.classes
+      : [];
+    classesList.forEach((t: any) => {
       if (t.classId) allowedClassIds.add(t.classId);
     });
     return classesData.filter((c: any) => allowedClassIds.has(c.id));
@@ -155,8 +160,13 @@ export default function ResultsPage() {
     if (classMaster?.classId && selectedClass === classMaster.classId) {
       return subjectsData;
     }
+    const classesList: any[] = Array.isArray(teaching)
+      ? teaching
+      : Array.isArray(teaching?.classes)
+      ? teaching.classes
+      : [];
     const taughtSubjectIds = new Set<string>(
-      (teaching || [])
+      classesList
         .filter((t: any) => t.classId === selectedClass)
         .map((t: any) => t.subjectId)
     );

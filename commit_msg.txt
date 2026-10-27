@@ -1,0 +1,8 @@
+fix(teacher-portal): resolve forEach crash, eliminate 401 notifs, and complete enterprise UI overhaul with Student 360 profile and Admission Letter
+
+- Fix TypeError: (u || []).forEach is not a function in ResultsPage.tsx by resolving teachingClasses as array
+- Guard notifications query in Topbar.tsx with auth and token state to eliminate 401 errors
+- Add Student360Modal component for full student demographics, guardian contacts, and academic history
+- Connect official printable Admission Letter & Enrollment Form to Class Master student roster
+- Complete enterprise UI overhaul for MyClassPage, MyTeachingPage, and DashboardPage
+- Refine teacher sidebar navigation and remove dead-end disabled cards
