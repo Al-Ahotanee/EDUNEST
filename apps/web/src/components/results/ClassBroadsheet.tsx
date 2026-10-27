@@ -5,29 +5,38 @@ import { Button, Select, PageLoader } from '../ui';
 import { resultsApi } from '../../services/api';
 
 interface ClassBroadsheetProps {
-  classes: any[];
-  terms: any[];
-  selectedClass: string;
-  selectedTerm: string;
-  onClassChange: (id: string) => void;
-  onTermChange: (id: string) => void;
+  classes?: any[];
+  terms?: any[];
+  selectedClass?: string;
+  selectedTerm?: string;
+  classId?: string;
+  termId?: string;
+  onClassChange?: (id: string) => void;
+  onTermChange?: (id: string) => void;
+  hideFilters?: boolean;
 }
 
 export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
-  classes,
-  terms,
+  classes = [],
+  terms = [],
   selectedClass,
   selectedTerm,
+  classId,
+  termId,
   onClassChange,
   onTermChange,
+  hideFilters = false,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
+  const activeClass = selectedClass || classId || '';
+  const activeTerm = selectedTerm || termId || '';
+
   const { data: broadsheet, isLoading } = useQuery({
-    queryKey: ['class-broadsheet', selectedClass, selectedTerm],
+    queryKey: ['class-broadsheet', activeClass, activeTerm],
     queryFn: () =>
-      resultsApi.broadsheet(selectedClass, selectedTerm).then((r) => r.data.data),
-    enabled: !!(selectedClass && selectedTerm),
+      resultsApi.broadsheet(activeClass, activeTerm).then((r) => r.data?.data || r.data),
+    enabled: !!(activeClass && activeTerm),
   });
 
   const exportCSV = () => {
@@ -46,13 +55,13 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
       'Promotion Status',
     ];
 
-    const rows = broadsheet.students.map((s: any) => {
+    const rows = (broadsheet.students || []).map((s: any) => {
       const subjectScores = subjects.map((sub: any) => {
-        const found = s.subjects.find((item: any) => item.subjectId === sub.id);
+        const found = (s.subjects || []).find((item: any) => item.subjectId === sub.id);
         return found?.totalScore ?? '';
       });
       const subjectGrades = subjects.map((sub: any) => {
-        const found = s.subjects.find((item: any) => item.subjectId === sub.id);
+        const found = (s.subjects || []).find((item: any) => item.subjectId === sub.id);
         return found?.grade ?? '';
       });
 
@@ -75,7 +84,7 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
     link.setAttribute('href', encodedUri);
     link.setAttribute(
       'download',
-      `broadsheet_${broadsheet.class?.name}_${broadsheet.term?.name}.csv`.replace(/\s+/g, '_'),
+      `broadsheet_${broadsheet.class?.name || activeClass}_${broadsheet.term?.name || activeTerm}.csv`.replace(/\s+/g, '_'),
     );
     document.body.appendChild(link);
     link.click();
@@ -89,31 +98,33 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
   return (
     <div className="space-y-4">
       {/* Selector Filters */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3 print:hidden">
-        <Select
-          label="Select Class"
-          value={selectedClass}
-          onChange={(e) => onClassChange(e.target.value)}
-          options={classes.map((c) => ({
-            value: c.id,
-            label: `${c.name} ${c.section ? `(${c.section})` : ''}`,
-          }))}
-          placeholder="Select Class..."
-        />
+      {!hideFilters && (classes?.length > 0 || terms?.length > 0) && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3 print:hidden">
+          <Select
+            label="Select Class"
+            value={activeClass}
+            onChange={(e) => onClassChange?.(e.target.value)}
+            options={(classes || []).map((c) => ({
+              value: c.id,
+              label: `${c.name} ${c.section ? `(${c.section})` : ''}`,
+            }))}
+            placeholder="Select Class..."
+          />
 
-        <Select
-          label="Select Academic Term"
-          value={selectedTerm}
-          onChange={(e) => onTermChange(e.target.value)}
-          options={terms.map((t) => ({
-            value: t.id,
-            label: `${t.name} (${t.session?.name || ''})`,
-          }))}
-          placeholder="Select Term..."
-        />
-      </div>
+          <Select
+            label="Select Academic Term"
+            value={activeTerm}
+            onChange={(e) => onTermChange?.(e.target.value)}
+            options={(terms || []).map((t) => ({
+              value: t.id,
+              label: `${t.name} (${t.session?.name || ''})`,
+            }))}
+            placeholder="Select Term..."
+          />
+        </div>
+      )}
 
-      {!selectedClass || !selectedTerm ? (
+      {!activeClass || !activeTerm ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500">
           <p className="text-base font-semibold text-slate-700">Please select a Class and Term</p>
           <p className="text-xs text-slate-400 mt-1">The master class broadsheet will compile automatically.</p>
@@ -213,7 +224,7 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
                     <th className="py-2 px-2 text-center border border-slate-800 w-8">Pos</th>
                     <th className="py-2 px-3 border border-slate-800 min-w-[140px]">Student Name</th>
                     <th className="py-2 px-2 border border-slate-800 w-24">Adm. No</th>
-                    {broadsheet.subjects.map((sub: any) => (
+                    {(broadsheet.subjects || []).map((sub: any) => (
                       <th
                         key={sub.id}
                         className="py-2 px-1 text-center border border-slate-800 min-w-[58px]"
@@ -235,7 +246,7 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
                 </thead>
 
                 <tbody className="divide-y divide-slate-200 text-[11px]">
-                  {broadsheet.students.map((student: any, idx: number) => (
+                  {(broadsheet.students || []).map((student: any, idx: number) => (
                     <tr
                       key={student.studentId}
                       className={`hover:bg-blue-50/30 transition-colors ${
@@ -253,8 +264,8 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
                       </td>
 
                       {/* Subject Marks */}
-                      {broadsheet.subjects.map((sub: any) => {
-                        const scoreData = student.subjects.find((s: any) => s.subjectId === sub.id);
+                      {(broadsheet.subjects || []).map((sub: any) => {
+                        const scoreData = (student.subjects || []).find((s: any) => s.subjectId === sub.id);
                         const hasScore = scoreData && scoreData.totalScore !== null;
                         return (
                           <td
@@ -313,8 +324,8 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
                     <td colSpan={3} className="py-1.5 px-3 border border-slate-300 uppercase tracking-wide">
                       Subject Class Average
                     </td>
-                    {broadsheet.subjects.map((sub: any) => {
-                      const stat = broadsheet.subjectStats?.find((s: any) => s.subjectId === sub.id);
+                    {(broadsheet.subjects || []).map((sub: any) => {
+                      const stat = (broadsheet.subjectStats || []).find((s: any) => s.subjectId === sub.id);
                       return (
                         <td key={sub.id} className="py-1.5 px-1 text-center font-mono border border-slate-300">
                           {stat?.averageScore ?? '—'}%
@@ -330,8 +341,8 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
                     <td colSpan={3} className="py-1.5 px-3 border border-slate-300 uppercase tracking-wide">
                       Subject Highest Score
                     </td>
-                    {broadsheet.subjects.map((sub: any) => {
-                      const stat = broadsheet.subjectStats?.find((s: any) => s.subjectId === sub.id);
+                    {(broadsheet.subjects || []).map((sub: any) => {
+                      const stat = (broadsheet.subjectStats || []).find((s: any) => s.subjectId === sub.id);
                       return (
                         <td key={sub.id} className="py-1.5 px-1 text-center font-mono text-emerald-700 border border-slate-300">
                           {stat?.highestScore ?? '—'}
@@ -345,8 +356,8 @@ export const ClassBroadsheet: React.FC<ClassBroadsheetProps> = ({
                     <td colSpan={3} className="py-1.5 px-3 border border-slate-300 uppercase tracking-wide">
                       Subject Pass Rate (%)
                     </td>
-                    {broadsheet.subjects.map((sub: any) => {
-                      const stat = broadsheet.subjectStats?.find((s: any) => s.subjectId === sub.id);
+                    {(broadsheet.subjects || []).map((sub: any) => {
+                      const stat = (broadsheet.subjectStats || []).find((s: any) => s.subjectId === sub.id);
                       return (
                         <td key={sub.id} className="py-1.5 px-1 text-center font-mono border border-slate-300">
                           {stat?.passRate ?? '—'}%

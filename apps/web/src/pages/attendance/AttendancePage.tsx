@@ -131,11 +131,11 @@ export default function AttendancePage() {
     enabled: scope !== 'staff' && !!selectedClass,
   });
 
-  // Staff list for staff attendance scope
+  // Staff list for staff attendance scope (strictly Admin/Principal only)
   const { data: staffList, isLoading: loadingStaff } = useQuery<any[]>({
     queryKey: ['staff-list-attendance'],
     queryFn: () => hrApi.list({ limit: 150 }).then(r => r.data.data || []),
-    enabled: scope === 'staff',
+    enabled: scope === 'staff' && isAdmin,
   });
 
   // Initialize student attendance roster

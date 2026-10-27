@@ -172,7 +172,7 @@ export const ScoreEntrySpreadsheet: React.FC<ScoreEntrySpreadsheetProps> = ({
           label="Class & Arm"
           value={selectedClass}
           onChange={(e) => onClassChange(e.target.value)}
-          options={classes.map((c) => ({
+          options={(classes || []).map((c) => ({
             value: c.id,
             label: `${c.name} ${c.section ? `(${c.section})` : ''}`,
           }))}
@@ -183,7 +183,7 @@ export const ScoreEntrySpreadsheet: React.FC<ScoreEntrySpreadsheetProps> = ({
           label="Subject"
           value={selectedSubject}
           onChange={(e) => onSubjectChange(e.target.value)}
-          options={subjects.map((s) => ({
+          options={(subjects || []).map((s) => ({
             value: s.id,
             label: `${s.name} (${s.code})`,
           }))}
@@ -194,7 +194,7 @@ export const ScoreEntrySpreadsheet: React.FC<ScoreEntrySpreadsheetProps> = ({
           label="Academic Term"
           value={selectedTerm}
           onChange={(e) => onTermChange(e.target.value)}
-          options={terms.map((t) => ({
+          options={(terms || []).map((t) => ({
             value: t.id,
             label: `${t.name} (${t.session?.name || ''})`,
           }))}

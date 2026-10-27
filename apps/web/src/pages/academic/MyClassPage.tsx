@@ -76,8 +76,8 @@ export default function MyClassPage() {
   const cls = myClassData?.class || {};
   const students = (myClassData?.students || []).filter((s: any) =>
     !search ||
-    s.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    s.admissionNumber.toLowerCase().includes(search.toLowerCase())
+    (s.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
+    (s.admissionNumber || '').toLowerCase().includes(search.toLowerCase())
   );
   const timetableSlots = myClassData?.timetableSlots || [];
   const session = myClassData?.session || {};
@@ -629,7 +629,8 @@ export default function MyClassPage() {
         <div className="space-y-4">
           <ClassBroadsheet
             classId={cls.id}
-            termId={term.id}
+            termId={term?.id}
+            hideFilters={true}
           />
         </div>
       )}

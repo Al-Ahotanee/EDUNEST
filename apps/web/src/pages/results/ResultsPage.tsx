@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -55,8 +56,15 @@ const GRADE_COLORS: Record<string, string> = {
 
 export default function ResultsPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const queryClassId = searchParams.get('classId');
+  const querySubjectId = searchParams.get('subjectId');
+  const queryStudentId = searchParams.get('studentId');
+  const queryTermId = searchParams.get('termId');
+  const queryTab = searchParams.get('tab');
+
   const { user } = useAuthStore();
-  const { isClassMaster } = useTeacherAssignments();
+  const { isTeacher, isClassMaster, classMaster, teaching } = useTeacherAssignments();
 
   const isSuperAdmin = user?.isSuperAdmin;
   const userRoles = (user?.roles || []).map((r) => r.name.toLowerCase());
@@ -69,14 +77,14 @@ export default function ResultsPage() {
     );
 
   const [tab, setTab] = useState<'analytics' | 'matrix' | 'broadsheet' | 'pipeline' | 'reportcard' | 'assignments'>(
-    'matrix',
+    (queryTab as any) || (queryStudentId ? 'reportcard' : 'matrix'),
   );
 
-  // Common filters
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedTerm, setSelectedTerm] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState('');
+  // Common filters initialized with URL params
+  const [selectedClass, setSelectedClass] = useState(queryClassId || '');
+  const [selectedSubject, setSelectedSubject] = useState(querySubjectId || '');
+  const [selectedTerm, setSelectedTerm] = useState(queryTermId || '');
+  const [selectedStudent, setSelectedStudent] = useState(queryStudentId || '');
 
   // Endorsement Modal State
   const [endorseModalOpen, setEndorseModalOpen] = useState(false);
@@ -131,17 +139,62 @@ export default function ResultsPage() {
   });
   const currentTerm = termsData.find((t: any) => t.isCurrent) || termsData[0];
 
-  // Auto-select defaults
+  // Filter available classes and subjects for teachers based on assigned scopes
+  const availableClasses = React.useMemo(() => {
+    if (isSchoolAdmin || !isTeacher) return classesData;
+    const allowedClassIds = new Set<string>();
+    if (classMaster?.classId) allowedClassIds.add(classMaster.classId);
+    (teaching || []).forEach((t: any) => {
+      if (t.classId) allowedClassIds.add(t.classId);
+    });
+    return classesData.filter((c: any) => allowedClassIds.has(c.id));
+  }, [classesData, isSchoolAdmin, isTeacher, classMaster, teaching]);
+
+  const availableSubjects = React.useMemo(() => {
+    if (isSchoolAdmin || !isTeacher) return subjectsData;
+    if (classMaster?.classId && selectedClass === classMaster.classId) {
+      return subjectsData;
+    }
+    const taughtSubjectIds = new Set<string>(
+      (teaching || [])
+        .filter((t: any) => t.classId === selectedClass)
+        .map((t: any) => t.subjectId)
+    );
+    return subjectsData.filter((s: any) => taughtSubjectIds.has(s.id));
+  }, [subjectsData, isSchoolAdmin, isTeacher, classMaster, teaching, selectedClass]);
+
+  // Auto-select defaults taking URL query parameters and assignments into account
   React.useEffect(() => {
-    if (!selectedTerm && currentTerm?.id) setSelectedTerm(currentTerm.id);
-    if (!selectedClass && classesData[0]?.id) setSelectedClass(classesData[0].id);
-    if (!selectedSubject && subjectsData[0]?.id) setSelectedSubject(subjectsData[0].id);
-  }, [currentTerm, classesData, subjectsData, selectedTerm, selectedClass, selectedSubject]);
+    if (!selectedTerm && currentTerm?.id) {
+      setSelectedTerm(queryTermId || currentTerm.id);
+    }
+    if (!selectedClass && availableClasses.length > 0) {
+      const match = queryClassId && availableClasses.some((c: any) => c.id === queryClassId);
+      setSelectedClass(match ? queryClassId : availableClasses[0].id);
+    }
+    if (!selectedSubject && availableSubjects.length > 0) {
+      const match = querySubjectId && availableSubjects.some((s: any) => s.id === querySubjectId);
+      setSelectedSubject(match ? querySubjectId : availableSubjects[0].id);
+    }
+    if (queryStudentId && !selectedStudent) {
+      setSelectedStudent(queryStudentId);
+    }
+  }, [currentTerm, availableClasses, availableSubjects, queryClassId, querySubjectId, queryStudentId, queryTermId]);
+
+  // When selectedClass changes, adjust selectedSubject if it's no longer valid in the new class
+  React.useEffect(() => {
+    if (selectedClass && availableSubjects.length > 0) {
+      const isValid = availableSubjects.some((s: any) => s.id === selectedSubject);
+      if (!isValid) {
+        setSelectedSubject(availableSubjects[0].id);
+      }
+    }
+  }, [selectedClass, availableSubjects, selectedSubject]);
 
   // Overall Statistics Query
   const { data: resultStats } = useQuery({
     queryKey: ['result-stats', selectedTerm || currentTerm?.id],
-    queryFn: () => resultsApi.stats(selectedTerm || currentTerm?.id).then((r) => r.data.data),
+    queryFn: () => resultsApi.stats(selectedTerm || currentTerm?.id).then((r) => r.data?.data || r.data),
     enabled: !!(selectedTerm || currentTerm?.id),
   });
 
@@ -149,10 +202,16 @@ export default function ResultsPage() {
   const { data: classEnrollments = [] } = useQuery({
     queryKey: ['class-enrollments', selectedClass],
     queryFn: () =>
-      resultsApi
-        .matrix({ classId: selectedClass, subjectId: selectedSubject || subjectsData[0]?.id || '', termId: selectedTerm || currentTerm?.id })
-        .then((r) => r.data.data?.students || []),
-    enabled: !!(selectedClass && (selectedTerm || currentTerm?.id)),
+      studentsApi
+        .list({ classId: selectedClass, limit: 100 })
+        .then((r) =>
+          (r.data?.data || []).map((s: any) => ({
+            studentId: s.id,
+            name: `${s.firstName} ${s.lastName}`,
+            admissionNumber: s.admissionNumber,
+          }))
+        ),
+    enabled: !!selectedClass,
   });
 
   // Auto-select student for report card
@@ -331,24 +390,34 @@ export default function ResultsPage() {
 
       {/* ─── TAB 1: SPREADSHEET MATRIX SCORE ENTRY ────────────────────────────── */}
       {tab === 'matrix' && (
-        <ScoreEntrySpreadsheet
-          classes={classesData}
-          subjects={subjectsData}
-          terms={termsData}
-          selectedClass={selectedClass}
-          selectedSubject={selectedSubject}
-          selectedTerm={selectedTerm}
-          onClassChange={setSelectedClass}
-          onSubjectChange={setSelectedSubject}
-          onTermChange={setSelectedTerm}
-          isPrivileged={isSchoolAdmin}
-        />
+        availableClasses.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
+            <GraduationCap className="mx-auto text-slate-400" size={40} />
+            <h3 className="text-base font-bold text-slate-800">No Assigned Classes Found</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              You are currently not assigned to teach any subjects or manage any classes. Please contact your school administrator to configure your teaching assignments.
+            </p>
+          </div>
+        ) : (
+          <ScoreEntrySpreadsheet
+            classes={availableClasses}
+            subjects={availableSubjects}
+            terms={termsData}
+            selectedClass={selectedClass}
+            selectedSubject={selectedSubject}
+            selectedTerm={selectedTerm}
+            onClassChange={setSelectedClass}
+            onSubjectChange={setSelectedSubject}
+            onTermChange={setSelectedTerm}
+            isPrivileged={isSchoolAdmin}
+          />
+        )
       )}
 
       {/* ─── TAB 2: CLASS BROADSHEET ──────────────────────────────────────────── */}
       {tab === 'broadsheet' && (
         <ClassBroadsheet
-          classes={classesData}
+          classes={availableClasses}
           terms={termsData}
           selectedClass={selectedClass}
           selectedTerm={selectedTerm}
@@ -371,7 +440,7 @@ export default function ResultsPage() {
                     setSelectedClass(e.target.value);
                     setSelectedStudent('');
                   }}
-                  options={classesData.map((c: any) => ({
+                  options={availableClasses.map((c: any) => ({
                     value: c.id,
                     label: `${c.name} ${c.section ? `(${c.section})` : ''}`,
                   }))}

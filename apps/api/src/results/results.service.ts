@@ -81,6 +81,11 @@ export class ResultsService {
       }
     }
 
+    // If action is view-only (e.g. broadsheet), permit teachers who teach in this class
+    if (action === 'view' && assignments.length > 0) {
+      return { isPrivileged: false, isClassMaster: false, role: 'SUBJECT_TEACHER' };
+    }
+
     // Graceful onboarding fallback: If the school has zero assignments configured yet, allow teachers access
     const totalAssignments = await this.prisma.teacherAssignment.count({ where: { schoolId, classId } });
     const isTeacher = roleNames.some((n: string) => n.includes('teacher') || n.includes('staff'));
