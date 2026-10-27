@@ -11,7 +11,8 @@ import { applyThemeColors } from '../../hooks/useTenantTheme';
 export default function SettingsPage() {
   const qc = useQueryClient();
   const { user, updateUser, logout } = useAuthStore();
-  const [tab, setTab] = useState<'school' | 'profile' | 'notifications' | 'security'>('school');
+  const isAdmin = Boolean(user?.isSuperAdmin || user?.roles?.some(r => ['Super Admin', 'Admin', 'School Admin', 'Principal'].includes(r.name)));
+  const [tab, setTab] = useState<'school' | 'profile' | 'notifications' | 'security'>(() => isAdmin ? 'school' : 'profile');
   const [savingPassword, setSavingPassword] = useState(false);
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -197,11 +198,11 @@ export default function SettingsPage() {
   });
 
   const TABS = [
-    { key: 'school', label: 'School Profile', icon: <Building size={16} /> },
-    { key: 'profile', label: 'My Profile', icon: <User size={16} /> },
-    { key: 'notifications', label: 'Notifications', icon: <Bell size={16} /> },
-    { key: 'security', label: 'Security', icon: <Shield size={16} /> },
-  ] as const;
+    ...(isAdmin ? [{ key: 'school' as const, label: 'School Profile', icon: <Building size={16} /> }] : []),
+    { key: 'profile' as const, label: 'My Profile', icon: <User size={16} /> },
+    { key: 'notifications' as const, label: 'Notifications', icon: <Bell size={16} /> },
+    { key: 'security' as const, label: 'Security', icon: <Shield size={16} /> },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -226,7 +227,7 @@ export default function SettingsPage() {
 
         {/* Content */}
         <div className="flex-1 space-y-6">
-          {tab === 'school' && (
+          {tab === 'school' && isAdmin && (
             <div className="card p-6 space-y-6">
               <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
                 <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><Building size={20} /></div>

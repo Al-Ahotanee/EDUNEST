@@ -45,7 +45,8 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const isNewRoute = searchParams.get('action') === 'new' || location.pathname.endsWith('/new') || location.pathname.endsWith('/register');
+  const isAdmin = Boolean(user?.isSuperAdmin || user?.roles?.some((r: any) => ['Super Admin', 'Admin', 'School Admin', 'Principal'].includes(r.name)));
+  const isNewRoute = (searchParams.get('action') === 'new' || location.pathname.endsWith('/new') || location.pathname.endsWith('/register')) && isAdmin;
   const [modalOpen, setModalOpen] = useState(isNewRoute);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -90,7 +91,6 @@ export default function StudentsPage() {
 
   // EDN-014: Unassigned students — surfaced in the admin UI with a bulk-assign
   // action so admins can move them into a class for the current session.
-  const isAdmin = user?.roles?.some((r: any) => r.name === 'Super Admin') || user?.isSuperAdmin;
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [unassignedSelected, setUnassignedSelected] = useState<Set<string>>(new Set());
   const [bulkClassId, setBulkClassId] = useState('');
@@ -452,20 +452,24 @@ setTimeout(function() {
           >
             <Eye size={15} />
           </button>
-          <button
-            onClick={() => handleEdit(row)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
-            title="Edit"
-          >
-            <Edit size={15} />
-          </button>
-          <button
-            onClick={() => setDeleteTarget(row)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
-            title="Delete"
-          >
-            <Trash2 size={15} />
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => handleEdit(row)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
+                title="Edit"
+              >
+                <Edit size={15} />
+              </button>
+              <button
+                onClick={() => setDeleteTarget(row)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                title="Delete"
+              >
+                <Trash2 size={15} />
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -522,9 +526,11 @@ setTimeout(function() {
               Print {selectedIds.size} ID Card{selectedIds.size > 1 ? 's' : ''}
             </Button>
           )}
-          <Button icon={<Plus size={15} />} onClick={() => setModalOpen(true)}>
-            Register Student
-          </Button>
+          {isAdmin && (
+            <Button icon={<Plus size={15} />} onClick={() => setModalOpen(true)}>
+              Register Student
+            </Button>
+          )}
         </div>
       </div>
 

@@ -109,7 +109,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: 'Notifications', path: '/app/notifications', icon: <Bell size={18} /> },
   { label: 'Reports', path: '/app/reports', icon: <BarChart3 size={18} />, adminOnly: true },
   { label: 'Website Builder', path: '/app/website-builder', icon: <Globe size={18} />, adminOnly: true },
-  { label: 'Settings', path: '/app/settings', icon: <Settings size={18} /> },
+  { label: 'Settings', path: '/app/settings', icon: <Settings size={18} />, adminOnly: true },
 ];
 
 function NavItemComponent({

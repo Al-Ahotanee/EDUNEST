@@ -78,7 +78,11 @@ async function main() {
       tenantId: tenant.id, name: 'Teacher', description: 'Academic staff access',
       rolePermissions: {
         create: allPermissions
-          .filter(p => ['students', 'attendance', 'results', 'academic'].includes(p.module) && ['read', 'create', 'update'].includes(p.action))
+          .filter(p => {
+            if (['results', 'cbt'].includes(p.module) && ['read', 'create', 'update'].includes(p.action)) return true;
+            if (['students', 'academic', 'attendance', 'timetable', 'notifications', 'library', 'hr'].includes(p.module) && p.action === 'read') return true;
+            return false;
+          })
           .map(p => ({ permissionId: p.id })),
       },
     },
@@ -91,7 +95,11 @@ async function main() {
       tenantId: tenant.id, name: 'Accountant', description: 'Finance module access',
       rolePermissions: {
         create: allPermissions
-          .filter(p => ['finance', 'students'].includes(p.module))
+          .filter(p => {
+            if (p.module === 'finance') return true;
+            if (p.module === 'students' && p.action === 'read') return true;
+            return false;
+          })
           .map(p => ({ permissionId: p.id })),
       },
     },

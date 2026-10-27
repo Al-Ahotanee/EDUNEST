@@ -15,13 +15,13 @@ export class FinanceController {
   constructor(private financeService: FinanceService) {}
 
   @Get('dashboard')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   getDashboardStats(@CurrentUser('schoolId') schoolId: string) {
     return this.financeService.getDashboardStats(schoolId);
   }
 
   @Get('monthly-trend')
-  @Roles('Super Admin', 'Accountant')
+  @Roles('Super Admin', 'Admin', 'School Admin', 'Accountant')
   getMonthlyTrend(
     @CurrentUser('schoolId') schoolId: string,
     @Query('year') year: number,

@@ -27,6 +27,7 @@ const TYPE_ICONS: Record<string, { icon: React.ReactNode; cls: string }> = {
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const isAdmin = Boolean(user?.isSuperAdmin || user?.roles?.some(r => ['Super Admin', 'Admin', 'School Admin', 'Principal'].includes(r.name)));
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [composeModal, setComposeModal] = useState(false);
 
@@ -71,7 +72,9 @@ export default function NotificationsPage() {
               Mark All Read
             </Button>
           )}
-          <Button icon={<Send size={16} />} onClick={() => setComposeModal(true)}>Send Notification</Button>
+          {isAdmin && (
+            <Button icon={<Send size={16} />} onClick={() => setComposeModal(true)}>Send Notification</Button>
+          )}
         </div>
       </div>
 

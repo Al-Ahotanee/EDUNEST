@@ -8,9 +8,13 @@ import {
 } from '../../components/ui';
 import { academicApi } from '../../services/api';
 import { formatDate } from '../../lib/utils';
+import { useAuthStore } from '../../store/authStore';
 
 export default function AcademicPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const isAdmin = Boolean(user?.isSuperAdmin || user?.roles?.some(r => ['Super Admin', 'Admin', 'School Admin', 'Principal'].includes(r.name)));
+
   // EDN-016 fix: Deep-link to the correct tab based on the URL path
   const [tab, setTab] = useState<'sessions' | 'classes' | 'subjects'>(() => {
     const path = window.location.pathname;
@@ -69,11 +73,13 @@ export default function AcademicPage() {
           <h1 className="page-title">Academic Management</h1>
           <p className="page-subtitle">Sessions, terms, classes and subjects</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {tab === 'sessions' && <Button icon={<Plus size={16} />} onClick={() => setSessionModal(true)}>New Session</Button>}
-          {tab === 'classes' && <Button icon={<Plus size={16} />} onClick={() => setClassModal(true)}>New Class</Button>}
-          {tab === 'subjects' && <Button icon={<Plus size={16} />} onClick={() => setSubjectModal(true)}>New Subject</Button>}
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {tab === 'sessions' && <Button icon={<Plus size={16} />} onClick={() => setSessionModal(true)}>New Session</Button>}
+            {tab === 'classes' && <Button icon={<Plus size={16} />} onClick={() => setClassModal(true)}>New Class</Button>}
+            {tab === 'subjects' && <Button icon={<Plus size={16} />} onClick={() => setSubjectModal(true)}>New Subject</Button>}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -114,9 +120,11 @@ export default function AcademicPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {session.isCurrent && <Badge status="ACTIVE" label="Current" />}
-                  <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setTermModal(session)}>
-                    Add Term
-                  </Button>
+                  {isAdmin && (
+                    <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setTermModal(session)}>
+                      Add Term
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="divide-y divide-slate-50">
@@ -157,11 +165,13 @@ export default function AcademicPage() {
               </div>
             </div>
           ))}
-          <button onClick={() => setClassModal(true)}
-            className="card p-5 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer min-h-[130px]">
-            <Plus size={24} />
-            <span className="text-sm font-medium">Add Class</span>
-          </button>
+          {isAdmin && (
+            <button onClick={() => setClassModal(true)}
+              className="card p-5 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer min-h-[130px]">
+              <Plus size={24} />
+              <span className="text-sm font-medium">Add Class</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -183,11 +193,13 @@ export default function AcademicPage() {
               {subj.description && <p className="text-xs text-slate-500 mt-2 line-clamp-2">{subj.description}</p>}
             </div>
           ))}
-          <button onClick={() => setSubjectModal(true)}
-            className="card p-5 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-purple-600 hover:border-purple-300 transition-all cursor-pointer min-h-[120px]">
-            <Plus size={24} />
-            <span className="text-sm font-medium">Add Subject</span>
-          </button>
+          {isAdmin && (
+            <button onClick={() => setSubjectModal(true)}
+              className="card p-5 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-purple-600 hover:border-purple-300 transition-all cursor-pointer min-h-[120px]">
+              <Plus size={24} />
+              <span className="text-sm font-medium">Add Subject</span>
+            </button>
+          )}
         </div>
       )}
 

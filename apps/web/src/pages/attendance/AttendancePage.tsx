@@ -15,7 +15,7 @@ import { useAuthStore } from '../../store/authStore';
 import { EduNestIcon } from '../../components/common/EduNestLogo';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' | 'HALF_DAY' | 'UNMARKED';
-type AttendanceScope = 'daily' | 'subject' | 'staff';
+type AttendanceScope = 'daily' | 'staff';
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string; short: string; color: string; badgeCls: string }[] = [
   { value: 'PRESENT', label: 'Present', short: 'P', color: 'bg-emerald-500 text-white', badgeCls: 'badge-green' },
@@ -30,11 +30,16 @@ export default function AttendancePage() {
   const { user } = useAuthStore();
   const school = user?.tenant || user?.school || { name: 'EduNest' };
 
+  // RBAC permissions: Only Admins and Class Masters can record or edit attendance. Normal teachers only view.
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const isAdmin = Boolean(isSuperAdmin || user?.roles?.some(r => ['Super Admin', 'Admin', 'School Admin', 'Principal'].includes(r.name)));
+  const isClassMaster = Boolean(user?.roles?.some(r => r.name === 'Class Master'));
+  const canRecordAttendance = isAdmin || isClassMaster;
+
   // Core navigation state
   const [scope, setScope] = useState<AttendanceScope>('daily');
-  const [tab, setTab] = useState<'mark' | 'history' | 'chronic'>('mark');
+  const [tab, setTab] = useState<'mark' | 'history' | 'chronic'>(() => canRecordAttendance ? 'mark' : 'history');
   const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -101,7 +106,6 @@ export default function AttendancePage() {
 
   // Data queries
   const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: () => academicApi.classes().then(r => r.data.data || []) });
-  const { data: subjectsData } = useQuery({ queryKey: ['subjects'], queryFn: () => academicApi.subjects().then(r => r.data.data || []) });
   const { data: sessionsData } = useQuery({ queryKey: ['sessions'], queryFn: () => academicApi.sessions().then(r => r.data.data || []) });
   const currentSession = sessionsData?.find((s: any) => s.isCurrent) || sessionsData?.[0];
   const { data: termsData } = useQuery({
@@ -232,7 +236,7 @@ export default function AttendancePage() {
         studentId: isStaff ? undefined : id,
         staffId: isStaff ? id : undefined,
         status: status as any,
-        remarks: targetRemarks[id] || (scope === 'subject' ? `Subject: ${selectedSubject || 'General'}` : undefined),
+        remarks: targetRemarks[id] || undefined,
         termId: selectedTerm || currentTerm?.id,
         date,
       }));
@@ -547,20 +551,24 @@ export default function AttendancePage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="secondary"
-            icon={<QrCode size={15} />}
-            onClick={() => setQrModal(true)}
-          >
-            QR Scanner
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<Printer size={15} />}
-            onClick={() => setQrBadgeModal(true)}
-          >
-            Print QR Badges
-          </Button>
+          {canRecordAttendance && (
+            <>
+              <Button
+                variant="secondary"
+                icon={<QrCode size={15} />}
+                onClick={() => setQrModal(true)}
+              >
+                QR Scanner
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Printer size={15} />}
+                onClick={() => setQrBadgeModal(true)}
+              >
+                Print QR Badges
+              </Button>
+            </>
+          )}
           {tab === 'history' && (
             <Button
               variant="secondary"
@@ -570,7 +578,7 @@ export default function AttendancePage() {
               Export CSV
             </Button>
           )}
-          {tab === 'mark' && (
+          {tab === 'mark' && canRecordAttendance && (
             <Button
               icon={<Save size={15} />}
               onClick={handleSave}
@@ -588,12 +596,11 @@ export default function AttendancePage() {
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
           {[
             { id: 'daily', label: 'Student Daily' },
-            { id: 'subject', label: 'Subject-Level' },
             { id: 'staff', label: 'Staff & Teachers' },
           ].map(s => (
             <button
               key={s.id}
-              onClick={() => { setScope(s.id as AttendanceScope); setTab('mark'); }}
+              onClick={() => { setScope(s.id as AttendanceScope); setTab(canRecordAttendance ? 'mark' : 'history'); }}
               className={cn(
                 'px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap',
                 scope === s.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
@@ -636,12 +643,14 @@ export default function AttendancePage() {
       {/* ─── NAVIGATION TABS & FILTERS ────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap border-b border-slate-200 pb-3">
         <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl flex-wrap">
-          <button
-            onClick={() => setTab('mark')}
-            className={cn('px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all', tab === 'mark' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-          >
-            Roll Call Register
-          </button>
+          {canRecordAttendance && (
+            <button
+              onClick={() => setTab('mark')}
+              className={cn('px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all', tab === 'mark' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+            >
+              Roll Call Register
+            </button>
+          )}
           <button
             onClick={() => setTab('history')}
             className={cn('px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all', tab === 'history' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
@@ -669,16 +678,6 @@ export default function AttendancePage() {
               value={selectedClass}
               onChange={e => setSelectedClass(e.target.value)}
               className="w-48 py-1.5 text-xs"
-            />
-          )}
-
-          {scope === 'subject' && (
-            <Select
-              options={(subjectsData || []).map((s: any) => ({ value: s.name, label: s.name }))}
-              placeholder="Select Subject *"
-              value={selectedSubject}
-              onChange={e => setSelectedSubject(e.target.value)}
-              className="w-44 py-1.5 text-xs"
             />
           )}
 
@@ -817,7 +816,7 @@ export default function AttendancePage() {
                     <th>Date</th>
                     <th>Status</th>
                     <th>Remarks</th>
-                    <th>Audit Action</th>
+                    {canRecordAttendance && <th>Audit Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -834,19 +833,21 @@ export default function AttendancePage() {
                         <Badge status={r.status} />
                       </td>
                       <td className="text-sm text-slate-500">{r.remarks || '—'}</td>
-                      <td>
-                        <button
-                          onClick={() => {
-                            setAuditModal(r);
-                            setAuditNewStatus(r.status);
-                            setAuditReason('');
-                          }}
-                          className="btn-secondary btn-sm gap-1"
-                        >
-                          <History size={13} />
-                          Correct Record
-                        </button>
-                      </td>
+                      {canRecordAttendance && (
+                        <td>
+                          <button
+                            onClick={() => {
+                              setAuditModal(r);
+                              setAuditNewStatus(r.status);
+                              setAuditReason('');
+                            }}
+                            className="btn-secondary btn-sm gap-1"
+                          >
+                            <History size={13} />
+                            Correct Record
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -885,7 +886,7 @@ export default function AttendancePage() {
                     <th>Unexcused Days</th>
                     <th>Consecutive Days</th>
                     <th>Risk Severity</th>
-                    <th>Escalation Action</th>
+                    {isAdmin && <th>Escalation Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -906,52 +907,54 @@ export default function AttendancePage() {
                           {st.riskLevel}
                         </span>
                       </td>
-                      <td>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            onClick={async () => {
-                              try {
-                                // Persist the warning as a notification to the school admin queue
-                                await api.post('/notifications/send', {
-                                  title: `⚠️ Official Warning: ${st.firstName} ${st.lastName}`,
-                                  message: `An official attendance warning has been generated for ${st.firstName} ${st.lastName} (Admission: ${st.admissionNumber || 'N/A'}). Chronic absenteeism rate: ${st.absenceRate || 'high'}. Parent/guardian should be contacted immediately.`,
-                                  type: 'WARNING',
-                                  targetRole: 'ALL_USERS',
-                                  targetStudentId: st.id,
-                                  metadata: { action: 'ATTENDANCE_WARNING', severity: st.riskLevel, unexcusedAbsences: st.unexcusedAbsences },
-                                });
-                                toast.success(`Official Warning Letter generated and persisted for parent of ${st.firstName}`);
-                              } catch (e: any) {
-                                // Even if persistence fails, surface the user-facing message
-                                toast.success(`Official Warning Letter generated for parent of ${st.firstName} (saved offline)`);
-                              }
-                            }}
-                            className="btn-sm bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
-                          >
-                            Issue Warning
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api.post('/notifications/send', {
-                                  title: `📋 Counselor Referral: ${st.firstName} ${st.lastName}`,
-                                  message: `Counselor referral ticket logged for ${st.firstName} ${st.lastName}. Risk level: ${st.riskLevel}. Please schedule a counseling session with the student and follow up with the parent/guardian.`,
-                                  type: 'INFO',
-                                  targetRole: 'ALL_USERS',
-                                  targetStudentId: st.id,
-                                  metadata: { action: 'COUNSELOR_REFERRAL', severity: st.riskLevel },
-                                });
-                                toast.success(`Counselor referral ticket logged for ${st.firstName}`);
-                              } catch (e: any) {
-                                toast.success(`Counselor referral ticket logged for ${st.firstName} (saved offline)`);
-                              }
-                            }}
-                            className="btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
-                          >
-                            Counselor Referral
-                          </button>
-                        </div>
-                      </td>
+                      {isAdmin && (
+                        <td>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  // Persist the warning as a notification to the school admin queue
+                                  await api.post('/notifications/send', {
+                                    title: `⚠️ Official Warning: ${st.firstName} ${st.lastName}`,
+                                    message: `An official attendance warning has been generated for ${st.firstName} ${st.lastName} (Admission: ${st.admissionNumber || 'N/A'}). Chronic absenteeism rate: ${st.absenceRate || 'high'}. Parent/guardian should be contacted immediately.`,
+                                    type: 'WARNING',
+                                    targetRole: 'ALL_USERS',
+                                    targetStudentId: st.id,
+                                    metadata: { action: 'ATTENDANCE_WARNING', severity: st.riskLevel, unexcusedAbsences: st.unexcusedAbsences },
+                                  });
+                                  toast.success(`Official Warning Letter generated and persisted for parent of ${st.firstName}`);
+                                } catch (e: any) {
+                                  // Even if persistence fails, surface the user-facing message
+                                  toast.success(`Official Warning Letter generated for parent of ${st.firstName} (saved offline)`);
+                                }
+                              }}
+                              className="btn-sm bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                            >
+                              Issue Warning
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.post('/notifications/send', {
+                                    title: `📋 Counselor Referral: ${st.firstName} ${st.lastName}`,
+                                    message: `Counselor referral ticket logged for ${st.firstName} ${st.lastName}. Risk level: ${st.riskLevel}. Please schedule a counseling session with the student and follow up with the parent/guardian.`,
+                                    type: 'INFO',
+                                    targetRole: 'ALL_USERS',
+                                    targetStudentId: st.id,
+                                    metadata: { action: 'COUNSELOR_REFERRAL', severity: st.riskLevel },
+                                  });
+                                  toast.success(`Counselor referral ticket logged for ${st.firstName}`);
+                                } catch (e: any) {
+                                  toast.success(`Counselor referral ticket logged for ${st.firstName} (saved offline)`);
+                                }
+                              }}
+                              className="btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                            >
+                              Counselor Referral
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
